@@ -1,0 +1,12 @@
+{
+  "extends": "@futuragest/tsconfig/nestjs",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@futuragest/contracts": ["../packages/contracts/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.int-spec.ts"]
+}

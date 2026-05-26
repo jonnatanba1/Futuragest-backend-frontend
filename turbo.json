@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "generate:openapi": {
+      "outputs": ["../packages/contracts/openapi.json"]
+    },
+    "@futuragest/contracts#generate": {
+      "inputs": ["openapi.json"],
+      "outputs": ["src/generated/**"],
+      "dependsOn": ["@futuragest/api#generate:openapi"]
+    },
+    "@futuragest/web#typecheck": {
+      "dependsOn": ["^build", "@futuragest/contracts#generate"]
+    },
+    "@futuragest/web#build": {
+      "dependsOn": ["^build", "@futuragest/contracts#generate"]
+    }
+  }
+}

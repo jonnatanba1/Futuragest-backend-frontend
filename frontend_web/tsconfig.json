@@ -1,0 +1,13 @@
+{
+  "extends": "@futuragest/tsconfig/react",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@futuragest/contracts": ["../packages/contracts/src/index.ts"],
+      "@futuragest/contracts/generated/api": ["../packages/contracts/src/generated/api.ts"]
+    },
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "windows", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SYSTEM_ADMIN
+  GERENCIA
+  TALENTO_HUMANO
+  LIDER_OPERATIVO
+  COORDINADOR
+  SUPERVISOR
+}
+
+enum SupervisorArea {
+  BARRIDO
+  RECOLECCION
+  SUPERNUMERARIO
+}
+
+// ---------------------------------------------------------------------------
+// Org domain
+// ---------------------------------------------------------------------------
+
+/// Geographic zone (e.g. Zona Urabá, Zona Bajo Cauca).
+/// Montería is the central office and operates with global scope (no zone).
+model Zone {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  municipios  Municipio[]
+  supervisors Supervisor[]
+  /// One COORDINADOR per zone (enforced by @unique on User.coordinatedZoneId)
+  coordinador User?        @relation("ZoneCoordinador")
+  createdAt   DateTime     @default(now())
+}
+
+/// Municipality belonging to a zone.
+model Municipio {
+  id          String       @id @default(uuid())
+  name        String
+  zoneId      String
+  zone        Zone         @relation(fields: [zoneId], references: [id])
+  supervisors Supervisor[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([zoneId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Identity domain
+// ---------------------------------------------------------------------------
+
+/// Application user. One row per human actor.
+model User {
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String
+  role              Role
+  mustChangePassword Boolean       @default(true)
+  /// Set only for COORDINADOR. @unique enforces one coordinador per zone.
+  coordinatedZoneId String?        @unique
+  coordinatedZone   Zone?          @relation("ZoneCoordinador", fields: [coordinatedZoneId], references: [id])
+  supervisor        Supervisor?
+  sessions          DeviceSession[]
+  createdAt         DateTime       @default(now())
+}
+
+/// Supervisor entity — linked to a User, scoped to a zone + municipio.
+model Supervisor {
+  id           String         @id @default(uuid())
+  userId       String         @unique
+  user         User           @relation(fields: [userId], references: [id])
+  municipioId  String
+  municipio    Municipio      @relation(fields: [municipioId], references: [id])
+  /// Denormalized zone for efficient scope filtering
+  zoneId       String
+  zone         Zone           @relation(fields: [zoneId], references: [id])
+  area         SupervisorArea
+  operarios    Operario[]
+  assignments  Assignment[]
+  createdAt    DateTime       @default(now())
+}
+
+/// Field operario (worker assigned to a supervisor).
+model Operario {
+  id           String       @id @default(uuid())
+  fullName     String
+  /// National document number — must be unique across all operarios
+  documento    String       @unique
+  /// Current supervisor (scope key → zone via supervisor.zoneId)
+  supervisorId String
+  supervisor   Supervisor   @relation(fields: [supervisorId], references: [id])
+  assignments  Assignment[]
+  createdAt    DateTime     @default(now())
+}
+
+/// Operario ↔ Supervisor assignment record (reassignable, end-dated).
+model Assignment {
+  id           String     @id @default(uuid())
+  operarioId   String
+  operario     Operario   @relation(fields: [operarioId], references: [id])
+  supervisorId String
+  supervisor   Supervisor @relation(fields: [supervisorId], references: [id])
+  /// Denormalized zone for efficient scope queries
+  zoneId       String
+  startDate    DateTime   @default(now())
+  /// NULL = currently active assignment
+  endDate      DateTime?
+  createdAt    DateTime   @default(now())
+}
+
+/// Device session for soft revocation and refresh token storage.
+model DeviceSession {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  /// Client-provided stable device identifier
+  deviceId         String
+  deviceLabel      String?
+  /// Argon2-hashed refresh token — never plaintext
+  refreshTokenHash String
+  /// Non-null = revoked (soft revoke preserves audit trail)
+  revokedAt        DateTime?
+  lastSeenAt       DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  /// Re-registration of the same device upserts on this key
+  @@unique([userId, deviceId])
+}
