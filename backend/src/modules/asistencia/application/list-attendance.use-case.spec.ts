@@ -66,4 +66,21 @@ describe('ListAttendanceUseCase', () => {
 
     expect(result).toEqual([]);
   });
+
+  // ── Delta ?since= branch (sync-delta-pull) ───────────────────────────────────
+
+  it('SD-UC-01: passes since to repo.findMany when provided', async () => {
+    const repo = makeMockRepo({ findMany: jest.fn().mockResolvedValue([]) });
+    const useCase = new ListAttendanceUseCase(repo);
+    const since = new Date('2026-05-31T12:00:00.000Z');
+    await useCase.execute(since);
+    expect(repo.findMany).toHaveBeenCalledWith(since);
+  });
+
+  it('SD-UC-02: calls repo.findMany with undefined when since not provided', async () => {
+    const repo = makeMockRepo({ findMany: jest.fn().mockResolvedValue([]) });
+    const useCase = new ListAttendanceUseCase(repo);
+    await useCase.execute();
+    expect(repo.findMany).toHaveBeenCalledWith(undefined);
+  });
 });

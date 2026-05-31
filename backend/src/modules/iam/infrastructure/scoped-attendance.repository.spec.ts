@@ -109,4 +109,27 @@ describe('ScopedAttendanceRepository — PR-B additions', () => {
       expect(result).toBeNull();
     });
   });
+
+  // ── Delta ?since= branch (sync-delta-pull) ───────────────────────────────────
+
+  describe('findMany (with optional since)', () => {
+    it('SD-REPO-01: calls findManyScoped with empty where when since is undefined', async () => {
+      const { repo, delegate } = makeRepo(null);
+      await repo.findMany(undefined);
+      expect(delegate.findMany).toHaveBeenCalledTimes(1);
+      const callArg = delegate.findMany.mock.calls[0][0];
+      expect(callArg.where).not.toHaveProperty('updatedAt');
+    });
+
+    it('SD-REPO-02: calls findManyScoped with updatedAt.gte when since is provided', async () => {
+      const { repo, delegate } = makeRepo(null);
+      const since = new Date('2026-05-31T12:00:00.000Z');
+      await repo.findMany(since);
+      expect(delegate.findMany).toHaveBeenCalledTimes(1);
+      const callArg = delegate.findMany.mock.calls[0][0];
+      const whereStr = JSON.stringify(callArg.where);
+      expect(whereStr).toContain('updatedAt');
+      expect(whereStr).toContain('gte');
+    });
+  });
 });

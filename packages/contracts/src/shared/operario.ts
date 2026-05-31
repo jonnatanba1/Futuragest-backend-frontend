@@ -15,6 +15,8 @@ export interface OperarioDto {
   /** ISO 8601 timestamp or null when active */
   deactivatedAt: string | null;
   createdAt: string;
+  /** ISO 8601 timestamp — used as delta cursor for ?since= queries */
+  updatedAt: string;
 }
 
 export interface CreateOperarioRequest {

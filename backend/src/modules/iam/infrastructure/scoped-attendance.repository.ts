@@ -46,10 +46,12 @@ export class ScopedAttendanceRepository
 
   /**
    * List attendance records visible to the current principal.
+   * Pass `since` to return only records with updatedAt >= since (delta mode).
    * W4: no include — returns scalar rows only.
    */
-  findMany(): Promise<Attendance[]> {
-    return this.findManyScoped({ where: {} });
+  findMany(since?: Date): Promise<Attendance[]> {
+    const where = since ? { updatedAt: { gte: since } } : {};
+    return this.findManyScoped({ where });
   }
 
   /**

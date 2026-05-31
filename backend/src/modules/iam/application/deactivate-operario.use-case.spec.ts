@@ -23,6 +23,7 @@ function makePort(overrides: Partial<OperarioRepositoryPort> = {}): jest.Mocked<
       supervisorId: 'sup-1',
       deactivatedAt: null,
       createdAt: new Date(),
+      updatedAt: new Date(),
     } as Operario),
     setDeactivatedAt: jest.fn().mockImplementation((_id: string, date: Date | null) =>
       Promise.resolve({
@@ -32,6 +33,7 @@ function makePort(overrides: Partial<OperarioRepositoryPort> = {}): jest.Mocked<
         supervisorId: 'sup-1',
         deactivatedAt: date,
         createdAt: new Date(),
+        updatedAt: new Date(),
       } as Operario),
     ),
     bulkCreate: jest.fn(),
@@ -65,6 +67,7 @@ describe('DeactivateOperarioUseCase', () => {
           supervisorId: 'sup-1',
           deactivatedAt: new Date('2026-05-01'),
           createdAt: new Date(),
+          updatedAt: new Date(),
         } as Operario),
       });
       const useCase = new DeactivateOperarioUseCase(port);

@@ -40,4 +40,21 @@ describe('ListNovedadesUseCase', () => {
     const result = await useCase.execute();
     expect(result).toEqual([]);
   });
+
+  // ── Delta ?since= branch (sync-delta-pull) ───────────────────────────────────
+
+  it('SD-UC-03: passes since filter to findManyScoped when provided', async () => {
+    const repo = makeMockRepo({ findManyScoped: jest.fn().mockResolvedValue([]) });
+    const useCase = new ListNovedadesUseCase(repo);
+    const since = new Date('2026-05-31T12:00:00.000Z');
+    await useCase.execute(since);
+    expect(repo.findManyScoped).toHaveBeenCalledWith({ updatedAt: { gte: since } });
+  });
+
+  it('SD-UC-04: calls findManyScoped with empty filter when since not provided', async () => {
+    const repo = makeMockRepo({ findManyScoped: jest.fn().mockResolvedValue([]) });
+    const useCase = new ListNovedadesUseCase(repo);
+    await useCase.execute();
+    expect(repo.findManyScoped).toHaveBeenCalledWith({});
+  });
 });

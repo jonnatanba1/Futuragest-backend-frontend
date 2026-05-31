@@ -205,7 +205,7 @@ describe('AttendanceController — error→HTTP mapping', () => {
   it('AT-24 — listAttendance → returns array (200)', async () => {
     const records = [makeAttendance()];
     mockList.execute.mockResolvedValue(records);
-    const result = await controller.listAttendance();
+    const result = await controller.listAttendance({});
     expect(result).toBe(records);
   });
 

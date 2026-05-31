@@ -37,6 +37,7 @@ export class DeactivateOperarioUseCase {
       active: updated.deactivatedAt === null,
       deactivatedAt: updated.deactivatedAt ? updated.deactivatedAt.toISOString() : null,
       createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
     };
   }
 }

@@ -47,6 +47,7 @@ const sampleDto = {
   active: true,
   deactivatedAt: null,
   createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 };
 
 describe('OperarioController', () => {

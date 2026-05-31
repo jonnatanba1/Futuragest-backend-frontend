@@ -34,10 +34,13 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { IsNumberString, IsOptional, IsString } from 'class-validator';
+import { IsISO8601, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { Roles } from '../../iam/interface/roles.decorator';
 import type { CreateNovedadUseCase } from '../application/create-novedad.use-case';
 import type { ApproveNovedadUseCase } from '../application/approve-novedad.use-case';
@@ -76,6 +79,15 @@ const READ_ROLES = [
   'GERENCIA',
   'TALENTO_HUMANO',
 ] as const;
+
+// ─── Query DTOs ───────────────────────────────────────────────────────────────
+
+class ListNovedadesQuery {
+  /** ISO 8601 cursor — return only records with updatedAt >= since (delta mode). */
+  @IsOptional()
+  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  since?: string;
+}
 
 // ─── Request DTOs ──────────────────────────────────────────────────────────────
 
@@ -162,8 +174,17 @@ export class NovedadController {
 
   @Roles(...READ_ROLES)
   @Get('novedades')
-  async listNovedades() {
-    return this.listUseCase.execute();
+  async listNovedades(@Query() rawQuery: Record<string, string>) {
+    // Validate query params
+    const query = plainToInstance(ListNovedadesQuery, rawQuery);
+    const errors = validateSync(query);
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(messages);
+    }
+
+    const since = query.since ? new Date(query.since) : undefined;
+    return this.listUseCase.execute(since);
   }
 
   // ── Detail ─────────────────────────────────────────────────────────────────

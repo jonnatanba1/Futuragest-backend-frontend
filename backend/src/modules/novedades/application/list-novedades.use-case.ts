@@ -15,7 +15,12 @@ import type { NovedadRepositoryPort } from '../domain/ports/novedad-repository.p
 export class ListNovedadesUseCase {
   constructor(private readonly novedadRepo: NovedadRepositoryPort) {}
 
-  async execute(): Promise<Novedad[]> {
-    return this.novedadRepo.findManyScoped();
+  /**
+   * Returns novedades visible to the current principal.
+   * Pass `since` to return only records with updatedAt >= since (delta mode).
+   */
+  async execute(since?: Date): Promise<Novedad[]> {
+    const filter = since ? { updatedAt: { gte: since } } : {};
+    return this.novedadRepo.findManyScoped(filter);
   }
 }

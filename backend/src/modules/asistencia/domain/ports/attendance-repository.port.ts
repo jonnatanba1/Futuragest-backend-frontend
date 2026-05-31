@@ -45,8 +45,11 @@ export interface AttendanceRepositoryPort {
   /** Scoped find by id — returns null if not found or out of scope. */
   findById(id: string): Promise<Attendance | null>;
 
-  /** Scoped list — returns records visible to the current principal. */
-  findMany(): Promise<Attendance[]>;
+  /**
+   * Scoped list — returns records visible to the current principal.
+   * Pass `since` to return only records with updatedAt >= since (delta mode).
+   */
+  findMany(since?: Date): Promise<Attendance[]>;
 
   /**
    * Scoped find by clientRef — used for idempotency.

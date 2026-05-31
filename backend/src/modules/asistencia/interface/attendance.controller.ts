@@ -35,6 +35,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Res,
   UnprocessableEntityException,
   UploadedFile,
@@ -42,7 +43,9 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsDateString, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsDateString, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { Roles } from '../../iam/interface/roles.decorator';
 import type { CheckInAttendanceUseCase } from '../application/check-in-attendance.use-case';
 import type { CheckOutAttendanceUseCase } from '../application/check-out-attendance.use-case';
@@ -112,6 +115,27 @@ export class CheckInBody {
 
   @IsString()
   clientRef!: string;
+}
+
+// ─── Query DTOs ───────────────────────────────────────────────────────────────
+
+class ListAttendanceQuery {
+  /**
+   * ISO 8601 cursor — return only records with updatedAt >= since.
+   * Mutually exclusive with clientRef (clientRef takes precedence).
+   */
+  @IsOptional()
+  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  since?: string;
+
+  /**
+   * clientRef recovery — return the single scoped attendance matching this
+   * check-in clientRef. Returns 200 [] if not found (not 404).
+   * Takes precedence over ?since= when both provided.
+   */
+  @IsOptional()
+  @IsString()
+  clientRef?: string;
 }
 
 export class CheckOutBody {
@@ -327,8 +351,23 @@ export class AttendanceController {
 
   @Roles(...READ_ROLES)
   @Get()
-  async listAttendance() {
-    return this.listUseCase.execute();
+  async listAttendance(@Query() rawQuery: Record<string, string>) {
+    // Validate query params
+    const query = plainToInstance(ListAttendanceQuery, rawQuery);
+    const errors = validateSync(query);
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(messages);
+    }
+
+    // ?clientRef= takes precedence over ?since=
+    if (query.clientRef) {
+      const record = await this.attendanceRepo.findByClientRef(query.clientRef);
+      return record ? [record] : [];
+    }
+
+    const since = query.since ? new Date(query.since) : undefined;
+    return this.listUseCase.execute(since);
   }
 
   // ── Detail ─────────────────────────────────────────────────────────────────

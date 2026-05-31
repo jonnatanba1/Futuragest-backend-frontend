@@ -49,6 +49,7 @@ model Zone {
   /// One COORDINADOR per zone (enforced by @unique on User.coordinatedZoneId)
   coordinador User?        @relation("ZoneCoordinador")
   createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
 }
 
 /// Municipality belonging to a zone.
@@ -59,6 +60,7 @@ model Municipio {
   zone        Zone         @relation(fields: [zoneId], references: [id])
   supervisors Supervisor[]
   createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
 
   @@unique([zoneId, name])
 }
@@ -115,6 +117,9 @@ model Operario {
   /// Soft-deactivation timestamp. null = active; non-null = deactivated.
   deactivatedAt DateTime?
   createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  @@index([updatedAt])
 }
 
 /// Operario ↔ Supervisor assignment record (reassignable, end-dated).
@@ -170,6 +175,7 @@ model Attendance {
   @@index([operarioId])
   @@index([zoneId])
   @@index([date])
+  @@index([updatedAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +211,7 @@ model Novedad {
   @@index([supervisorId])
   @@index([zoneId])
   @@index([status])
+  @@index([updatedAt])
 }
 
 /// Device session for soft revocation and refresh token storage.

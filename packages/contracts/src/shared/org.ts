@@ -15,6 +15,8 @@ export interface ZoneResponseDto {
   id: string;
   name: string;
   createdAt: string; // ISO 8601
+  /** ISO 8601 timestamp — used as delta cursor for ?since= queries (Change 3) */
+  updatedAt: string;
 }
 
 /** Municipio returned by GET /org/municipios */
@@ -23,6 +25,8 @@ export interface MunicipioResponseDto {
   name: string;
   zoneId: string;
   createdAt: string; // ISO 8601
+  /** ISO 8601 timestamp — used as delta cursor for ?since= queries (Change 3) */
+  updatedAt: string;
 }
 
 // ---------------------------------------------------------------------------

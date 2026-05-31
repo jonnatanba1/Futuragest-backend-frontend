@@ -25,16 +25,31 @@
  */
 
 import {
+  BadRequestException,
   Controller,
   Get,
   NotFoundException,
   Param,
   Query,
 } from '@nestjs/common';
+import { IsISO8601, IsOptional } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { ScopedSupervisorRepository } from '../infrastructure/scoped-supervisor.repository';
 import { ScopedOperarioRepository } from '../infrastructure/scoped-operario.repository';
 import { ScopedAssignmentRepository } from '../infrastructure/scoped-assignment.repository';
 import { Roles } from './roles.decorator';
+
+// ─── Query DTOs ──────────────────────────────────────────────────────────────
+
+class ListOperariosQuery {
+  @IsOptional()
+  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  since?: string;
+
+  @IsOptional()
+  includeInactive?: string;
+}
 
 /**
  * Roles permitted to access IAM read endpoints.
@@ -79,10 +94,26 @@ export class IamController {
 
   @Roles(...IAM_READ_ROLES)
   @Get('operarios')
-  async listOperarios(@Query('includeInactive') includeInactive?: string) {
+  async listOperarios(@Query() rawQuery: Record<string, string>) {
+    // Validate query params manually (global ValidationPipe only handles @Body — @Query
+    // with a DTO class needs explicit class-transformer + class-validator round-trip)
+    const query = plainToInstance(ListOperariosQuery, rawQuery);
+    const errors = validateSync(query);
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(messages);
+    }
+
+    // Delta mode: when ?since= present, bypass deactivatedAt:null filter so
+    // tombstones (deactivated operarios) are included — client learns of deactivations.
+    // Non-delta mode: honour ?includeInactive=true (or exclude inactive by default).
+    if (query.since) {
+      const since = new Date(query.since);
+      return this.operarioRepo.findMany({ updatedAt: { gte: since } });
+    }
+
     // REQ-08: exclude inactive by default; ?includeInactive=true includes all
-    const where =
-      includeInactive === 'true' ? {} : { deactivatedAt: null };
+    const where = query.includeInactive === 'true' ? {} : { deactivatedAt: null };
     return this.operarioRepo.findMany(where);
   }
 
