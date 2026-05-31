@@ -29,6 +29,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Query,
 } from '@nestjs/common';
 import { ScopedSupervisorRepository } from '../infrastructure/scoped-supervisor.repository';
 import { ScopedOperarioRepository } from '../infrastructure/scoped-operario.repository';
@@ -78,8 +79,11 @@ export class IamController {
 
   @Roles(...IAM_READ_ROLES)
   @Get('operarios')
-  async listOperarios() {
-    return this.operarioRepo.findMany();
+  async listOperarios(@Query('includeInactive') includeInactive?: string) {
+    // REQ-08: exclude inactive by default; ?includeInactive=true includes all
+    const where =
+      includeInactive === 'true' ? {} : { deactivatedAt: null };
+    return this.operarioRepo.findMany(where);
   }
 
   @Roles(...IAM_READ_ROLES)

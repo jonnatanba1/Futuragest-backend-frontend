@@ -10,6 +10,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthRepositoryPort, DeviceSessionData } from '../domain/auth-repository.port';
 import type { AuthUser } from '../domain/auth-user';
+import type { UserProfile } from '../domain/user-profile';
 
 @Injectable()
 export class PrismaAuthRepository implements AuthRepositoryPort {
@@ -113,6 +114,28 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     });
   }
 
+  async findUserWithScope(userId: string): Promise<UserProfile | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        coordinatedZone: { select: { id: true, name: true } },
+        supervisor: {
+          select: {
+            id: true,
+            area: true,
+            zoneId: true,
+            municipioId: true,
+            zone: { select: { id: true, name: true } },
+            municipio: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) return null;
+    return this.mapUserProfile(user);
+  }
+
   // ─── Mappers ───────────────────────────────────────────────────────────────
 
   private mapUser(user: {
@@ -154,6 +177,38 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
       revokedAt: session.revokedAt,
       lastSeenAt: session.lastSeenAt,
       createdAt: session.createdAt,
+    };
+  }
+
+  private mapUserProfile(user: {
+    id: string;
+    email: string;
+    role: string;
+    mustChangePassword: boolean;
+    coordinatedZoneId: string | null;
+    coordinatedZone: { id: string; name: string } | null;
+    supervisor: {
+      id: string;
+      area: string;
+      zoneId: string;
+      municipioId: string;
+      zone: { id: string; name: string };
+      municipio: { id: string; name: string };
+    } | null;
+  }): UserProfile {
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+      coordinatedZoneId: user.coordinatedZoneId ?? null,
+      coordinatedZoneName: user.coordinatedZone?.name ?? null,
+      supervisorId: user.supervisor?.id ?? null,
+      supervisorArea: user.supervisor?.area ?? null,
+      supervisorZoneId: user.supervisor?.zone?.id ?? null,
+      supervisorZoneName: user.supervisor?.zone?.name ?? null,
+      supervisorMunicipioId: user.supervisor?.municipio?.id ?? null,
+      supervisorMunicipioName: user.supervisor?.municipio?.name ?? null,
     };
   }
 }

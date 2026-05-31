@@ -26,6 +26,7 @@ import { AppModule } from '../../app.module';
 import { createPrismaClient } from '../../database/prisma-client';
 import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import * as jwt from 'jsonwebtoken';
 
 const ADMIN_EMAIL = 'admin@futuragest.co';
 const ADMIN_PASSWORD = 'ChangeMe@2024!'; // placeholder password set in seed.ts
@@ -245,6 +246,290 @@ describe('Auth Integration', () => {
         .post('/auth/refresh')
         .send({ userId: adminUser!.id, deviceId, refreshToken })
         .expect(401);
+    });
+  });
+
+  // ─── GET /auth/me ─────────────────────────────────────────────────────────
+
+  describe('GET /auth/me', () => {
+    const DEV_JWT_SECRET = 'futuragest-dev-secret-do-not-use-in-production';
+    const ME_DEVICE = 'get-me-test-device';
+
+    function mintToken(claims: {
+      sub: string;
+      role: string;
+      zoneId?: string;
+      supervisorId?: string;
+      deviceId?: string;
+      mustChangePassword?: boolean;
+    }): string {
+      return jwt.sign(
+        {
+          sub: claims.sub,
+          role: claims.role,
+          zoneId: claims.zoneId,
+          supervisorId: claims.supervisorId,
+          deviceId: claims.deviceId ?? ME_DEVICE,
+          mustChangePassword: claims.mustChangePassword ?? false,
+        },
+        DEV_JWT_SECRET,
+        { expiresIn: '15m' },
+      );
+    }
+
+    // ── Fixture state ──────────────────────────────────────────────────────
+
+    let adminUser: { id: string };
+    let supervisorUser: { id: string };
+    let supervisorRecord: { id: string; area: string; zoneId: string; municipioId: string };
+    let supervisorZone: { id: string; name: string };
+    let supervisorMunicipio: { id: string; name: string };
+
+    // COORDINADOR fixtures created in beforeAll
+    let coordWithZoneUserId: string;
+    let coordWithZoneId: string;
+    let coordWithZoneName: string;
+    let coordNoZoneUserId: string;
+
+    // Tokens
+    let tokenAdmin: string;
+    let tokenSupervisor: string;
+    let tokenCoordWithZone: string;
+    let tokenCoordNoZone: string;
+
+    beforeAll(async () => {
+      // ── Reset admin to known state ──────────────────────────────────────
+      // Previous describe blocks may have cleared mustChangePassword; restore it.
+      await resetAdmin(prisma, true);
+
+      // ── Load seeded data ────────────────────────────────────────────────
+
+      const admin = await prisma.user.findUniqueOrThrow({ where: { email: ADMIN_EMAIL } });
+      adminUser = admin;
+
+      // Use supervisor-1 (first seeded supervisor — Zona Urabá / Apartadó / BARRIDO)
+      const sup1 = await prisma.user.findUniqueOrThrow({
+        where: { email: 'supervisor-1@futuragest.co' },
+      });
+      supervisorUser = sup1;
+
+      const supRecord = await prisma.supervisor.findUniqueOrThrow({
+        where: { userId: sup1.id },
+        include: {
+          zone: { select: { id: true, name: true } },
+          municipio: { select: { id: true, name: true } },
+        },
+      });
+      supervisorRecord = {
+        id: supRecord.id,
+        area: supRecord.area,
+        zoneId: supRecord.zoneId,
+        municipioId: supRecord.municipioId,
+      };
+      supervisorZone = supRecord.zone;
+      supervisorMunicipio = supRecord.municipio;
+
+      // ── Create COORDINADOR with zone ────────────────────────────────────
+      // Reuse the first zone (Zona Urabá) — only if no coordinador assigned yet
+      const urabaZone = await prisma.zone.findUniqueOrThrow({ where: { name: 'Zona Urabá' } });
+
+      const coordWithZone = await prisma.user.create({
+        data: {
+          email: 'coord-with-zone@test.futuragest',
+          passwordHash: 'placeholder-not-used',
+          role: 'COORDINADOR',
+          mustChangePassword: false,
+          coordinatedZoneId: urabaZone.id,
+        },
+      });
+      coordWithZoneUserId = coordWithZone.id;
+      coordWithZoneId = urabaZone.id;
+      coordWithZoneName = urabaZone.name;
+
+      // ── Create COORDINADOR without zone ─────────────────────────────────
+      const coordNoZone = await prisma.user.create({
+        data: {
+          email: 'coord-no-zone@test.futuragest',
+          passwordHash: 'placeholder-not-used',
+          role: 'COORDINADOR',
+          mustChangePassword: false,
+          coordinatedZoneId: null,
+        },
+      });
+      coordNoZoneUserId = coordNoZone.id;
+
+      // ── Create device sessions for mintToken to pass the guard ──────────
+      const dummyHash = 'test-hash-not-checked';
+      await prisma.deviceSession.createMany({
+        data: [
+          { userId: admin.id, deviceId: ME_DEVICE, refreshTokenHash: dummyHash, lastSeenAt: new Date() },
+          { userId: sup1.id, deviceId: ME_DEVICE, refreshTokenHash: dummyHash, lastSeenAt: new Date() },
+          { userId: coordWithZone.id, deviceId: ME_DEVICE, refreshTokenHash: dummyHash, lastSeenAt: new Date() },
+          { userId: coordNoZone.id, deviceId: ME_DEVICE, refreshTokenHash: dummyHash, lastSeenAt: new Date() },
+        ],
+        skipDuplicates: true,
+      });
+
+      // ── Mint tokens ─────────────────────────────────────────────────────
+      tokenAdmin = mintToken({ sub: admin.id, role: 'SYSTEM_ADMIN', mustChangePassword: true });
+      tokenSupervisor = mintToken({ sub: sup1.id, role: 'SUPERVISOR', supervisorId: supRecord.id });
+      tokenCoordWithZone = mintToken({ sub: coordWithZone.id, role: 'COORDINADOR', zoneId: urabaZone.id });
+      tokenCoordNoZone = mintToken({ sub: coordNoZone.id, role: 'COORDINADOR' });
+    }, 30_000);
+
+    afterAll(async () => {
+      // Clean up COORDINADOR fixture users (FK-safe order)
+      if (coordWithZoneUserId) {
+        await prisma.deviceSession.deleteMany({ where: { userId: coordWithZoneUserId } });
+        // Disconnect coordinatedZoneId before deleting user (Zone.coordinador @unique relation)
+        await prisma.user.update({
+          where: { id: coordWithZoneUserId },
+          data: { coordinatedZoneId: null },
+        });
+        await prisma.user.delete({ where: { id: coordWithZoneUserId } });
+      }
+      if (coordNoZoneUserId) {
+        await prisma.deviceSession.deleteMany({ where: { userId: coordNoZoneUserId } });
+        await prisma.user.delete({ where: { id: coordNoZoneUserId } });
+      }
+      // Clean up admin and supervisor device sessions created in this suite
+      if (adminUser) {
+        await prisma.deviceSession.deleteMany({ where: { userId: adminUser.id, deviceId: ME_DEVICE } });
+      }
+      if (supervisorUser) {
+        await prisma.deviceSession.deleteMany({ where: { userId: supervisorUser.id, deviceId: ME_DEVICE } });
+      }
+    });
+
+    // ── ME-1: SYSTEM_ADMIN — 200, base shape, no scope fields ─────────────
+
+    it('ME-1: SYSTEM_ADMIN returns 200 with base shape; no zone or supervisor keys', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .expect(200);
+
+      expect(resp.body.id).toBe(adminUser.id);
+      expect(resp.body.email).toBe(ADMIN_EMAIL);
+      expect(resp.body.role).toBe('SYSTEM_ADMIN');
+      expect(resp.body.mustChangePassword).toBe(true);
+      // Global roles: explicit null on scope fields
+      expect(resp.body).toHaveProperty('coordinatedZone', null);
+      expect(resp.body).toHaveProperty('supervisor', null);
+    });
+
+    // ── ME-5: COORDINADOR with zone ────────────────────────────────────────
+
+    it('ME-5: COORDINADOR with zone returns 200 with coordinatedZone block', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${tokenCoordWithZone}`)
+        .expect(200);
+
+      expect(resp.body.role).toBe('COORDINADOR');
+      expect(resp.body.coordinatedZone).toEqual({ id: coordWithZoneId, name: coordWithZoneName });
+      expect(resp.body.supervisor).toBeNull();
+      // Zone name must come from DB (not from JWT claims)
+      expect(resp.body.coordinatedZone.name).toBe('Zona Urabá');
+    });
+
+    // ── ME-6: COORDINADOR no zone ─────────────────────────────────────────
+
+    it('ME-6: COORDINADOR without zone returns 200 with coordinatedZone: null', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${tokenCoordNoZone}`)
+        .expect(200);
+
+      expect(resp.body.role).toBe('COORDINADOR');
+      // Key must be present with value null (INV-7)
+      expect(resp.body).toHaveProperty('coordinatedZone', null);
+      expect(resp.body.supervisor).toBeNull();
+    });
+
+    // ── ME-7: SUPERVISOR — full supervisor block ───────────────────────────
+
+    it('ME-7: SUPERVISOR returns 200 with full supervisor block; supervisor.id == Supervisor.id', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${tokenSupervisor}`)
+        .expect(200);
+
+      expect(resp.body.role).toBe('SUPERVISOR');
+      expect(resp.body.coordinatedZone).toBeNull();
+
+      const sup = resp.body.supervisor;
+      expect(sup).toBeDefined();
+      // INV-5: supervisor.id must be the Supervisor table PK, NOT User.id
+      expect(sup.id).toBe(supervisorRecord.id);
+      expect(sup.id).not.toBe(supervisorUser.id);
+      expect(sup.area).toBe(supervisorRecord.area);
+      expect(sup.zone).toEqual({ id: supervisorZone.id, name: supervisorZone.name });
+      expect(sup.municipio).toEqual({ id: supervisorMunicipio.id, name: supervisorMunicipio.name });
+    });
+
+    // ── ME-8: mustChangePassword=true → 200 not 403 ───────────────────────
+
+    it('ME-8: user with mustChangePassword=true receives 200 (SkipMustChangePasswordCheck)', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .expect(200);
+
+      expect(resp.body.mustChangePassword).toBe(true);
+    });
+
+    // ── ME-9: no token → 401 ──────────────────────────────────────────────
+
+    it('ME-9: no token returns 401', async () => {
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .expect(401);
+    });
+
+    // ── ME-10: invalid token → 401 ────────────────────────────────────────
+
+    it('ME-10: invalid token returns 401', async () => {
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', 'Bearer not.a.valid.jwt')
+        .expect(401);
+    });
+
+    // ── ME-11: revoked device session → 401 ──────────────────────────────
+
+    it('ME-11: revoked device session returns 401', async () => {
+      // Create a fresh user + session, revoke it, then attempt /auth/me
+      const revokedUser = await prisma.user.create({
+        data: {
+          email: 'revoked-me@test.futuragest',
+          passwordHash: 'placeholder',
+          role: 'SYSTEM_ADMIN',
+          mustChangePassword: false,
+        },
+      });
+      const revokedDeviceId = 'revoked-me-device';
+      await prisma.deviceSession.create({
+        data: {
+          userId: revokedUser.id,
+          deviceId: revokedDeviceId,
+          refreshTokenHash: 'h',
+          revokedAt: new Date(), // immediately revoked
+          lastSeenAt: new Date(),
+        },
+      });
+
+      const token = mintToken({ sub: revokedUser.id, role: 'SYSTEM_ADMIN', deviceId: revokedDeviceId });
+
+      try {
+        await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(401);
+      } finally {
+        await prisma.deviceSession.deleteMany({ where: { userId: revokedUser.id } });
+        await prisma.user.delete({ where: { id: revokedUser.id } });
+      }
     });
   });
 });

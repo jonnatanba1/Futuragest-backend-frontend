@@ -104,7 +104,7 @@ describe('C1 Meta-Guard — SCOPE_MAPS models only accessible via ScopedReposito
 
   it('every scoped model in SCOPE_MAPS has a corresponding ScopedRepository file', () => {
     // Models with confirmed ScopedRepository implementations
-    const implementedModels = ['Supervisor', 'Operario', 'Assignment'];
+    const implementedModels = ['Supervisor', 'Operario', 'Assignment', 'Zone', 'Municipio', 'Attendance', 'Novedad'];
 
     const violations: string[] = [];
 
@@ -119,10 +119,6 @@ describe('C1 Meta-Guard — SCOPE_MAPS models only accessible via ScopedReposito
         violations.push(`Missing ScopedRepository for ${model}: expected ${repoFile}`);
       }
     }
-
-    // W3 note: Municipio is in SCOPE_MAPS but has no ScopedMunicipioRepository yet.
-    // This is a known gap (documented in apply-progress W3 as accepted/deferred).
-    // We do NOT assert Municipio here to avoid a false CI failure for a known-deferred item.
 
     expect(violations).toEqual([]);
   });

@@ -28,6 +28,7 @@ import { LoginUseCase } from './application/login.use-case';
 import { ChangePasswordUseCase } from './application/change-password.use-case';
 import { RefreshUseCase } from './application/refresh.use-case';
 import { RevokeDeviceUseCase } from './application/revoke-device.use-case';
+import { GetMeUseCase } from './application/get-me.use-case';
 
 import { AuthController } from './interface/auth.controller';
 import { AuthGuard } from './interface/auth.guard';
@@ -41,6 +42,7 @@ import {
   CHANGE_PASSWORD_USE_CASE,
   REFRESH_USE_CASE,
   REVOKE_DEVICE_USE_CASE,
+  GET_ME_USE_CASE,
 } from './interface/auth.controller';
 
 /** Safe dev-only fallback secret — NEVER used in production. */
@@ -108,6 +110,11 @@ function resolveJwtSecret(): string {
     {
       provide: REVOKE_DEVICE_USE_CASE,
       useFactory: (repo: PrismaAuthRepository) => new RevokeDeviceUseCase(repo),
+      inject: [AUTH_REPOSITORY_PORT],
+    },
+    {
+      provide: GET_ME_USE_CASE,
+      useFactory: (repo: PrismaAuthRepository) => new GetMeUseCase(repo),
       inject: [AUTH_REPOSITORY_PORT],
     },
 

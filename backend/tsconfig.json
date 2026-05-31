@@ -4,7 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
-      "@futuragest/contracts": ["../packages/contracts/src/index.ts"]
+      "@futuragest/contracts": ["../packages/contracts/dist/index"]
     }
   },
   "include": ["src/**/*"],

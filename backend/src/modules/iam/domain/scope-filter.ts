@@ -88,19 +88,40 @@ export const SCOPE_MAPS: Record<string, ScopeMap> = {
   /**
    * Municipio is scoped by zone only (supervisors don't own municipios).
    * SUPERVISOR has no direct municipio scope — deny via impossible predicate.
-   *
-   * W3 NOTE: No ScopedMunicipioRepository exists yet, so this entry is currently
-   * dead (nothing routes through it in production code). It is kept here to:
-   *   (a) Preserve design intent for when Municipio queries are added.
-   *   (b) Prevent MissingScopeMapError if someone accidentally queries Municipio
-   *       through a future ScopedRepository.
-   * Risk: kept in SCOPE_MAPS but ESLint does NOT enforce a ScopedMunicipioRepository
-   * — the meta-guard test validates this gap. Accepted as known until a
-   * ScopedMunicipioRepository is implemented (tracked in W3).
    */
   Municipio: {
     zonePath: (zoneId) => ({ zoneId }),
     supervisorPath: () => ({ id: { in: [] } }), // SUPERVISOR → structurally-impossible deny
+  },
+
+  /**
+   * Zone is scoped by the zone's own id.
+   * COORDINADOR sees only their own zone row (self-id zonePath).
+   * SUPERVISOR has no zone-level read permission — deny via impossible predicate.
+   */
+  Zone: {
+    zonePath: (zoneId) => ({ id: zoneId }),
+    supervisorPath: () => ({ id: { in: [] } }), // SUPERVISOR → structurally-impossible deny
+  },
+
+  /**
+   * Attendance has a denormalized zoneId for efficient COORDINADOR filtering.
+   * SUPERVISOR sees only their own attendance records.
+   */
+  Attendance: {
+    zonePath: (zoneId) => ({ zoneId }),
+    supervisorPath: (supervisorId) => ({ supervisorId }),
+  },
+
+  /**
+   * Novedad (overtime novelty) has denormalized zoneId + supervisorId columns.
+   * SUPERVISOR sees only their own novedades.
+   * COORDINADOR sees all novedades in their zone (cross-supervisor).
+   * LIDER_OPERATIVO/SYSTEM_ADMIN → global (pass-through via GLOBAL_ROLES).
+   */
+  Novedad: {
+    zonePath: (zoneId) => ({ zoneId }),
+    supervisorPath: (supervisorId) => ({ supervisorId }),
   },
 };
 

@@ -49,6 +49,7 @@ function makeRepo(activeSession: DeviceSessionData | null = null): jest.Mocked<A
     countActiveSessions: jest.fn().mockResolvedValue(0),
     updatePassword: jest.fn().mockResolvedValue(undefined),
     clearMustChangePassword: jest.fn().mockResolvedValue(undefined),
+    findUserWithScope: jest.fn(),
   };
 }
 

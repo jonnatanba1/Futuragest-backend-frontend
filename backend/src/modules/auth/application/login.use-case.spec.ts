@@ -60,6 +60,7 @@ function makeRepo(user: AuthUser | null = makeUser()): jest.Mocked<AuthRepositor
     countActiveSessions: jest.fn().mockResolvedValue(0),
     updatePassword: jest.fn().mockResolvedValue(undefined),
     clearMustChangePassword: jest.fn().mockResolvedValue(undefined),
+    findUserWithScope: jest.fn(),
   };
 }
 

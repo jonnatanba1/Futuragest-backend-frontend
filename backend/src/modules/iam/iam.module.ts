@@ -1,18 +1,29 @@
 /**
- * T4.11 — IamModule.
+ * T4.11 + T-72 — IamModule.
  *
- * Wires the IAM read layer:
+ * Wires the IAM read layer AND the new org management layer:
  * - ScopeContextHolder → request-scoped provider that reads from request.scopeContextHolder
  *   (populated by AuthGuard before any repository is invoked)
  * - ScopedSupervisorRepository / ScopedOperarioRepository / ScopedAssignmentRepository
  *   → request-scoped (they depend on the request-scoped holder)
+ * - ScopedZoneRepository / ScopedMunicipioRepository → request-scoped
+ * - PrismaOrgRepository → request-scoped (depends on scoped zone/municipio repos)
+ * - AssignCoordinadorToZoneUseCase → request-scoped (depends on PrismaOrgRepository)
+ * - ProvisionManagementUserUseCase → REQUEST-SCOPED (depends on ScopeContextHolder
+ *   to read actor role for the privilege-escalation guard; MUST be request-scoped or
+ *   it silently reads an empty context and the guard becomes a no-op)
  * - IamController → singleton (NestJS default)
+ * - OrgController → singleton (read routes scope-filtered at repo level)
  * - RolesGuard → exported so AppModule can register it globally
+ *
+ * Cross-module DI:
+ * AuthModule exports PASSWORD_HASHER_PORT (ArgonPasswordHasher). IamModule imports
+ * AuthModule to consume it for ProvisionManagementUserUseCase.
  *
  * Request-scoped DI strategy:
  * The ScopeContextHolder instance is placed on request.scopeContextHolder by AuthGuard.
- * We expose it as a request-scoped provider using the SCOPE_CONTEXT_HOLDER injection token
- * so repositories can declare a typed constructor parameter.
+ * We expose a lazy proxy under SCOPE_CONTEXT_HOLDER that defers reading the holder
+ * until .current() is called (after guards have run).
  */
 
 import { Module, Scope } from '@nestjs/common';
@@ -24,10 +35,35 @@ import {
   ScopeContextHolder,
   SCOPE_CONTEXT_HOLDER,
 } from '../auth/domain/scope-context';
+import { AuthModule } from '../auth/auth.module';
+import { PASSWORD_HASHER_PORT } from '../auth/domain/password-hasher.port';
+import type { PasswordHasherPort } from '../auth/domain/password-hasher.port';
 import { ScopedSupervisorRepository } from './infrastructure/scoped-supervisor.repository';
 import { ScopedOperarioRepository } from './infrastructure/scoped-operario.repository';
 import { ScopedAssignmentRepository } from './infrastructure/scoped-assignment.repository';
+import { ScopedZoneRepository } from './infrastructure/scoped-zone.repository';
+import { ScopedMunicipioRepository } from './infrastructure/scoped-municipio.repository';
+import { PrismaOrgRepository } from './infrastructure/prisma-org.repository';
+import { AssignCoordinadorToZoneUseCase } from './application/assign-coordinador-to-zone.use-case';
+import { ProvisionManagementUserUseCase } from './application/provision-management-user.use-case';
+import { CreateOperarioUseCase } from './application/create-operario.use-case';
+import { DeactivateOperarioUseCase } from './application/deactivate-operario.use-case';
+import { ReactivateOperarioUseCase } from './application/reactivate-operario.use-case';
+import { BulkImportOperariosUseCase } from './application/bulk-import-operarios.use-case';
+import { ORG_REPOSITORY_PORT } from './domain/ports/org-repository.port';
+import type { OrgRepositoryPort } from './domain/ports/org-repository.port';
+import { OPERARIO_REPOSITORY } from './domain/ports/operario.repository.port';
+import type { OperarioRepositoryPort } from './domain/ports/operario.repository.port';
+import { OPERARIO_STATUS } from './domain/ports/operario-status.port';
 import { IamController } from './interface/iam.controller';
+import { OrgController, ORG_REPO, ASSIGN_COORDINADOR_USE_CASE, PROVISION_MANAGEMENT_USER_USE_CASE } from './interface/org.controller';
+import {
+  OperarioController,
+  CREATE_OPERARIO_USE_CASE,
+  DEACTIVATE_OPERARIO_USE_CASE,
+  REACTIVATE_OPERARIO_USE_CASE,
+  BULK_IMPORT_OPERARIOS_USE_CASE,
+} from './interface/operario.controller';
 import { RolesGuard } from './interface/roles.guard';
 
 /**
@@ -57,8 +93,8 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
 }
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [IamController],
+  imports: [PrismaModule, AuthModule],
+  controllers: [IamController, OrgController, OperarioController],
   providers: [
     // ── Request-scoped ScopeContextHolder ──────────────────────────────────
     // AuthGuard sets request.scopeContextHolder on every authenticated request.
@@ -95,6 +131,119 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
       inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
     },
 
+    // ── Org scoped repositories ────────────────────────────────────────────
+    {
+      provide: ScopedZoneRepository,
+      scope: Scope.REQUEST,
+      useFactory: (prisma: PrismaService, holder: ScopeContextHolder) =>
+        new ScopedZoneRepository(prisma, holder),
+      inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
+    },
+    {
+      provide: ScopedMunicipioRepository,
+      scope: Scope.REQUEST,
+      useFactory: (prisma: PrismaService, holder: ScopeContextHolder) =>
+        new ScopedMunicipioRepository(prisma, holder),
+      inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
+    },
+
+    // ── PrismaOrgRepository — request-scoped (depends on scoped repos) ─────
+    {
+      provide: ORG_REPOSITORY_PORT,
+      scope: Scope.REQUEST,
+      useFactory: (
+        prisma: PrismaService,
+        zoneRepo: ScopedZoneRepository,
+        municipioRepo: ScopedMunicipioRepository,
+      ) => new PrismaOrgRepository(prisma, zoneRepo, municipioRepo),
+      inject: [PrismaService, ScopedZoneRepository, ScopedMunicipioRepository],
+    },
+
+    // ── Alias ORG_REPO → ORG_REPOSITORY_PORT (OrgController uses ORG_REPO) ─
+    {
+      provide: ORG_REPO,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OrgRepositoryPort) => repo,
+      inject: [ORG_REPOSITORY_PORT],
+    },
+
+    // ── AssignCoordinadorToZoneUseCase — request-scoped ────────────────────
+    {
+      provide: ASSIGN_COORDINADOR_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (orgRepo: OrgRepositoryPort) =>
+        new AssignCoordinadorToZoneUseCase(orgRepo),
+      inject: [ORG_REPOSITORY_PORT],
+    },
+
+    // ── ProvisionManagementUserUseCase — REQUEST-SCOPED (CRITICAL) ─────────
+    // Must be request-scoped so ScopeContextHolder.current() returns the
+    // per-request actor role for the privilege-escalation guard.
+    // A singleton would silently read empty context and bypass the guard.
+    {
+      provide: PROVISION_MANAGEMENT_USER_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (
+        orgRepo: OrgRepositoryPort,
+        hasher: PasswordHasherPort,
+        scopeHolder: ScopeContextHolder,
+      ) => new ProvisionManagementUserUseCase(orgRepo, hasher, scopeHolder),
+      inject: [ORG_REPOSITORY_PORT, PASSWORD_HASHER_PORT, SCOPE_CONTEXT_HOLDER],
+    },
+
+    // ── OPERARIO_REPOSITORY alias → ScopedOperarioRepository (already provided) ──
+    {
+      provide: OPERARIO_REPOSITORY,
+      scope: Scope.REQUEST,
+      useFactory: (repo: ScopedOperarioRepository): OperarioRepositoryPort => repo,
+      inject: [ScopedOperarioRepository],
+    },
+
+    // ── OPERARIO_STATUS alias → ScopedOperarioRepository (PR-3: cross-module port) ──
+    // Exported so AsistenciaModule can inject it into CheckInAttendanceUseCase.
+    // ScopedOperarioRepository implements isActive(operarioId): Promise<boolean|null>.
+    // No circular dep: asistencia → iam only.
+    {
+      provide: OPERARIO_STATUS,
+      scope: Scope.REQUEST,
+      useFactory: (repo: ScopedOperarioRepository) => repo,
+      inject: [ScopedOperarioRepository],
+    },
+
+    // ── CreateOperarioUseCase — REQUEST-SCOPED ─────────────────────────────
+    {
+      provide: CREATE_OPERARIO_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OperarioRepositoryPort) => new CreateOperarioUseCase(repo),
+      inject: [OPERARIO_REPOSITORY],
+    },
+
+    // ── DeactivateOperarioUseCase — REQUEST-SCOPED ─────────────────────────
+    {
+      provide: DEACTIVATE_OPERARIO_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OperarioRepositoryPort) => new DeactivateOperarioUseCase(repo),
+      inject: [OPERARIO_REPOSITORY],
+    },
+
+    // ── ReactivateOperarioUseCase — REQUEST-SCOPED ─────────────────────────
+    {
+      provide: REACTIVATE_OPERARIO_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OperarioRepositoryPort) => new ReactivateOperarioUseCase(repo),
+      inject: [OPERARIO_REPOSITORY],
+    },
+
+    // ── BulkImportOperariosUseCase — REQUEST-SCOPED ────────────────────────
+    // Parser (parseOperarioImport) is a pure function — imported directly in the
+    // controller; this use-case only receives pre-parsed rows.
+    {
+      provide: BULK_IMPORT_OPERARIOS_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OperarioRepositoryPort) => new BulkImportOperariosUseCase(repo),
+      inject: [OPERARIO_REPOSITORY],
+    },
+
     // ── Guards ─────────────────────────────────────────────────────────────
     RolesGuard,
   ],
@@ -103,6 +252,8 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
     ScopedSupervisorRepository,
     ScopedOperarioRepository,
     ScopedAssignmentRepository,
+    OPERARIO_REPOSITORY,
+    OPERARIO_STATUS,
     RolesGuard,
   ],
 })

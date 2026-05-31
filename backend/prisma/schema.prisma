@@ -29,6 +29,12 @@ enum SupervisorArea {
   SUPERNUMERARIO
 }
 
+enum NovedadStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ---------------------------------------------------------------------------
 // Org domain
 // ---------------------------------------------------------------------------
@@ -73,6 +79,7 @@ model User {
   coordinatedZone   Zone?          @relation("ZoneCoordinador", fields: [coordinatedZoneId], references: [id])
   supervisor        Supervisor?
   sessions          DeviceSession[]
+  approvedNovedades Novedad[]      @relation("NovedadApprover")
   createdAt         DateTime       @default(now())
 }
 
@@ -89,20 +96,25 @@ model Supervisor {
   area         SupervisorArea
   operarios    Operario[]
   assignments  Assignment[]
+  attendances  Attendance[]
+  novedades    Novedad[]
   createdAt    DateTime       @default(now())
 }
 
 /// Field operario (worker assigned to a supervisor).
 model Operario {
-  id           String       @id @default(uuid())
-  fullName     String
+  id            String       @id @default(uuid())
+  fullName      String
   /// National document number — must be unique across all operarios
-  documento    String       @unique
+  documento     String       @unique
   /// Current supervisor (scope key → zone via supervisor.zoneId)
-  supervisorId String
-  supervisor   Supervisor   @relation(fields: [supervisorId], references: [id])
-  assignments  Assignment[]
-  createdAt    DateTime     @default(now())
+  supervisorId  String
+  supervisor    Supervisor   @relation(fields: [supervisorId], references: [id])
+  assignments   Assignment[]
+  attendances   Attendance[]
+  /// Soft-deactivation timestamp. null = active; non-null = deactivated.
+  deactivatedAt DateTime?
+  createdAt     DateTime     @default(now())
 }
 
 /// Operario ↔ Supervisor assignment record (reassignable, end-dated).
@@ -118,6 +130,81 @@ model Assignment {
   /// NULL = currently active assignment
   endDate      DateTime?
   createdAt    DateTime   @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Attendance domain
+// ---------------------------------------------------------------------------
+
+/// Attendance record — one per operario per Colombia calendar day.
+/// Created on check-in; completed (locked) on check-out.
+model Attendance {
+  id                  String     @id @default(uuid())
+  supervisorId        String
+  supervisor          Supervisor @relation(fields: [supervisorId], references: [id])
+  operarioId          String
+  operario            Operario   @relation(fields: [operarioId], references: [id])
+  /// Denormalized zone for O(1) COORDINADOR scope filtering (same pattern as Assignment)
+  zoneId              String
+  date                String     // YYYY-MM-DD, client-computed Colombia local
+  checkInCapturedAt   DateTime   // client device clock
+  checkInReceivedAt   DateTime   @default(now()) // server clock
+  checkInLat          Float
+  checkInLng          Float
+  checkInAccuracy     Float?
+  checkOutCapturedAt  DateTime?
+  checkOutReceivedAt  DateTime?
+  checkOutLat         Float?
+  checkOutLng         Float?
+  checkOutAccuracy    Float?
+  signatureKey        String?    // MinIO object key; null until uploaded
+  clientRef           String     @unique // client idempotency token (required)
+  checkOutClientRef   String?    // optional checkout idempotency token (not globally unique)
+  completedAt         DateTime?  // non-null = record locked/immutable
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  novedades           Novedad[]
+
+  @@unique([operarioId, date])
+  @@index([supervisorId])
+  @@index([operarioId])
+  @@index([zoneId])
+  @@index([date])
+}
+
+// ---------------------------------------------------------------------------
+// Novedad domain (overtime novelty + approval)
+// ---------------------------------------------------------------------------
+
+/// Overtime novelty record — one ACTIVE (PENDING|APPROVED) per attendance enforced
+/// by a partial unique index hand-authored in the migration SQL.
+/// REJECTED rows do not count toward the limit (partial unique excludes them).
+model Novedad {
+  id               String        @id @default(uuid())
+  attendanceId     String
+  attendance       Attendance    @relation(fields: [attendanceId], references: [id])
+  /// Denormalized creator — scope key for SUPERVISOR filter
+  supervisorId     String
+  supervisor       Supervisor    @relation(fields: [supervisorId], references: [id])
+  /// Denormalized zone — scope key for COORDINADOR filter
+  zoneId           String
+  horasExtra       Decimal       @db.Decimal(5, 2)
+  motivo           String?
+  status           NovedadStatus @default(PENDING)
+  clientRef        String?       @unique // optional idempotency token for offline sync
+  approvedByUserId String?
+  approvedBy       User?         @relation("NovedadApprover", fields: [approvedByUserId], references: [id])
+  decidedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // No @@unique([attendanceId]) — partial unique index added by hand in migration:
+  // CREATE UNIQUE INDEX "Novedad_attendanceId_active_key"
+  //   ON "Novedad"("attendanceId")
+  //   WHERE status IN ('PENDING', 'APPROVED');
+  @@index([supervisorId])
+  @@index([zoneId])
+  @@index([status])
 }
 
 /// Device session for soft revocation and refresh token storage.

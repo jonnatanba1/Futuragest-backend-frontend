@@ -6,6 +6,7 @@
  */
 
 import type { AuthUser } from './auth-user';
+import type { UserProfile } from './user-profile';
 
 export interface DeviceSessionData {
   id: string;
@@ -53,6 +54,12 @@ export interface AuthRepositoryPort {
 
   /** Clear the mustChangePassword flag for a user. */
   clearMustChangePassword(userId: string): Promise<void>;
+
+  /**
+   * Fetch a user with role-specific scope data in a single DB round-trip.
+   * Returns null when the user no longer exists (deleted-with-live-token edge case).
+   */
+  findUserWithScope(userId: string): Promise<UserProfile | null>;
 }
 
 export const AUTH_REPOSITORY_PORT = Symbol('AuthRepositoryPort');

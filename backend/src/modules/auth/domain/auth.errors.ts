@@ -53,3 +53,10 @@ export class MaxDevicesExceededError extends Error {
     this.name = 'MaxDevicesExceededError';
   }
 }
+
+export class UserNotFoundError extends Error {
+  constructor() {
+    super('User not found');
+    this.name = 'UserNotFoundError';
+  }
+}

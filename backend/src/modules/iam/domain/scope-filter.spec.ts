@@ -160,6 +160,43 @@ describe('applyScopeFilter — empty base where', () => {
   });
 });
 
+// ─── NV-53, NV-54, NV-55: Novedad scope filter ──────────────────────────────
+
+describe('applyScopeFilter — Novedad model (NV-53, NV-54, NV-55)', () => {
+  it('NV-53 — SUPERVISOR missing supervisorId → DENY_PREDICATE (fail-closed)', () => {
+    const result = applyScopeFilter(ctx({ role: 'SUPERVISOR' /* no supervisorId */ }), 'Novedad', BASE_WHERE);
+    expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
+  });
+
+  it('NV-54 — COORDINADOR missing zoneId → DENY_PREDICATE (fail-closed)', () => {
+    const result = applyScopeFilter(ctx({ role: 'COORDINADOR' /* no zoneId */ }), 'Novedad', BASE_WHERE);
+    expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
+  });
+
+  it('NV-55 — LIDER_OPERATIVO → pass-through (global role, no restriction)', () => {
+    const result = applyScopeFilter(ctx({ role: 'LIDER_OPERATIVO' }), 'Novedad', {});
+    expect(result).toEqual({});
+  });
+
+  it('SUPERVISOR + supervisorId → filters by supervisorId', () => {
+    const result = applyScopeFilter(
+      ctx({ role: 'SUPERVISOR', supervisorId: SUPERVISOR_ID }),
+      'Novedad',
+      BASE_WHERE,
+    );
+    expect(result).toEqual({ AND: [BASE_WHERE, { supervisorId: SUPERVISOR_ID }] });
+  });
+
+  it('COORDINADOR + zoneId → filters by zoneId', () => {
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }),
+      'Novedad',
+      BASE_WHERE,
+    );
+    expect(result).toEqual({ AND: [BASE_WHERE, { zoneId: ZONE_ID }] });
+  });
+});
+
 // ─── W5: Unknown / unmapped role fail-closed ─────────────────────────────────
 // Scenario #8 from design §8: a role not in GLOBAL_ROLES, COORDINADOR, or
 // SUPERVISOR must NEVER pass-through — it must produce zero rows (fail-closed).

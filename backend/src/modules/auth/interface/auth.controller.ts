@@ -18,9 +18,11 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   Post,
   Request,
@@ -32,6 +34,7 @@ import { LoginUseCase } from '../application/login.use-case';
 import { ChangePasswordUseCase } from '../application/change-password.use-case';
 import { RefreshUseCase } from '../application/refresh.use-case';
 import { RevokeDeviceUseCase } from '../application/revoke-device.use-case';
+import { GetMeUseCase } from '../application/get-me.use-case';
 import {
   InvalidCredentialsError,
   PasswordMismatchError,
@@ -40,17 +43,20 @@ import {
   DeviceNotBoundError,
   SessionNotFoundError,
   MaxDevicesExceededError,
+  UserNotFoundError,
 } from '../domain/auth.errors';
 import { LoginDto, ChangePasswordDto, RefreshDto } from './dtos';
 import { Public } from './public.decorator';
 import { SkipMustChangePasswordCheck } from './skip-mcp.decorator';
 import type { ScopeContext } from '../domain/scope-context';
+import type { MeResponse } from '@futuragest/contracts';
 
 // Injection tokens for use cases (bound in AuthModule)
 export const LOGIN_USE_CASE = Symbol('LoginUseCase');
 export const CHANGE_PASSWORD_USE_CASE = Symbol('ChangePasswordUseCase');
 export const REFRESH_USE_CASE = Symbol('RefreshUseCase');
 export const REVOKE_DEVICE_USE_CASE = Symbol('RevokeDeviceUseCase');
+export const GET_ME_USE_CASE = Symbol('GetMeUseCase');
 
 @Controller('auth')
 export class AuthController {
@@ -59,6 +65,7 @@ export class AuthController {
     @Inject(CHANGE_PASSWORD_USE_CASE) private readonly changePasswordUseCase: ChangePasswordUseCase,
     @Inject(REFRESH_USE_CASE) private readonly refreshUseCase: RefreshUseCase,
     @Inject(REVOKE_DEVICE_USE_CASE) private readonly revokeDeviceUseCase: RevokeDeviceUseCase,
+    @Inject(GET_ME_USE_CASE) private readonly getMeUseCase: GetMeUseCase,
   ) {}
 
   @Public()
@@ -118,6 +125,20 @@ export class AuthController {
       }
       if (err instanceof SamePasswordError) {
         throw new BadRequestException('New password must differ from the current password');
+      }
+      throw err;
+    }
+  }
+
+  @SkipMustChangePasswordCheck()
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  async getMe(@Request() req: { user: ScopeContext }): Promise<MeResponse> {
+    try {
+      return await this.getMeUseCase.execute({ userId: req.user.userId });
+    } catch (err) {
+      if (err instanceof UserNotFoundError) {
+        throw new NotFoundException('User not found');
       }
       throw err;
     }

@@ -9,6 +9,8 @@ import { MustChangePasswordGuard } from './modules/auth/interface/must-change-pa
 import { IamModule } from './modules/iam/iam.module';
 import { RolesGuard } from './modules/iam/interface/roles.guard';
 import { StorageModule } from './modules/storage/storage.module';
+import { AsistenciaModule } from './modules/asistencia/asistencia.module';
+import { NovedadesModule } from './modules/novedades/novedades.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { StorageModule } from './modules/storage/storage.module';
     AuthModule,
     IamModule,
     StorageModule,
+    AsistenciaModule,
+    NovedadesModule,
   ],
   controllers: [AppController],
   providers: [
