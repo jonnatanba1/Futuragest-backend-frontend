@@ -27,6 +27,9 @@ export const OPERARIO_WRITE_ROLES: RoleName[] = ['SYSTEM_ADMIN', 'TALENTO_HUMANO
 /** Roles allowed to approve/reject novedades (backend APPROVE_REJECT_ROLES). */
 export const NOVEDAD_APPROVE_ROLES: RoleName[] = ['LIDER_OPERATIVO', 'SYSTEM_ADMIN'];
 
+/** Roles allowed to close fortnights, view payout, and manage jornada policies. */
+export const COMPENSACION_WRITE_ROLES: RoleName[] = ['SYSTEM_ADMIN', 'TALENTO_HUMANO'];
+
 /** Roles allowed into the master-data administration section. Admin-only for now. */
 export const ADMIN_ROLES: RoleName[] = ['SYSTEM_ADMIN'];
 
