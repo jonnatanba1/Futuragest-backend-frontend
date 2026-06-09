@@ -9,6 +9,10 @@
  *   409 — JornadaPolicyOverlapsLiquidatedPeriodError (POLICY_OVERLAPS_LIQUIDATED)
  *   409 — JornadaPolicyDuplicateEffectiveDateError   (POLICY_DUPLICATE_DATE)
  *   400 — JornadaPolicyInvalidHorasError    (POLICY_INVALID_HORAS)
+ *
+ * PR-B additions:
+ *   409 — CompensationPeriodAlreadyClosedError       (PERIOD_ALREADY_CLOSED)
+ *   422 — DispositionRequiredError                   (DISPOSITION_REQUIRED)
  */
 
 export class NoPolicyForDateError extends Error {
@@ -60,5 +64,44 @@ export class JornadaPolicyInvalidHorasError extends Error {
         `La jornada diaria debe estar entre 0.5 y 24 horas inclusive.`,
     );
     this.name = 'JornadaPolicyInvalidHorasError';
+  }
+}
+
+// ── PR-B error classes ────────────────────────────────────────────────────────
+
+/**
+ * Thrown when a CompensationPeriod already exists for this operario + periodKey
+ * AND the clientRef does not match (immutability violation — cannot re-close a
+ * period with different parameters).
+ * HTTP 409 — PERIOD_ALREADY_CLOSED.
+ */
+export class CompensationPeriodAlreadyClosedError extends Error {
+  readonly httpStatus = 409 as const;
+  readonly code = 'PERIOD_ALREADY_CLOSED' as const;
+
+  constructor(operarioId: string, periodKey: string) {
+    super(
+      `El período "${periodKey}" del operario "${operarioId}" ya fue cerrado y es inmutable. ` +
+        `Para reutilizar el resultado existente envíe el mismo clientRef del cierre original.`,
+    );
+    this.name = 'CompensationPeriodAlreadyClosedError';
+  }
+}
+
+/**
+ * Thrown when saldo < 0 at fortnight close and no disposition was provided.
+ * A negative balance requires an explicit decision: CARRY_OVER or PAYROLL_DEDUCTION.
+ * HTTP 422 — DISPOSITION_REQUIRED.
+ */
+export class DispositionRequiredError extends Error {
+  readonly httpStatus = 422 as const;
+  readonly code = 'DISPOSITION_REQUIRED' as const;
+
+  constructor(periodKey: string) {
+    super(
+      `El saldo del período "${periodKey}" es negativo. ` +
+        `Se requiere indicar "disposition" (CARRY_OVER o PAYROLL_DEDUCTION) para cerrar el período.`,
+    );
+    this.name = 'DispositionRequiredError';
   }
 }

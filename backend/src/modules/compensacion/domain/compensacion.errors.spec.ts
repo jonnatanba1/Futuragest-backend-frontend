@@ -8,6 +8,8 @@ import {
   JornadaPolicyOverlapsLiquidatedPeriodError,
   JornadaPolicyDuplicateEffectiveDateError,
   JornadaPolicyInvalidHorasError,
+  CompensationPeriodAlreadyClosedError,
+  DispositionRequiredError,
 } from './compensacion.errors';
 
 describe('compensacion domain errors', () => {
@@ -55,6 +57,29 @@ describe('compensacion domain errors', () => {
       expect(err.httpStatus).toBe(400);
       expect(err.code).toBe('POLICY_INVALID_HORAS');
       expect(err.message).toContain('24.01');
+    });
+  });
+
+  // ── PR-B errors ──────────────────────────────────────────────────────────────
+
+  describe('CompensationPeriodAlreadyClosedError', () => {
+    it('carries httpStatus 409 and code PERIOD_ALREADY_CLOSED', () => {
+      const err = new CompensationPeriodAlreadyClosedError('O1', '2026-05-Q1');
+      expect(err.httpStatus).toBe(409);
+      expect(err.code).toBe('PERIOD_ALREADY_CLOSED');
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toContain('O1');
+      expect(err.message).toContain('2026-05-Q1');
+    });
+  });
+
+  describe('DispositionRequiredError', () => {
+    it('carries httpStatus 422 and code DISPOSITION_REQUIRED', () => {
+      const err = new DispositionRequiredError('2026-05-Q1');
+      expect(err.httpStatus).toBe(422);
+      expect(err.code).toBe('DISPOSITION_REQUIRED');
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toContain('2026-05-Q1');
     });
   });
 });

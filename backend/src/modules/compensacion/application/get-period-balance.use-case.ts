@@ -5,9 +5,10 @@
  *   1. Scoped operario existence check via OperarioReaderPort (fail-closed 404).
  *   2. Fetch scoped completed attendances in [desde, hasta] via AttendanceReaderPort.
  *   3. Fetch full JornadaPolicy timeline via JornadaPolicyRepositoryPort.
- *   4. Delegate math to CalculatePeriodBalanceUseCase (pure, no DB).
+ *   4. Read carryIn from previous CARRY_OVER period via CompensationPeriodRepositoryPort (PR-B).
+ *   5. Delegate math to CalculatePeriodBalanceUseCase (pure, no DB).
  *
- * PR-A: carryIn = 0 (carry-over read is PR-B).
+ * PR-A: periodRepo is optional (default null → carryIn = 0, backward-compatible).
  * PR-B: inject CompensationPeriodRepositoryPort to read previous CARRY_OVER period.
  *
  * Scope / RBAC (spec §6 REQ-RBAC-04):
@@ -21,14 +22,22 @@
  *   - Operario exists in scope but has zero completed attendances in range → 200 zeros (valid).
  *   - Operario not in scope or nonexistent → OperarioNotInScopeError → 404 (fail-closed).
  *
+ * Carry-over read path (PR-B):
+ *   - Derive the periodKey for `desde` and look up the PREVIOUS closed period.
+ *   - If it has disposition = CARRY_OVER and saldo < 0, use its saldo as carryIn.
+ *   - PAYROLL_DEDUCTION periods do NOT carry (debt was settled in payroll).
+ *
  * Result is NOT persisted — purely derived on demand.
  */
 
+import { Decimal } from '@prisma/client/runtime/client';
 import type { AttendanceReaderPort } from '../domain/ports/attendance-reader.port';
 import type { JornadaPolicyRepositoryPort } from '../domain/ports/jornada-policy-repository.port';
 import type { OperarioReaderPort } from '../domain/ports/operario-reader.port';
+import type { CompensationPeriodRepositoryPort } from '../domain/ports/compensation-period-repository.port';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import { CalculatePeriodBalanceUseCase } from './calculate-period-balance.use-case';
+import { derivePeriodKey } from './derive-period-key';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 
 export interface GetPeriodBalanceInput {
@@ -43,6 +52,8 @@ export class GetPeriodBalanceUseCase {
     private readonly policyRepo: JornadaPolicyRepositoryPort,
     private readonly calcUseCase: CalculatePeriodBalanceUseCase,
     private readonly operarioReader: OperarioReaderPort,
+    /** Optional (PR-B): when provided, reads carryIn from previous CARRY_OVER period. */
+    private readonly periodRepo?: CompensationPeriodRepositoryPort | null,
   ) {}
 
   async execute(input: GetPeriodBalanceInput): Promise<PeriodBalance> {
@@ -65,7 +76,17 @@ export class GetPeriodBalanceUseCase {
     // 3. Fetch full policy timeline
     const policyTimeline = await this.policyRepo.findTimeline();
 
-    // 4. Delegate math to pure use-case (carryIn = 0 for PR-A)
-    return this.calcUseCase.execute({ attendances, policyTimeline });
+    // 4. Resolve carryIn from previous CARRY_OVER period (PR-B)
+    let carryIn = new Decimal(0);
+    if (this.periodRepo) {
+      const currentPeriodKey = derivePeriodKey(desde);
+      const prevPeriod = await this.periodRepo.findPreviousClosed(operarioId, currentPeriodKey);
+      if (prevPeriod !== null && prevPeriod.disposition === 'CARRY_OVER' && prevPeriod.saldo.isNegative()) {
+        carryIn = prevPeriod.saldo;
+      }
+    }
+
+    // 5. Delegate math to pure use-case with resolved carryIn
+    return this.calcUseCase.execute({ attendances, policyTimeline, carryIn });
   }
 }
