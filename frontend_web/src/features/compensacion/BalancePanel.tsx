@@ -1,5 +1,6 @@
 import {
   Alert,
+  Button,
   Card,
   Group,
   Paper,
@@ -10,12 +11,17 @@ import {
   Text,
   Title,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import React, { useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/auth-context';
+import { hasAnyRole, COMPENSACION_WRITE_ROLES } from '../../lib/auth/roles';
 import { TableSkeleton } from '../../components/TableSkeleton';
 import { useOperarios } from '../operarios/operario-queries';
+import { CloseFortnightModal } from './CloseFortnightModal';
 import { useBalanceQuery } from './compensacion-queries';
 import { DayBreakdown } from './DayBreakdown';
+import { PayoutPanel } from './PayoutPanel';
 import { quincenaToRange } from './quincena';
 import type { Quincena } from './quincena';
 
@@ -67,11 +73,20 @@ function StatCard({ label, value }: { label: string; value: string }) {
  * Query: useBalanceQuery — disabled until all three selections are made.
  */
 export function BalancePanel() {
+  const { user } = useAuth();
+  const canWrite = hasAnyRole(user?.role, COMPENSACION_WRITE_ROLES);
+
   const currentDate = new Date();
   const [operarioId, setOperarioId] = useState<string | null>(null);
   const [year, setYear] = useState<string>(String(currentDate.getFullYear()));
   const [month, setMonth] = useState<string>(String(currentDate.getMonth() + 1));
   const [quincena, setQuincena] = useState<Quincena>('Q1');
+
+  // Close modal state
+  const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+
+  // Track whether the current period has been closed in this session
+  const [periodClosed, setPeriodClosed] = useState(false);
 
   const operarios = useOperarios(true);
 
@@ -138,7 +153,20 @@ export function BalancePanel() {
       <Stack gap="md">
         <Card withBorder>
           <Stack gap="sm">
-            <Title order={4}>Balance de horas</Title>
+            <Group justify="space-between" align="flex-start">
+              <Title order={4}>Balance de horas</Title>
+              {canWrite && operarioId && (
+                <Button
+                  size="sm"
+                  color="red"
+                  variant="light"
+                  onClick={openModal}
+                  data-testid="close-period-btn"
+                >
+                  Cerrar período
+                </Button>
+              )}
+            </Group>
             <Text size="xs" c="dimmed">
               Saldo de horas = Arrastre + Créditos − Débitos
             </Text>
@@ -152,6 +180,14 @@ export function BalancePanel() {
         </Card>
 
         {breakdown.length > 0 && <DayBreakdown breakdown={breakdown} />}
+
+        {/* Inline payout panel — auto-shown when period is closed and user has write access */}
+        <PayoutPanel
+          operarioId={operarioId}
+          periodKey={range.periodKey}
+          closed={periodClosed}
+          canWrite={canWrite}
+        />
       </Stack>
     );
   }
@@ -167,7 +203,10 @@ export function BalancePanel() {
           aria-label="Seleccionar operario"
           data={operarioOptions}
           value={operarioId}
-          onChange={setOperarioId}
+          onChange={(v) => {
+            setOperarioId(v);
+            setPeriodClosed(false);
+          }}
           searchable
           clearable
           w={240}
@@ -177,7 +216,10 @@ export function BalancePanel() {
           aria-label="Seleccionar año"
           data={YEAR_OPTIONS}
           value={year}
-          onChange={(v) => setYear(v ?? year)}
+          onChange={(v) => {
+            setYear(v ?? year);
+            setPeriodClosed(false);
+          }}
           w={100}
           allowDeselect={false}
         />
@@ -186,7 +228,10 @@ export function BalancePanel() {
           aria-label="Seleccionar mes"
           data={MONTH_OPTIONS}
           value={month}
-          onChange={(v) => setMonth(v ?? month)}
+          onChange={(v) => {
+            setMonth(v ?? month);
+            setPeriodClosed(false);
+          }}
           w={140}
           allowDeselect={false}
         />
@@ -197,12 +242,29 @@ export function BalancePanel() {
             { value: 'Q2', label: '2.ª quincena' },
           ]}
           value={quincena}
-          onChange={(v) => setQuincena(v as Quincena)}
+          onChange={(v) => {
+            setQuincena(v as Quincena);
+            setPeriodClosed(false);
+          }}
         />
       </Group>
 
       {/* Content area */}
       {renderContent()}
+
+      {/* Close modal — only mounted when there is data and an operario is selected */}
+      {canWrite && operarioId && balance.data && (
+        <CloseFortnightModal
+          opened={modalOpened}
+          onClose={closeModal}
+          operarioId={operarioId}
+          desde={range.desde}
+          hasta={range.hasta}
+          periodKey={range.periodKey}
+          saldoHoras={balance.data.saldoHoras}
+          onSuccess={() => setPeriodClosed(true)}
+        />
+      )}
     </Stack>
   );
 }
