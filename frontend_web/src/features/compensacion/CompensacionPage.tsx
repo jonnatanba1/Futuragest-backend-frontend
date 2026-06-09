@@ -1,16 +1,8 @@
-import { Stack, Tabs, Text, Title } from '@mantine/core';
+import { Stack, Tabs, Title } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import React from 'react';
 import { BalancePanel } from './BalancePanel';
-
-/** Placeholder panel shown while JornadaPolicyAdmin (PR-4) is not yet implemented. */
-function PolicyPanelStub() {
-  return (
-    <Text c="dimmed" size="sm" data-testid="policy-tab-panel">
-      Próximamente: política de jornada laboral.
-    </Text>
-  );
-}
+import { JornadaPolicyPanel } from './JornadaPolicyPanel';
 
 export function CompensacionPage() {
   useDocumentTitle('FuturaGest · Compensación');
@@ -30,7 +22,7 @@ export function CompensacionPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="policy" pt="md">
-          <PolicyPanelStub />
+          <JornadaPolicyPanel />
         </Tabs.Panel>
       </Tabs>
     </Stack>
