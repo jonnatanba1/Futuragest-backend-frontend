@@ -8,6 +8,15 @@ import { CompensacionPage } from './CompensacionPage';
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
+// BalancePanel dependencies — mocked here so CompensacionPage tests stay focused on page-level behavior
+vi.mock('./compensacion-queries', () => ({
+  useBalanceQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+}));
+
+vi.mock('../operarios/operario-queries', () => ({
+  useOperarios: () => ({ data: [], isLoading: false }),
+}));
+
 function setRole(role: string) {
   useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role } });
 }

@@ -1,15 +1,7 @@
 import { Stack, Tabs, Text, Title } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import React from 'react';
-
-/** Placeholder panel shown while BalancePanel (PR-2b) is not yet implemented. */
-function BalancePanelStub() {
-  return (
-    <Text c="dimmed" size="sm" data-testid="balance-tab-panel">
-      Próximamente: balance y cierre de quincena.
-    </Text>
-  );
-}
+import { BalancePanel } from './BalancePanel';
 
 /** Placeholder panel shown while JornadaPolicyAdmin (PR-4) is not yet implemented. */
 function PolicyPanelStub() {
@@ -34,7 +26,7 @@ export function CompensacionPage() {
         </Tabs.List>
 
         <Tabs.Panel value="balance" pt="md">
-          <BalancePanelStub />
+          <BalancePanel />
         </Tabs.Panel>
 
         <Tabs.Panel value="policy" pt="md">
