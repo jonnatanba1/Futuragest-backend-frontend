@@ -114,7 +114,7 @@ describe('compensacionApi', () => {
   });
 
   it('getBalance GETs /compensacion/:operarioId with desde & hasta query params', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ operarioId: 'op-1', desde: '2026-05-01', hasta: '2026-05-15', creditosHoras: '3.50', debitosHoras: '1.00', carryIn: '0.00', saldoHoras: '2.50', breakdown: [] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ describe('compensacionApi', () => {
   });
 
   it('closePeriod POSTs to /compensacion/:operarioId/close', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ id: 'period-1', periodKey: '2026-05-Q1' }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +146,7 @@ describe('compensacionApi', () => {
   });
 
   it('getPayout GETs /compensacion/:operarioId/payout with periodKey', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ operarioId: 'op-1', periodKey: '2026-05-Q1', saldoHoras: '2.50', horasBase: '2.50', factorRecargo: '1.25', horasPagables: '3.13' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +163,7 @@ describe('compensacionApi', () => {
   });
 
   it('getJornadaPolicies GETs /compensacion/jornada-policy', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify([{ id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' }]), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -179,7 +179,7 @@ describe('compensacionApi', () => {
   });
 
   it('createJornadaPolicy POSTs to /compensacion/jornada-policy', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ id: 'pol-2', horasDiarias: '7.00', vigenteDesde: '2026-07-01', createdAt: '' }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
