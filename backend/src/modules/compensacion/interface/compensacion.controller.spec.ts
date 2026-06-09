@@ -29,9 +29,11 @@ import {
   SET_JORNADA_POLICY_USE_CASE,
   GET_JORNADA_POLICY_TIMELINE_USE_CASE,
   CLOSE_COMPENSATION_PERIOD_USE_CASE,
+  GET_PERIOD_PAYOUT_USE_CASE,
 } from './compensacion.controller';
 import { ROLES_KEY } from '../../iam/interface/roles.decorator';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
+import { PeriodNotClosedError } from '../domain/compensacion.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type { CompensationPeriodRecord } from '../domain/ports/compensation-period-repository.port';
@@ -95,12 +97,14 @@ describe('CompensacionController', () => {
   let mockSetPolicy: jest.Mock;
   let mockGetTimeline: jest.Mock;
   let mockClosePeriod: jest.Mock;
+  let mockPayout: jest.Mock;
 
   beforeEach(async () => {
     mockGetBalance = jest.fn();
     mockSetPolicy = jest.fn();
     mockGetTimeline = jest.fn();
     mockClosePeriod = jest.fn();
+    mockPayout = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompensacionController],
@@ -109,6 +113,7 @@ describe('CompensacionController', () => {
         { provide: SET_JORNADA_POLICY_USE_CASE, useValue: { execute: mockSetPolicy } },
         { provide: GET_JORNADA_POLICY_TIMELINE_USE_CASE, useValue: { execute: mockGetTimeline } },
         { provide: CLOSE_COMPENSATION_PERIOD_USE_CASE, useValue: { execute: mockClosePeriod } },
+        { provide: GET_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockPayout } },
       ],
     })
       .overrideGuard(require('../../auth/interface/auth.guard').AuthGuard)
@@ -282,6 +287,56 @@ describe('CompensacionController', () => {
       expect(roles).toContain('SYSTEM_ADMIN');
       expect(roles).not.toContain('COORDINATOR');
       expect(roles).not.toContain('SUPERVISOR');
+    });
+  });
+
+  // ── PR-C GET /compensacion/:operarioId/payout ──────────────────────────────
+
+  describe('getPeriodPayout', () => {
+    it('EP-05a — returns 200 with serialized payout', async () => {
+      mockPayout.mockResolvedValue({
+        operarioId: 'O1',
+        periodKey: '2026-05-Q1',
+        saldoHoras: new Decimal('8'),
+        horasBase: new Decimal('8'),
+        factorRecargo: new Decimal('1.25'),
+        horasPagables: new Decimal('10'),
+      });
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const result = await controller.getPeriodPayout('O1', '2026-05-Q1', mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.OK);
+      expect(result.horasPagables).toBe('10');
+      expect(result.factorRecargo).toBe('1.25');
+      expect(result.saldoHoras).toBe('8');
+    });
+
+    it('EP-05b — invalid periodKey → 400 BadRequest', async () => {
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      await expect(
+        controller.getPeriodPayout('O1', 'not-a-period', mockRes),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockPayout).not.toHaveBeenCalled();
+    });
+
+    it('EP-05c — PeriodNotClosedError → 404 NotFound', async () => {
+      mockPayout.mockRejectedValue(new PeriodNotClosedError('O1', '2026-05-Q1'));
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      await expect(
+        controller.getPeriodPayout('O1', '2026-05-Q1', mockRes),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('EP-05d — PAYOUT_ROLES metadata: only TALENTO_HUMANO and SYSTEM_ADMIN', () => {
+      const reflector = new Reflector();
+      const roles: string[] = reflector.get(ROLES_KEY, controller.getPeriodPayout);
+
+      expect(roles).toContain('TALENTO_HUMANO');
+      expect(roles).toContain('SYSTEM_ADMIN');
+      expect(roles).not.toContain('SUPERVISOR');
+      expect(roles).not.toContain('COORDINADOR');
     });
   });
 });

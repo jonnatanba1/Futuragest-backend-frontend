@@ -47,6 +47,7 @@ import type { GetPeriodBalanceUseCase } from '../application/get-period-balance.
 import type { SetJornadaPolicyUseCase } from '../application/set-jornada-policy.use-case';
 import type { GetJornadaPolicyTimelineUseCase } from '../application/get-jornada-policy-timeline.use-case';
 import type { CloseCompensationPeriodUseCase } from '../application/close-compensation-period.use-case';
+import type { GetPeriodPayoutUseCase, PeriodPayout } from '../application/get-period-payout.use-case';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type {
@@ -60,6 +61,7 @@ import {
   JornadaPolicyInvalidHorasError,
   CompensationPeriodAlreadyClosedError,
   DispositionRequiredError,
+  PeriodNotClosedError,
 } from '../domain/compensacion.errors';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import {
@@ -67,6 +69,7 @@ import {
   JornadaPolicyResponseDto,
   CompensationPeriodResponseDto,
   DayBreakdownDto,
+  PeriodPayoutResponseDto,
 } from './response-dtos';
 
 // ─── Injection tokens ─────────────────────────────────────────────────────────
@@ -75,6 +78,7 @@ export const GET_PERIOD_BALANCE_USE_CASE = Symbol('GetPeriodBalanceUseCase');
 export const SET_JORNADA_POLICY_USE_CASE = Symbol('SetJornadaPolicyUseCase');
 export const GET_JORNADA_POLICY_TIMELINE_USE_CASE = Symbol('GetJornadaPolicyTimelineUseCase');
 export const CLOSE_COMPENSATION_PERIOD_USE_CASE = Symbol('CloseCompensationPeriodUseCase');
+export const GET_PERIOD_PAYOUT_USE_CASE = Symbol('GetPeriodPayoutUseCase');
 
 // ─── Role constants ────────────────────────────────────────────────────────────
 
@@ -100,6 +104,12 @@ const WRITE_POLICY_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
  * Decision #174-5 (REQ-RBAC-03): fortnight close requires HR authority.
  */
 const CLOSE_PERIOD_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
+
+/**
+ * Only TALENTO_HUMANO and SYSTEM_ADMIN may read the payout/liquidation of a period.
+ * Payout is payroll-sensitive information (decision #174-1 + #174-5).
+ */
+const PAYOUT_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
 
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
@@ -165,6 +175,10 @@ function mapDomainError(err: unknown): never {
   if (err instanceof DispositionRequiredError) {
     throw new UnprocessableEntityException({ error: err.code, message: err.message });
   }
+  // PR-C errors
+  if (err instanceof PeriodNotClosedError) {
+    throw new NotFoundException({ error: err.code, message: err.message });
+  }
   throw err;
 }
 
@@ -223,6 +237,17 @@ function serializePeriod(period: CompensationPeriodRecord): CompensationPeriodRe
   };
 }
 
+function serializePayout(payout: PeriodPayout): PeriodPayoutResponseDto {
+  return {
+    operarioId: payout.operarioId,
+    periodKey: payout.periodKey,
+    saldoHoras: payout.saldoHoras.toString(),
+    horasBase: payout.horasBase.toString(),
+    factorRecargo: payout.factorRecargo.toString(),
+    horasPagables: payout.horasPagables.toString(),
+  };
+}
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 
 @Controller()
@@ -236,6 +261,8 @@ export class CompensacionController {
     private readonly getTimelineUseCase: Pick<GetJornadaPolicyTimelineUseCase, 'execute'>,
     @Inject(CLOSE_COMPENSATION_PERIOD_USE_CASE)
     private readonly closeUseCase: Pick<CloseCompensationPeriodUseCase, 'execute'>,
+    @Inject(GET_PERIOD_PAYOUT_USE_CASE)
+    private readonly payoutUseCase: Pick<GetPeriodPayoutUseCase, 'execute'>,
   ) {}
 
   // ── GET /compensacion/:operarioId?desde&hasta ─────────────────────────────
@@ -341,6 +368,33 @@ export class CompensacionController {
 
       res.status(idempotent ? HttpStatus.OK : HttpStatus.CREATED);
       return serializePeriod(period);
+    } catch (err) {
+      mapDomainError(err);
+    }
+  }
+
+  // ── GET /compensacion/:operarioId/payout?periodKey ────────────────────────
+  // Liquidation of a CLOSED period's positive saldo with the recargo factor (PR-C).
+  // Payroll-sensitive → TALENTO_HUMANO + SYSTEM_ADMIN only.
+
+  @Roles(...PAYOUT_ROLES)
+  @Get('compensacion/:operarioId/payout')
+  @ApiOkResponse({ type: PeriodPayoutResponseDto })
+  async getPeriodPayout(
+    @Param('operarioId') operarioId: string,
+    @Query('periodKey') periodKey: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<PeriodPayoutResponseDto> {
+    if (!periodKey || !/^\d{4}-\d{2}-Q[12]$/.test(periodKey)) {
+      throw new BadRequestException(
+        'El parámetro "periodKey" es requerido en formato YYYY-MM-Q1 o YYYY-MM-Q2',
+      );
+    }
+
+    try {
+      const payout = await this.payoutUseCase.execute({ operarioId, periodKey });
+      res.status(HttpStatus.OK);
+      return serializePayout(payout);
     } catch (err) {
       mapDomainError(err);
     }

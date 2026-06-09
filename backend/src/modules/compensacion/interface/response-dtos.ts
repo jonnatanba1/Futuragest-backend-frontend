@@ -118,3 +118,25 @@ export class PeriodBalanceResponseDto {
   @ApiProperty({ type: () => DayBreakdownDto, isArray: true })
   breakdown!: DayBreakdownDto[];
 }
+
+// ─── GET /compensacion/:operarioId/payout ─────────────────────────────────────
+
+export class PeriodPayoutResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  operarioId!: string;
+
+  @ApiProperty({ description: 'Canonical fortnight identifier e.g. "2026-05-Q1"' })
+  periodKey!: string;
+
+  @ApiProperty({ description: 'Frozen saldo of the closed period (can be ≤ 0). Decimal string.', example: '8.00' })
+  saldoHoras!: string;
+
+  @ApiProperty({ description: 'Payable base hours (positive saldo only; 0 if saldo ≤ 0). Decimal string.', example: '8.00' })
+  horasBase!: string;
+
+  @ApiProperty({ description: 'Recargo factor applied (1.25 daytime). Decimal string.', example: '1.25' })
+  factorRecargo!: string;
+
+  @ApiProperty({ description: 'horasBase × factorRecargo — payable hours to liquidate. Decimal string.', example: '10.00' })
+  horasPagables!: string;
+}

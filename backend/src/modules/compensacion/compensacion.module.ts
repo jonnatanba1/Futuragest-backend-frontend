@@ -38,6 +38,7 @@ import { GetPeriodBalanceUseCase } from './application/get-period-balance.use-ca
 import { SetJornadaPolicyUseCase } from './application/set-jornada-policy.use-case';
 import { GetJornadaPolicyTimelineUseCase } from './application/get-jornada-policy-timeline.use-case';
 import { CloseCompensationPeriodUseCase } from './application/close-compensation-period.use-case';
+import { GetPeriodPayoutUseCase } from './application/get-period-payout.use-case';
 
 // Controller tokens
 import {
@@ -46,6 +47,7 @@ import {
   SET_JORNADA_POLICY_USE_CASE,
   GET_JORNADA_POLICY_TIMELINE_USE_CASE,
   CLOSE_COMPENSATION_PERIOD_USE_CASE,
+  GET_PERIOD_PAYOUT_USE_CASE,
 } from './interface/compensacion.controller';
 
 @Module({
@@ -168,6 +170,18 @@ import {
         CalculatePeriodBalanceUseCase,
         OPERARIO_READER_PORT,
       ],
+    },
+
+    // ── GetPeriodPayoutUseCase — request-scoped (PR-C) ───────────────────────
+    // Reads the frozen CompensationPeriod snapshot and applies the recargo factor.
+    {
+      provide: GET_PERIOD_PAYOUT_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (
+        periodRepo: ScopedCompensationPeriodRepository,
+        operarioRepo: ScopedOperarioRepository,
+      ) => new GetPeriodPayoutUseCase(periodRepo, operarioRepo),
+      inject: [COMPENSATION_PERIOD_REPOSITORY_PORT, OPERARIO_READER_PORT],
     },
   ],
 })
