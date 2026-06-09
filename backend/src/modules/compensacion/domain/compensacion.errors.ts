@@ -105,3 +105,24 @@ export class DispositionRequiredError extends Error {
     this.name = 'DispositionRequiredError';
   }
 }
+
+// ── PR-C error classes ──────────────────────────────────────────────────────────
+
+/**
+ * Thrown when a payout is requested for a period that was never closed
+ * (no CompensationPeriod snapshot for operario + periodKey). Only a closed
+ * period can be liquidated.
+ * HTTP 404 — PERIOD_NOT_CLOSED.
+ */
+export class PeriodNotClosedError extends Error {
+  readonly httpStatus = 404 as const;
+  readonly code = 'PERIOD_NOT_CLOSED' as const;
+
+  constructor(operarioId: string, periodKey: string) {
+    super(
+      `El período "${periodKey}" del operario "${operarioId}" no fue cerrado. ` +
+        `Solo se puede liquidar un período cerrado (cierre de quincena).`,
+    );
+    this.name = 'PeriodNotClosedError';
+  }
+}
