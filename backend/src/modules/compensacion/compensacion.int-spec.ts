@@ -20,7 +20,8 @@
  * INT-02 and INT-03 are PR-B (require CompensationPeriod table).
  */
 
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../../database/prisma-client';
 import { SetJornadaPolicyUseCase } from './application/set-jornada-policy.use-case';
 import { CalculatePeriodBalanceUseCase } from './application/calculate-period-balance.use-case';
 import { GetPeriodBalanceUseCase } from './application/get-period-balance.use-case';
@@ -48,8 +49,8 @@ class UnrestrictedScopeHolder extends ScopeContextHolder {
     return {
       role: 'SYSTEM_ADMIN' as const,
       userId: 'test-user-id',
-      supervisorId: null,
-      zoneId: null,
+      supervisorId: undefined,
+      zoneId: undefined,
     };
   }
 }
@@ -70,7 +71,7 @@ describe('Compensacion integration (real Prisma)', () => {
   const INT04_OPERARIO_ID = 'int04-operario';
 
   beforeAll(async () => {
-    prisma = new PrismaClient();
+    prisma = createPrismaClient();
     await prisma.$connect();
     policyRepo = new JornadaPolicyRepository(prisma as any);
     const periodLookup = new NullCompensationPeriodLookup();
