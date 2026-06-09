@@ -22,7 +22,7 @@ export interface CompensationPeriodLookupPort {
    */
   findOverlappingLiquidated(
     vigenteDesde: Date,
-  ): Promise<{ desde: Date; hasta: Date } | null>;
+  ): Promise<{ desde: string; hasta: string } | null>;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface CompensationPeriodLookupPort {
  */
 export class NullCompensationPeriodLookup implements CompensationPeriodLookupPort {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  findOverlappingLiquidated(_vigenteDesde: Date): Promise<{ desde: Date; hasta: Date } | null> {
+  findOverlappingLiquidated(_vigenteDesde: Date): Promise<{ desde: string; hasta: string } | null> {
     return Promise.resolve(null);
   }
 }
