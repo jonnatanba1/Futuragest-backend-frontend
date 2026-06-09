@@ -182,14 +182,30 @@ describe('BalancePanel', () => {
     expect(screen.queryByTestId('close-period-btn')).not.toBeInTheDocument();
   });
 
-  // CLO-2: Close button visible for write roles when data and operario are present
-  it('shows the close period button for TALENTO_HUMANO when data is loaded', () => {
+  // CLO-2 (negative): button absent until an operario is selected
+  it('hides the close period button when no operario is selected', () => {
     defaultSetup('TALENTO_HUMANO');
-    // BalancePanel starts with no operario selected — button is gated on operarioId too.
-    // The default mock returns data regardless, but operarioId starts null.
-    // We test that the button is absent when no operario is selected.
     renderPanel();
-    // No operario selected initially, so button should not appear
+    // operarioId starts as null → button must not appear yet
     expect(screen.queryByTestId('close-period-btn')).not.toBeInTheDocument();
+  });
+
+  // CLO-2 (positive): close button appears for write role once operario + data are present
+  it('shows the close period button for TALENTO_HUMANO once an operario is selected', async () => {
+    const user = userEvent.setup();
+    defaultSetup('TALENTO_HUMANO');
+    renderPanel();
+
+    // Select an operario: click the combobox input, then pick the first option
+    const combobox = screen.getByPlaceholderText(/operario/i);
+    await user.click(combobox);
+    // Mantine renders options with the operario name — click "Ana García"
+    const option = await screen.findByText('Ana García');
+    await user.click(option);
+
+    // Now operarioId is set and balance.data is mocked → button must be present
+    await waitFor(() =>
+      expect(screen.getByTestId('close-period-btn')).toBeInTheDocument(),
+    );
   });
 });

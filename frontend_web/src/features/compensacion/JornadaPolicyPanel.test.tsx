@@ -201,7 +201,9 @@ describe('JornadaPolicyPanel', () => {
       isPending: false,
     });
     renderPanel();
-    // The skeleton should be in the DOM (our TableSkeleton renders rows)
+    // TableSkeleton renders a Stack with aria-label="Cargando" — must be present
+    expect(screen.getByLabelText('Cargando')).toBeInTheDocument();
+    // Policy data must not be visible during load
     expect(screen.queryByText('8.00')).not.toBeInTheDocument();
   });
 
