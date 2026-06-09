@@ -215,6 +215,22 @@ model Novedad {
   @@index([updatedAt])
 }
 
+// ---------------------------------------------------------------------------
+// Compensacion de Horas domain — PR-A
+// ---------------------------------------------------------------------------
+
+/// Company-wide effective-dated work-day baseline (append-only).
+/// Lowering the journey = INSERT a new row with a future vigenteDesde — NEVER UPDATE.
+/// Resolving jornadaDelDia: latest JornadaPolicy with vigenteDesde <= attendance.date.
+model JornadaPolicy {
+  id           String   @id @default(uuid())
+  horasDiarias Decimal  @db.Decimal(4, 2)
+  vigenteDesde DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([vigenteDesde])
+}
+
 /// Device session for soft revocation and refresh token storage.
 model DeviceSession {
   id               String    @id @default(uuid())
