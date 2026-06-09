@@ -327,13 +327,13 @@ export const compensacionApi = {
       `/compensacion/${operarioId}/payout?periodKey=${encodeURIComponent(periodKey)}`,
     ),
 
-  /** GET /compensacion/jornada-policy */
+  /** GET /jornada-policy */
   getJornadaPolicies: (): Promise<JornadaPolicyDto[]> =>
-    request<JornadaPolicyDto[]>('GET', '/compensacion/jornada-policy'),
+    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
 
-  /** POST /compensacion/jornada-policy */
+  /** POST /jornada-policy */
   createJornadaPolicy: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
-    request<JornadaPolicyDto>('POST', '/compensacion/jornada-policy', { body }),
+    request<JornadaPolicyDto>('POST', '/jornada-policy', { body }),
 };
 
 export const novedadesApi = {

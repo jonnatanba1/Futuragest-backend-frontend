@@ -162,7 +162,7 @@ describe('compensacionApi', () => {
     expect(String(url)).toContain('periodKey=2026-05-Q1');
   });
 
-  it('getJornadaPolicies GETs /compensacion/jornada-policy', async () => {
+  it('getJornadaPolicies GETs /jornada-policy', async () => {
     const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify([{ id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' }]), {
         status: 200,
@@ -175,10 +175,10 @@ describe('compensacionApi', () => {
 
     expect(result[0].horasDiarias).toBe('8.00');
     const [url] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain('/compensacion/jornada-policy');
+    expect(String(url)).toMatch(/\/jornada-policy$/);
   });
 
-  it('createJornadaPolicy POSTs to /compensacion/jornada-policy', async () => {
+  it('createJornadaPolicy POSTs to /jornada-policy', async () => {
     const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ id: 'pol-2', horasDiarias: '7.00', vigenteDesde: '2026-07-01', createdAt: '' }), {
         status: 201,
@@ -191,7 +191,7 @@ describe('compensacionApi', () => {
 
     expect(result.horasDiarias).toBe('7.00');
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain('/compensacion/jornada-policy');
+    expect(String(url)).toMatch(/\/jornada-policy$/);
     expect(init?.method).toBe('POST');
   });
 });
