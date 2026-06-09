@@ -12,6 +12,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { AsistenciaModule } from './modules/asistencia/asistencia.module';
 import { NovedadesModule } from './modules/novedades/novedades.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CompensacionModule } from './modules/compensacion/compensacion.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     AsistenciaModule,
     NovedadesModule,
     NotificationsModule,
+    CompensacionModule,
   ],
   controllers: [AppController],
   providers: [
