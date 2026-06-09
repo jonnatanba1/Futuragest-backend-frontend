@@ -19,11 +19,13 @@ import { SCOPE_CONTEXT_HOLDER, type ScopeContextHolder } from '../auth/domain/sc
 
 // Infrastructure adapters
 import { ScopedAttendanceRepository } from '../iam/infrastructure/scoped-attendance.repository';
+import { ScopedOperarioRepository } from '../iam/infrastructure/scoped-operario.repository';
 import { JornadaPolicyRepository } from '../iam/infrastructure/jornada-policy.repository';
 
 // Domain ports
 import { JORNADA_POLICY_REPOSITORY_PORT } from './domain/ports/jornada-policy-repository.port';
 import { ATTENDANCE_READER_PORT } from './domain/ports/attendance-reader.port';
+import { OPERARIO_READER_PORT } from './domain/ports/operario-reader.port';
 import {
   COMPENSATION_PERIOD_LOOKUP_PORT,
   NullCompensationPeriodLookup,
@@ -64,6 +66,18 @@ import {
       inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
     },
 
+    // ── ScopedOperarioRepository — request-scoped, provided as OperarioReaderPort ─
+    // Used by GetPeriodBalanceUseCase to do a scoped existence check BEFORE reading
+    // attendances (fail-closed 404 per REQ-RBAC-04 / REQ-EP-01b).
+    // ScopedOperarioRepository is already exported by IamModule; we alias it here
+    // under the OperarioReaderPort symbol so the use-case has a narrow dependency.
+    {
+      provide: OPERARIO_READER_PORT,
+      scope: Scope.REQUEST,
+      useFactory: (operarioRepo: ScopedOperarioRepository) => operarioRepo,
+      inject: [ScopedOperarioRepository],
+    },
+
     // ── CompensationPeriodLookupPort — PR-A stub (always returns null) ─────────
     // PR-B replaces this with the real scoped adapter.
     {
@@ -82,8 +96,9 @@ import {
         reader: ScopedAttendanceRepository,
         policyRepo: JornadaPolicyRepository,
         calcUseCase: CalculatePeriodBalanceUseCase,
-      ) => new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase),
-      inject: [ATTENDANCE_READER_PORT, JORNADA_POLICY_REPOSITORY_PORT, CalculatePeriodBalanceUseCase],
+        operarioRepo: ScopedOperarioRepository,
+      ) => new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase, operarioRepo),
+      inject: [ATTENDANCE_READER_PORT, JORNADA_POLICY_REPOSITORY_PORT, CalculatePeriodBalanceUseCase, OPERARIO_READER_PORT],
     },
 
     // ── SetJornadaPolicyUseCase — singleton (global policy, no scope) ─────────
