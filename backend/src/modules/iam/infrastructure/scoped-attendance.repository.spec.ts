@@ -111,6 +111,35 @@ describe('ScopedAttendanceRepository — PR-B additions', () => {
     });
   });
 
+  // ── findCompletedInRange (A7.1 — AttendanceReaderPort) ─────────────────────────
+
+  describe('findCompletedInRange', () => {
+    it('A7-01: delegates to findManyScoped with operarioId + date range + completedAt not null', async () => {
+      const { repo, delegate } = makeRepo(null);
+      delegate.findMany.mockResolvedValue([]);
+      await repo.findCompletedInRange('O1', '2026-05-01', '2026-05-15');
+
+      expect(delegate.findMany).toHaveBeenCalledTimes(1);
+      const callArg = delegate.findMany.mock.calls[0][0];
+      const whereStr = JSON.stringify(callArg.where);
+      expect(whereStr).toContain('operarioId');
+      expect(whereStr).toContain('O1');
+      expect(whereStr).toContain('date');
+      expect(whereStr).toContain('2026-05-01');
+      expect(whereStr).toContain('2026-05-15');
+      expect(whereStr).toContain('completedAt');
+    });
+
+    it('A7-02: returns empty array when no completed attendances in range', async () => {
+      const { repo, delegate } = makeRepo(null);
+      delegate.findMany.mockResolvedValue([]);
+
+      const result = await repo.findCompletedInRange('O1', '2026-05-01', '2026-05-15');
+
+      expect(result).toEqual([]);
+    });
+  });
+
   // ── Delta ?since= branch (sync-delta-pull) ───────────────────────────────────
 
   describe('findMany (with optional since)', () => {

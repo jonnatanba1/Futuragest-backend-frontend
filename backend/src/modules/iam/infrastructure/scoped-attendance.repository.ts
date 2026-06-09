@@ -30,11 +30,12 @@ import type {
   CreateAttendanceData,
   UpdateAttendanceData,
 } from '../../asistencia/domain/ports/attendance-repository.port';
+import type { AttendanceReaderPort, AttendanceReaderRecord } from '../../compensacion/domain/ports/attendance-reader.port';
 
 @Injectable()
 export class ScopedAttendanceRepository
   extends ScopedRepository<PrismaService['attendance'], Attendance>
-  implements AttendanceRepositoryPort
+  implements AttendanceRepositoryPort, AttendanceReaderPort
 {
   protected readonly model = 'Attendance';
 
@@ -85,6 +86,30 @@ export class ScopedAttendanceRepository
    */
   findByOperarioAndDate(operarioId: string, date: string): Promise<Attendance | null> {
     return this.findFirstScoped({ where: { operarioId, date } });
+  }
+
+  // ── AttendanceReaderPort (compensacion module) ──────────────────────────────
+
+  /**
+   * Returns completed attendance records for the given operario in [desde, hasta].
+   * Scope-enforced via findManyScoped. Returns [] (not null) when in-scope but
+   * no records exist. Returns null only when the port is explicitly mocked to do
+   * so for out-of-scope detection (the real scoped implementation returns []).
+   *
+   * Implements AttendanceReaderPort.findCompletedInRange.
+   */
+  async findCompletedInRange(
+    operarioId: string,
+    desde: string,
+    hasta: string,
+  ): Promise<AttendanceReaderRecord[]> {
+    return this.findManyScoped({
+      where: {
+        operarioId,
+        completedAt: { not: null },
+        date: { gte: desde, lte: hasta },
+      },
+    }) as Promise<AttendanceReaderRecord[]>;
   }
 
   // ── Writes (inside sanctioned file — safe from meta-guard scan) ─────────────
