@@ -17,7 +17,7 @@ export class NovedadNotFoundError extends Error {
   readonly httpStatus = 404 as const;
 
   constructor(id: string) {
-    super(`[novedad] Novedad "${id}" not found or not accessible in current scope.`);
+    super(`La novedad "${id}" no fue encontrada o no es accesible en el ámbito actual.`);
     this.name = 'NovedadNotFoundError';
   }
 }
@@ -27,8 +27,7 @@ export class AttendanceNotFoundError extends Error {
 
   constructor(id: string) {
     super(
-      `[novedad] Attendance record "${id}" not found or not accessible in current scope. ` +
-        `Cannot create a novedad for an attendance that is out of scope.`,
+      `El registro de asistencia "${id}" no fue encontrado o no es accesible en el ámbito actual.`,
     );
     this.name = 'AttendanceNotFoundError';
   }
@@ -39,9 +38,9 @@ export class NovedadAlreadyExistsError extends Error {
 
   constructor(attendanceId: string) {
     super(
-      `[novedad] An active novedad (PENDING or APPROVED) already exists for attendance "${attendanceId}". ` +
-        `Only one active novedad per attendance is allowed. ` +
-        `The existing novedad must be rejected or cancelled before creating a new one.`,
+      `Ya existe una novedad activa (PENDING o APPROVED) para la asistencia "${attendanceId}". ` +
+        `Solo se permite una novedad activa por asistencia. ` +
+        `La novedad existente debe ser rechazada o cancelada antes de crear una nueva.`,
     );
     this.name = 'NovedadAlreadyExistsError';
   }
@@ -52,8 +51,8 @@ export class AttendanceNotCompletedError extends Error {
 
   constructor(attendanceId: string) {
     super(
-      `[novedad] Attendance record "${attendanceId}" is not yet completed (completedAt is null). ` +
-        `A novedad can only be created for a completed (checked-out) attendance record.`,
+      `El registro de asistencia "${attendanceId}" aún no ha sido completado. ` +
+        `Solo se puede crear una novedad para una asistencia completada (con check-out).`,
     );
     this.name = 'AttendanceNotCompletedError';
   }
@@ -64,8 +63,8 @@ export class ImmutableNovedadError extends Error {
 
   constructor(id: string) {
     super(
-      `[novedad] Novedad "${id}" has already been decided (status is APPROVED or REJECTED). ` +
-        `No further mutations are allowed on a decided novedad.`,
+      `La novedad "${id}" ya fue decidida (estado APPROVED o REJECTED). ` +
+        `No se permiten más modificaciones sobre una novedad decidida.`,
     );
     this.name = 'ImmutableNovedadError';
   }
@@ -76,8 +75,8 @@ export class InvalidHorasExtraError extends Error {
 
   constructor(value: string | number) {
     super(
-      `[novedad] Invalid horasExtra value "${value}". ` +
-        `horasExtra must be a positive number greater than 0 and at most 24 (representing hours worked).`,
+      `Valor de horasExtra inválido: "${value}". ` +
+        `horasExtra debe ser un número positivo mayor que 0 y como máximo 24.`,
     );
     this.name = 'InvalidHorasExtraError';
   }

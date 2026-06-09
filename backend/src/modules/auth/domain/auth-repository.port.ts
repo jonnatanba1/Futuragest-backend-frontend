@@ -60,6 +60,20 @@ export interface AuthRepositoryPort {
    * Returns null when the user no longer exists (deleted-with-live-token edge case).
    */
   findUserWithScope(userId: string): Promise<UserProfile | null>;
+
+  /**
+   * Store (or clear) the FCM/APNs push token for the caller's active device session.
+   * Identified by (userId, deviceId) — never by body values.
+   * platform: optional hint ("android" | "ios" | "web").
+   */
+  updatePushToken(userId: string, deviceId: string, pushToken: string, platform?: string): Promise<void>;
+
+  /**
+   * Clear the FCM/APNs push token (and platform) for the caller's device session.
+   * Identified by (userId, deviceId) — never by body values.
+   * Idempotent: clearing an already-null token is a no-op.
+   */
+  clearPushToken(userId: string, deviceId: string): Promise<void>;
 }
 
 export const AUTH_REPOSITORY_PORT = Symbol('AuthRepositoryPort');

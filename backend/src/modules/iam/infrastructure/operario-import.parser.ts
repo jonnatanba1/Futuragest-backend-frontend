@@ -26,8 +26,8 @@ export class UnsupportedImportFormatError extends Error {
 
   constructor(extension: string) {
     super(
-      `[operario-import] Unsupported file format "${extension}". ` +
-        `Accepted formats: .csv, .xlsx.`,
+      `Formato de archivo no soportado: "${extension}". ` +
+        `Los formatos aceptados son: .csv, .xlsx.`,
     );
     this.name = 'UnsupportedImportFormatError';
   }

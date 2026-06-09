@@ -11,6 +11,7 @@ import { RolesGuard } from './modules/iam/interface/roles.guard';
 import { StorageModule } from './modules/storage/storage.module';
 import { AsistenciaModule } from './modules/asistencia/asistencia.module';
 import { NovedadesModule } from './modules/novedades/novedades.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { NovedadesModule } from './modules/novedades/novedades.module';
     StorageModule,
     AsistenciaModule,
     NovedadesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

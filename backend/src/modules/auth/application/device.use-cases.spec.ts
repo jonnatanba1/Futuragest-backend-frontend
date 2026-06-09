@@ -50,6 +50,8 @@ function makeRepo(activeSession: DeviceSessionData | null = null): jest.Mocked<A
     updatePassword: jest.fn().mockResolvedValue(undefined),
     clearMustChangePassword: jest.fn().mockResolvedValue(undefined),
     findUserWithScope: jest.fn(),
+    updatePushToken: jest.fn(),
+    clearPushToken: jest.fn(),
   };
 }
 

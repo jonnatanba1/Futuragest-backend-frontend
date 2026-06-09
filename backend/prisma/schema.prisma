@@ -162,7 +162,8 @@ model Attendance {
   checkOutLat         Float?
   checkOutLng         Float?
   checkOutAccuracy    Float?
-  signatureKey        String?    // MinIO object key; null until uploaded
+  signatureKey        String?    // MinIO object key for INGRESO (check-in) signature; null until uploaded
+  checkOutSignatureKey String?   // MinIO object key for SALIDA (check-out) signature; null until uploaded
   clientRef           String     @unique // client idempotency token (required)
   checkOutClientRef   String?    // optional checkout idempotency token (not globally unique)
   completedAt         DateTime?  // non-null = record locked/immutable
@@ -228,6 +229,11 @@ model DeviceSession {
   revokedAt        DateTime?
   lastSeenAt       DateTime  @default(now())
   createdAt        DateTime  @default(now())
+
+  /// FCM / APNs push token. Null = device not registered for push notifications.
+  pushToken    String?
+  /// Device platform hint: "android" | "ios" | "web". Null = unspecified.
+  pushPlatform String?
 
   /// Re-registration of the same device upserts on this key
   @@unique([userId, deviceId])

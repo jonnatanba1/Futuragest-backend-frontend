@@ -12,4 +12,5 @@ export interface AuthUser {
   mustChangePassword: boolean;
   coordinatedZoneId?: string | null; // present for COORDINADOR
   supervisorId?: string | null; // present for SUPERVISOR (Supervisor.id, not User.id)
+  supervisorZoneId?: string | null; // present for SUPERVISOR (Supervisor.zoneId — needed in JWT scope)
 }

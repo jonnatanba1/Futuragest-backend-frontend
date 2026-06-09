@@ -118,7 +118,7 @@ describe('BulkImportOperariosUseCase', () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].row).toBe(3);
       expect(result.errors[0].documento).toBe('DUPFILE');
-      expect(result.errors[0].reason).toMatch(/duplicate/i);
+      expect(result.errors[0].reason).toMatch(/duplicado/i);
 
       // bulkCreate receives rows 1 and 2 only
       const bulkRows = repo.bulkCreate.mock.calls[0][0] as Array<{ documento: string }>;
@@ -191,7 +191,7 @@ describe('BulkImportOperariosUseCase', () => {
       const result = await useCase.execute({ rows });
 
       expect(result.imported).toBe(0);
-      expect(result.errors[0].reason).toMatch(/required/i);
+      expect(result.errors[0].reason).toMatch(/obligatorio/i);
       expect(repo.bulkCreate).not.toHaveBeenCalled();
     });
 
@@ -206,7 +206,7 @@ describe('BulkImportOperariosUseCase', () => {
       const result = await useCase.execute({ rows });
 
       expect(result.imported).toBe(0);
-      expect(result.errors[0].reason).toMatch(/required/i);
+      expect(result.errors[0].reason).toMatch(/obligatorio/i);
     });
 
     it('reports error for row missing supervisorEmail', async () => {
@@ -220,7 +220,7 @@ describe('BulkImportOperariosUseCase', () => {
       const result = await useCase.execute({ rows });
 
       expect(result.imported).toBe(0);
-      expect(result.errors[0].reason).toMatch(/required/i);
+      expect(result.errors[0].reason).toMatch(/obligatorio/i);
     });
   });
 

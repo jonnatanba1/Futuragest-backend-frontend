@@ -49,19 +49,19 @@ export class AuthGuard implements CanActivate {
     const token = this.extractBearerToken(request);
 
     if (!token) {
-      throw new UnauthorizedException('Missing authorization token');
+      throw new UnauthorizedException('Token de autorización no proporcionado');
     }
 
     const claims = this.signer.verifyAccessToken(token);
     if (!claims) {
-      throw new UnauthorizedException('Invalid or expired token');
+      throw new UnauthorizedException('Token inválido o expirado');
     }
 
     // Verify device session is non-revoked (device binding gate)
     if (claims.deviceId) {
       const session = await this.repo.findActiveDeviceSession(claims.sub, claims.deviceId);
       if (!session) {
-        throw new UnauthorizedException('Device session revoked or not registered');
+        throw new UnauthorizedException('Sesión del dispositivo revocada o no registrada');
       }
     }
 

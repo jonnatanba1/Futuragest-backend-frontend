@@ -176,7 +176,7 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
   it('throws UserNotFoundError when user does not exist', async () => {
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue(null); // user not found
     const repo = new PrismaOrgRepository(
       prisma as any,
@@ -194,7 +194,7 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
   it('throws InvalidCoordinadorRoleError when user role is not COORDINADOR', async () => {
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue({
       id: USER_ID,
       role: 'SUPERVISOR', // wrong role
@@ -220,7 +220,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
   it('enters $transaction after passing validation', async () => {
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue({ id: USER_ID, role: 'COORDINADOR', email: 'coord@test.co' });
 
     // Mock $transaction to execute the callback with the fake prisma as tx
@@ -252,7 +252,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     const callOrder: string[] = [];
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue({ id: USER_ID, role: 'COORDINADOR', email: 'coord@test.co' });
 
     prisma.$transaction.mockImplementation(async (cb: (tx: FakePrisma) => Promise<void>) => {
@@ -290,7 +290,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     let capturedTx: FakePrisma | null = null;
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue({ id: USER_ID, role: 'COORDINADOR', email: 'coord@test.co' });
 
     prisma.$transaction.mockImplementation(async (cb: (tx: FakePrisma) => Promise<void>) => {
@@ -328,7 +328,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     let capturedTx: FakePrisma | null = null;
     const prisma = makePrisma();
     const zoneRepo = makeZoneRepo();
-    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() });
+    zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue({ id: USER_ID, role: 'COORDINADOR', email: 'coord@test.co' });
 
     prisma.$transaction.mockImplementation(async (cb: (tx: FakePrisma) => Promise<void>) => {
@@ -368,7 +368,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
 describe('PrismaOrgRepository — findZones and findMunicipios delegation', () => {
   it('findZones delegates to ScopedZoneRepository.findMany', async () => {
     const fakeZones: Zone[] = [
-      { id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() },
+      { id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() },
     ];
     const zoneRepo = makeZoneRepo(fakeZones);
     const repo = new PrismaOrgRepository(
@@ -385,7 +385,7 @@ describe('PrismaOrgRepository — findZones and findMunicipios delegation', () =
 
   it('findMunicipios delegates to ScopedMunicipioRepository.findMany', async () => {
     const fakeMunicipios: Municipio[] = [
-      { id: 'mun-1', name: 'Turbo', zoneId: ZONE_ID, createdAt: new Date() },
+      { id: 'mun-1', name: 'Turbo', zoneId: ZONE_ID, createdAt: new Date(), updatedAt: new Date() },
     ];
     const municipioRepo = makeMunicipioRepo(fakeMunicipios);
     const repo = new PrismaOrgRepository(

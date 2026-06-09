@@ -22,8 +22,8 @@ export class AttendanceAlreadyExistsError extends Error {
 
   constructor(operarioId: string, date: string, conflicting: Attendance) {
     super(
-      `[attendance] Attendance already exists for operario "${operarioId}" on date "${date}". ` +
-        `Use a different clientRef to retry or query the existing record.`,
+      `El operario "${operarioId}" ya tiene un registro de asistencia para la fecha "${date}". ` +
+        `Use un clientRef distinto para reintentar o consulte el registro existente.`,
     );
     this.name = 'AttendanceAlreadyExistsError';
     this.conflicting = conflicting;
@@ -34,7 +34,7 @@ export class AttendanceNotFoundError extends Error {
   readonly httpStatus = 404 as const;
 
   constructor(id: string) {
-    super(`[attendance] Attendance record "${id}" not found or not accessible in current scope.`);
+    super(`El registro de asistencia "${id}" no fue encontrado o no es accesible en el ámbito actual.`);
     this.name = 'AttendanceNotFoundError';
   }
 }
@@ -46,8 +46,8 @@ export class ImmutableAttendanceError extends Error {
 
   constructor(id: string, conflicting: Attendance) {
     super(
-      `[attendance] Attendance record "${id}" is immutable (completedAt is set). ` +
-        `No further mutations are allowed.`,
+      `El registro de asistencia "${id}" ya fue completado (completedAt está establecido). ` +
+        `No se permiten más modificaciones.`,
     );
     this.name = 'ImmutableAttendanceError';
     this.conflicting = conflicting;
@@ -59,8 +59,8 @@ export class SignatureRequiredError extends Error {
 
   constructor(id: string) {
     super(
-      `[attendance] Attendance record "${id}" cannot be checked out: ` +
-        `a signature must be uploaded before check-out.`,
+      `El registro de asistencia "${id}" no puede ser cerrado: ` +
+        `se debe subir la firma antes del check-out.`,
     );
     this.name = 'SignatureRequiredError';
   }
@@ -71,8 +71,8 @@ export class InvalidGpsError extends Error {
 
   constructor(field: string, value: number) {
     super(
-      `[attendance] GPS validation failed: field "${field}" has invalid value ${value}. ` +
-        `Expected: lat ∈ [-90, 90], lng ∈ [-180, 180], accuracy >= 0.`,
+      `Validación de GPS fallida: el campo "${field}" tiene un valor inválido (${value}). ` +
+        `Se esperaba: lat ∈ [-90, 90], lng ∈ [-180, 180], accuracy >= 0.`,
     );
     this.name = 'InvalidGpsError';
   }
@@ -83,8 +83,7 @@ export class OperarioNotInScopeError extends Error {
 
   constructor(operarioId: string) {
     super(
-      `[attendance] Operario "${operarioId}" not found in current supervisor scope. ` +
-        `Check-in is only allowed for operarios under the authenticated supervisor.`,
+      `El operario "${operarioId}" no fue encontrado en el ámbito del supervisor actual.`,
     );
     this.name = 'OperarioNotInScopeError';
   }
@@ -99,8 +98,7 @@ export class InactiveOperarioError extends Error {
 
   constructor(operarioId: string) {
     super(
-      `[attendance] Operario "${operarioId}" is inactive (deactivatedAt is set). ` +
-        `Check-in is only allowed for active operarios. Reactivate the operario first.`,
+      `El operario "${operarioId}" está inactivo. El check-in solo está permitido para operarios activos. Reactive el operario primero.`,
     );
     this.name = 'InactiveOperarioError';
   }

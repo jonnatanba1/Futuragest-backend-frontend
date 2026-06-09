@@ -27,6 +27,7 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
+import { NOTIFICATION_PORT } from '../notifications/domain/notification.port';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -815,6 +816,92 @@ describe('Novedades Integration Suite (NV-01..NV-37 + SI-01..SI-04)', () => {
       const count = await prisma.novedad.count({ where: { attendanceId: a1Id } });
       expect(count).toBe(1);
     });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PUSH NOTIFICATION WIRING scenarios (PN-int-A, PN-int-B)
+  // These tests prove the DI wiring is live — NOTIFICATION_PORT is injected
+  // into CreateNovedadUseCase via the real NestJS graph (not just unit tests).
+  // PN-int-A: port IS called when novedad is genuinely created (created=true).
+  // PN-int-B (INV-01): a rejecting port never breaks the 201 response or the DB row.
+  // Both tests would FAIL if novedades.module.ts wiring is reverted to 3 args.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('PUSH NOTIFICATION WIRING (PN-int-A, PN-int-B)', () => {
+    afterEach(async () => {
+      await prisma.novedad.deleteMany({ where: { attendanceId: a1Id } });
+    });
+
+    it('PN-int-A — novedad create fires NOTIFICATION_PORT.notifyNovedadCreated (port wired in DI graph)', async () => {
+      // Build a SEPARATE app instance with a spy override for NOTIFICATION_PORT.
+      // This is the proof that the factory injects the port (it would be undefined if reverted).
+      const notifyFn = jest.fn().mockResolvedValue(undefined);
+      const spyPort = { notifyNovedadCreated: notifyFn };
+
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideProvider(STORAGE_PORT)
+        .useValue(mockStoragePort)
+        .overrideProvider(NOTIFICATION_PORT)
+        .useValue(spyPort)
+        .compile();
+
+      const spyApp = moduleRef.createNestApplication();
+      spyApp.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+      await spyApp.init();
+
+      await request(spyApp.getHttpServer())
+        .post(`/asistencia/${a1Id}/novedades`)
+        .set('Authorization', `Bearer ${tokenS1}`)
+        .send({ horasExtra: '2.00' })
+        .expect(201);
+
+      // Allow the fire-and-forget microtask to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(notifyFn).toHaveBeenCalledTimes(1);
+      const payload = notifyFn.mock.calls[0][0] as Record<string, unknown>;
+      expect(typeof payload.novedadId).toBe('string');
+      expect(payload.novedadId).toBeTruthy();
+
+      await spyApp.close();
+    }, 30_000);
+
+    it('PN-int-B — rejecting NOTIFICATION_PORT never breaks novedad creation (INV-01)', async () => {
+      // Override port with a rejecting spy — proves fire-and-forget isolation end-to-end.
+      const rejectPort = {
+        notifyNovedadCreated: jest.fn().mockRejectedValue(new Error('FCM down')),
+      };
+
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideProvider(STORAGE_PORT)
+        .useValue(mockStoragePort)
+        .overrideProvider(NOTIFICATION_PORT)
+        .useValue(rejectPort)
+        .compile();
+
+      const isolationApp = moduleRef.createNestApplication();
+      isolationApp.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+      await isolationApp.init();
+
+      const resp = await request(isolationApp.getHttpServer())
+        .post(`/asistencia/${a1Id}/novedades`)
+        .set('Authorization', `Bearer ${tokenS1}`)
+        .send({ horasExtra: '1.50' })
+        .expect(201); // MUST still be 201 — notification failure is swallowed
+
+      const body = resp.body as Record<string, unknown>;
+      expect(typeof body.id).toBe('string');
+
+      // Novedad row MUST exist in DB despite the notification rejection
+      const row = await prisma.novedad.findFirst({ where: { attendanceId: a1Id } });
+      expect(row).not.toBeNull();
+
+      await isolationApp.close();
+    }, 30_000);
   });
 
   // ═══════════════════════════════════════════════════════════════════════════

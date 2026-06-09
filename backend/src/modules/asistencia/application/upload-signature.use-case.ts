@@ -1,16 +1,23 @@
 /**
  * UploadSignatureUseCase — stores a signature image in MinIO and updates the
- * attendance record's signatureKey.
+ * attendance record's signature key for the requested phase.
  *
- * AT-11: happy path — stores PNG; updates signatureKey.
+ * AT-11: happy path — stores PNG; updates signatureKey (checkin) or checkOutSignatureKey (checkout).
  * AT-13: not found → AttendanceNotFoundError (404).
  * AT-38: completed record → ImmutableAttendanceError (409).
  * AT-17: wrong mime type (not png/jpeg) → SignatureRequiredError (422).
  * AT-18: file > 2MB → SignatureRequiredError (422).
  *
- * Key scheme: `signatures/{supervisorId}/{attendanceId}.png`
+ * Key scheme:
+ *   checkin  → `signatures/{supervisorId}/{attendanceId}.png`
+ *   checkout → `signatures/{supervisorId}/{attendanceId}-checkout.png`
+ *
  * supervisorId comes from the scoped record (already scope-verified), not from JWT holder,
  * so COORDINADOR/global reads of an existing record still build the correct key.
+ *
+ * Immutability guard: completedAt !== null → ImmutableAttendanceError.
+ * The checkout signature is uploaded BEFORE check-out while completedAt is still null,
+ * so the guard stays correct for both phases.
  *
  * Bucket: 'futuragest' (hardcoded per design).
  */
@@ -29,6 +36,8 @@ const BUCKET = 'futuragest';
 
 export interface UploadSignatureInput {
   id: string;
+  /** 'checkin' (default) writes signatureKey; 'checkout' writes checkOutSignatureKey. */
+  phase?: 'checkin' | 'checkout';
   file: {
     buffer: Buffer;
     mimetype: string;
@@ -55,6 +64,8 @@ export class UploadSignatureUseCase {
     }
 
     // 2. Immutability guard — completedAt set = locked
+    // Note: the checkout signature is uploaded BEFORE check-out (completedAt still null),
+    // so this guard is correct for both phases.
     if (attendance.completedAt !== null) {
       throw new ImmutableAttendanceError(input.id, attendance);
     }
@@ -73,14 +84,22 @@ export class UploadSignatureUseCase {
       );
     }
 
-    // 5. Build deterministic key using supervisorId from the scoped record
-    const key = `signatures/${attendance.supervisorId}/${input.id}.png`;
+    // 5. Build deterministic key based on phase.
+    //    checkin  → signatures/{supervisorId}/{id}.png        (unchanged)
+    //    checkout → signatures/{supervisorId}/{id}-checkout.png
+    const phase = input.phase ?? 'checkin';
+    const suffix = phase === 'checkout' ? '-checkout' : '';
+    const key = `signatures/${attendance.supervisorId}/${input.id}${suffix}.png`;
 
     // 6. Store in MinIO
     await this.storage.putObject(BUCKET, key, input.file.buffer, input.file.mimetype);
 
-    // 7. Update signatureKey on the attendance record
-    await this.attendanceRepo.update(input.id, { signatureKey: key });
+    // 7. Write to the correct column based on phase
+    if (phase === 'checkout') {
+      await this.attendanceRepo.update(input.id, { checkOutSignatureKey: key });
+    } else {
+      await this.attendanceRepo.update(input.id, { signatureKey: key });
+    }
 
     return { attendanceId: input.id, signatureKey: key };
   }

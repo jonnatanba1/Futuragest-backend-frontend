@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment & secrets — NEVER commit
+.env
+.env.*
+!.env.example
+secrets/
+*firebase*service*account*.json
+*-service-account.json
+
+# Prisma
+prisma/*.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Test / coverage
+coverage/
+
+# Agent tooling (local only)
+.agents/
+.claude/
+skills-lock.json
+
+# Migration-verification scratch (local only)
+.probe.txt
+probe*.txt
+.verify-migrate-*.txt
+migstat*.txt
+migstat*_summary.txt
+migstatus_*.out
+.migrate-marker.json

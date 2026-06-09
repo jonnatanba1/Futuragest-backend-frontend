@@ -93,7 +93,7 @@ export class BulkImportOperariosUseCase {
         error: {
           row: rowNumber,
           documento: documento || null,
-          reason: 'Missing required field (fullName, documento, or supervisorEmail)',
+          reason: 'Campo obligatorio faltante (fullName, documento o supervisorEmail)',
         },
       };
     }
@@ -105,7 +105,7 @@ export class BulkImportOperariosUseCase {
         error: {
           row: rowNumber,
           documento,
-          reason: 'Duplicate documento in file',
+          reason: 'Documento duplicado en el archivo',
         },
       };
     }
@@ -117,7 +117,7 @@ export class BulkImportOperariosUseCase {
         error: {
           row: rowNumber,
           documento,
-          reason: 'Duplicate documento',
+          reason: 'Documento duplicado',
         },
       };
     }
@@ -129,7 +129,7 @@ export class BulkImportOperariosUseCase {
         error: {
           row: rowNumber,
           documento,
-          reason: 'Supervisor not found',
+          reason: 'Supervisor no encontrado',
         },
       };
     }

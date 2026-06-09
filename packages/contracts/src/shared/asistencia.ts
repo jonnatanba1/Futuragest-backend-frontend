@@ -26,6 +26,7 @@ export interface AttendanceDto {
   checkOutLng: number | null;
   checkOutAccuracy: number | null;
   signatureKey: string | null;
+  checkOutSignatureKey: string | null;
   clientRef: string;
   checkOutClientRef: string | null;
   completedAt: string | null;

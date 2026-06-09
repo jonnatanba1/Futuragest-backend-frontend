@@ -27,6 +27,13 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     assignCoordinador: jest.fn().mockResolvedValue(undefined),
     findZones: jest.fn().mockResolvedValue([]),
     findMunicipios: jest.fn().mockResolvedValue([]),
+    createZone: jest.fn().mockResolvedValue({ id: 'zone-id' }),
+    updateZone: jest.fn().mockResolvedValue({ id: 'zone-id', name: 'Zone', createdAt: new Date(), updatedAt: new Date() }),
+    deleteZone: jest.fn().mockResolvedValue(undefined),
+    createMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id' }),
+    updateMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id', name: 'Muni', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
+    deleteMunicipio: jest.fn().mockResolvedValue(undefined),
+    findUsers: jest.fn().mockResolvedValue([]),
   };
 }
 

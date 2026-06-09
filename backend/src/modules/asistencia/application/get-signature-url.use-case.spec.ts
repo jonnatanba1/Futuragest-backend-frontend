@@ -28,6 +28,7 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: 'signatures/S1/ATT-1.png',
+    checkOutSignatureKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -97,6 +98,57 @@ describe('GetSignatureUrlUseCase', () => {
 
       await expect(useCase.execute({ id: 'ATT-1' })).rejects.toThrow(AttendanceNotFoundError);
       expect(storage.getPresignedGetUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('phase=checkout — signs the check-out signature key', () => {
+    it('presigns checkOutSignatureKey when phase is checkout', async () => {
+      const att = makeAttendance({
+        signatureKey: 'signatures/S1/ATT-1.png',
+        checkOutSignatureKey: 'signatures/S1/ATT-1-checkout.png',
+      });
+      const repo = makeMockRepo(att);
+      const storage = makeMockStorage();
+      const useCase = new GetSignatureUrlUseCase(repo, storage);
+
+      const result = await useCase.execute({ id: 'ATT-1', phase: 'checkout' });
+
+      expect(storage.getPresignedGetUrl).toHaveBeenCalledWith(
+        'futuragest',
+        'signatures/S1/ATT-1-checkout.png',
+        300,
+      );
+      expect(result).toEqual({ url: 'https://minio.example/presigned' });
+    });
+
+    it('throws AttendanceNotFoundError when checkOutSignatureKey is null', async () => {
+      const att = makeAttendance({ checkOutSignatureKey: null });
+      const repo = makeMockRepo(att);
+      const storage = makeMockStorage();
+      const useCase = new GetSignatureUrlUseCase(repo, storage);
+
+      await expect(useCase.execute({ id: 'ATT-1', phase: 'checkout' })).rejects.toThrow(
+        AttendanceNotFoundError,
+      );
+      expect(storage.getPresignedGetUrl).not.toHaveBeenCalled();
+    });
+
+    it('defaults to the check-in signature when no phase is given', async () => {
+      const att = makeAttendance({
+        signatureKey: 'signatures/S1/ATT-1.png',
+        checkOutSignatureKey: 'signatures/S1/ATT-1-checkout.png',
+      });
+      const repo = makeMockRepo(att);
+      const storage = makeMockStorage();
+      const useCase = new GetSignatureUrlUseCase(repo, storage);
+
+      await useCase.execute({ id: 'ATT-1' });
+
+      expect(storage.getPresignedGetUrl).toHaveBeenCalledWith(
+        'futuragest',
+        'signatures/S1/ATT-1.png',
+        300,
+      );
     });
   });
 });

@@ -13,10 +13,12 @@
  * REQUEST-scoped: reads ScopeContextHolder per request (populated after AuthGuard runs).
  */
 
+import { Logger } from '@nestjs/common';
 import type { Novedad } from '@prisma/client';
 import type { NovedadRepositoryPort } from '../domain/ports/novedad-repository.port';
 import type { AttendanceRepositoryPort } from '../../asistencia/domain/ports/attendance-repository.port';
 import type { ScopeContextHolder } from '../../auth/domain/scope-context';
+import type { NotificationPort } from '../../notifications/domain/notification.port';
 import {
   AttendanceNotFoundError,
   AttendanceNotCompletedError,
@@ -57,10 +59,14 @@ function validateHorasExtra(value: string | number): number {
 }
 
 export class CreateNovedadUseCase {
+  private readonly logger = new Logger(CreateNovedadUseCase.name);
+
   constructor(
     private readonly novedadRepo: NovedadRepositoryPort,
     private readonly attendanceRepo: AttendanceRepositoryPort,
     private readonly scopeHolder: ScopeContextHolder,
+    /** Optional: omitting preserves backward compat with existing unit tests. */
+    private readonly notificationPort?: NotificationPort,
   ) {}
 
   async execute(input: CreateNovedadInput): Promise<CreateNovedadResult> {
@@ -100,6 +106,19 @@ export class CreateNovedadUseCase {
         motivo: input.motivo ?? null,
         clientRef: input.clientRef ?? null,
       });
+
+      // Fire-and-forget: notify eligible approvers. Errors are swallowed — novedad is already persisted.
+      // horasExtra is normalized to a fixed 2-decimal string (e.g. 3 → "3.00") for consistent
+      // notification copy, matching the DB Decimal(.,2) precision.
+      void this.notificationPort?.notifyNovedadCreated({
+        novedadId: record.id,
+        horasExtra: Number(record.horasExtra).toFixed(2),
+        supervisorId: record.supervisorId,
+        zoneId: record.zoneId,
+      }).catch((err: unknown) => {
+        this.logger.error(`notifyNovedadCreated failed for novedad ${record.id} (non-blocking)`, err as Error);
+      });
+
       return { record, created: true };
     } catch (err) {
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002') {

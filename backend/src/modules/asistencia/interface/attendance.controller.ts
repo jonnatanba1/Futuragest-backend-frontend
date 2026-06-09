@@ -43,6 +43,12 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import {
+  AttendanceResponseDto,
+  SignatureUploadResponseDto,
+  SignatureUrlDto,
+} from './response-dtos';
 import { IsDateString, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -91,28 +97,35 @@ const READ_ROLES = [
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export class CheckInBody {
+  @ApiProperty({ format: 'uuid' })
   @IsString()
   operarioId!: string;
 
+  @ApiProperty({ description: 'Colombia local date', example: '2026-06-05' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'date must be in YYYY-MM-DD format',
+    message: 'La fecha debe tener el formato YYYY-MM-DD',
   })
   date!: string;
 
+  @ApiProperty({ format: 'date-time' })
   @IsDateString()
   checkInCapturedAt!: string;
 
+  @ApiProperty()
   @IsNumber()
   checkInLat!: number;
 
+  @ApiProperty()
   @IsNumber()
   checkInLng!: number;
 
+  @ApiPropertyOptional({ minimum: 0 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   checkInAccuracy?: number;
 
+  @ApiProperty({ description: 'Idempotency token' })
   @IsString()
   clientRef!: string;
 }
@@ -125,7 +138,7 @@ class ListAttendanceQuery {
    * Mutually exclusive with clientRef (clientRef takes precedence).
    */
   @IsOptional()
-  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  @IsISO8601({}, { message: 'since debe ser una fecha ISO 8601 válida' })
   since?: string;
 
   /**
@@ -139,20 +152,25 @@ class ListAttendanceQuery {
 }
 
 export class CheckOutBody {
+  @ApiProperty({ format: 'date-time' })
   @IsDateString()
   checkOutCapturedAt!: string;
 
+  @ApiProperty()
   @IsNumber()
   checkOutLat!: number;
 
+  @ApiProperty()
   @IsNumber()
   checkOutLng!: number;
 
+  @ApiPropertyOptional({ minimum: 0 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   checkOutAccuracy?: number;
 
+  @ApiPropertyOptional({ description: 'Idempotency token' })
   @IsOptional()
   @IsString()
   checkOutClientRef?: string;
@@ -235,6 +253,8 @@ export class AttendanceController {
 
   @Roles(...WRITE_ROLES)
   @Post('check-in')
+  @ApiCreatedResponse({ type: AttendanceResponseDto, description: '201 on new record, 200 on idempotent clientRef hit' })
+  @ApiOkResponse({ type: AttendanceResponseDto })
   async checkIn(@Body() body: CheckInBody, @Res({ passthrough: true }) res: Response) {
     try {
       const result = await this.checkInUseCase.execute({
@@ -259,6 +279,7 @@ export class AttendanceController {
 
   @Roles(...WRITE_ROLES)
   @Post('by-client-ref/:clientRef/check-out')
+  @ApiOkResponse({ type: AttendanceResponseDto })
   async checkOutByClientRef(
     @Param('clientRef') clientRef: string,
     @Body() body: CheckOutBody,
@@ -290,6 +311,7 @@ export class AttendanceController {
 
   @Roles(...WRITE_ROLES)
   @Post(':id/check-out')
+  @ApiOkResponse({ type: AttendanceResponseDto })
   async checkOut(
     @Param('id') id: string,
     @Body() body: CheckOutBody,
@@ -317,13 +339,24 @@ export class AttendanceController {
   @Post(':id/signature')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOkResponse({ type: SignatureUploadResponseDto })
   async uploadSignature(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
+    @Query('phase') phase?: string,
   ) {
+    // Validate phase query param — must be exactly 'checkin' or 'checkout' (or absent → 'checkin')
+    const resolvedPhase = phase ?? 'checkin';
+    if (resolvedPhase !== 'checkin' && resolvedPhase !== 'checkout') {
+      throw new BadRequestException(
+        `phase debe ser 'checkin' o 'checkout'; se recibió '${resolvedPhase}'`,
+      );
+    }
+
     try {
       return await this.uploadSignatureUseCase.execute({
         id,
+        phase: resolvedPhase as 'checkin' | 'checkout',
         file: {
           buffer: file.buffer,
           mimetype: file.mimetype,
@@ -339,9 +372,20 @@ export class AttendanceController {
 
   @Roles(...READ_ROLES)
   @Get(':id/signature')
-  async getSignatureUrl(@Param('id') id: string) {
+  @ApiOkResponse({ type: SignatureUrlDto })
+  async getSignatureUrl(@Param('id') id: string, @Query('phase') phase?: string) {
+    // phase must be 'checkin' or 'checkout' (or absent → 'checkin'). Mirrors uploadSignature.
+    const resolvedPhase = phase ?? 'checkin';
+    if (resolvedPhase !== 'checkin' && resolvedPhase !== 'checkout') {
+      throw new BadRequestException(
+        `phase debe ser 'checkin' o 'checkout'; se recibió '${resolvedPhase}'`,
+      );
+    }
     try {
-      return await this.getSignatureUrlUseCase.execute({ id });
+      return await this.getSignatureUrlUseCase.execute({
+        id,
+        phase: resolvedPhase as 'checkin' | 'checkout',
+      });
     } catch (err) {
       mapDomainError(err);
     }
@@ -351,6 +395,7 @@ export class AttendanceController {
 
   @Roles(...READ_ROLES)
   @Get()
+  @ApiOkResponse({ type: AttendanceResponseDto, isArray: true })
   async listAttendance(@Query() rawQuery: Record<string, string>) {
     // Validate query params
     const query = plainToInstance(ListAttendanceQuery, rawQuery);
@@ -374,6 +419,7 @@ export class AttendanceController {
 
   @Roles(...READ_ROLES)
   @Get(':id')
+  @ApiOkResponse({ type: AttendanceResponseDto })
   async getAttendance(@Param('id') id: string) {
     try {
       return await this.getUseCase.execute(id);

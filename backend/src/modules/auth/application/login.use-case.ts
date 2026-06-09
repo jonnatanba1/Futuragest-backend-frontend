@@ -63,6 +63,11 @@ export class LoginUseCase {
       claims.zoneId = user.coordinatedZoneId;
     } else if (user.role === 'SUPERVISOR' && user.supervisorId) {
       claims.supervisorId = user.supervisorId;
+      // Supervisors also carry their zone in scope — attendance writes denormalize
+      // zoneId from the JWT, so it MUST be present or check-in fails server-side.
+      if (user.supervisorZoneId) {
+        claims.zoneId = user.supervisorZoneId;
+      }
     }
 
     if (user.mustChangePassword) {

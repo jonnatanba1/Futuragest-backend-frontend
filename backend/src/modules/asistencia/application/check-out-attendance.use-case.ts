@@ -6,7 +6,8 @@
  * 2. If completedAt !== null (record already completed):
  *    a. checkOutClientRef provided AND matches stored → idempotent replay → {record, idempotent:true} (200, no write).
  *    b. Otherwise → ImmutableAttendanceError (structured 409).
- * 3. signatureKey != null → else SignatureRequiredError (422).
+ * 3. checkOutSignatureKey != null → else SignatureRequiredError (422).
+ *    (The SALIDA/checkout signature must be uploaded before check-out.)
  * 4. GPS validation → InvalidGpsError (400).
  * 5. Update with all checkout fields + completedAt + checkOutClientRef.
  *
@@ -73,8 +74,8 @@ export class CheckOutAttendanceUseCase {
       throw new ImmutableAttendanceError(input.id, attendance);
     }
 
-    // 3. Signature required — must be uploaded before check-out
-    if (!attendance.signatureKey) {
+    // 3. Checkout signature required — the SALIDA signature must be uploaded before check-out
+    if (!attendance.checkOutSignatureKey) {
       throw new SignatureRequiredError(input.id);
     }
 

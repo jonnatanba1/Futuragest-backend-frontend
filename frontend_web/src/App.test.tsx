@@ -1,10 +1,15 @@
+import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App';
 
 describe('App', () => {
-  it('renders without throwing', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('redirects an unauthenticated visitor to the sign-in page', async () => {
     render(<App />);
-    expect(screen.getByText('FuturaGest')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument(),
+    );
   });
 });

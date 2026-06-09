@@ -19,12 +19,15 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { IamModule } from '../iam/iam.module';
 import { AsistenciaModule } from '../asistencia/asistencia.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SCOPE_CONTEXT_HOLDER, type ScopeContextHolder } from '../auth/domain/scope-context';
 import { ScopedNovedadRepository } from '../iam/infrastructure/scoped-novedad.repository';
 import { NOVEDAD_REPOSITORY_PORT } from './domain/ports/novedad-repository.port';
 import type { NovedadRepositoryPort } from './domain/ports/novedad-repository.port';
 import { ATTENDANCE_REPOSITORY_PORT } from '../asistencia/domain/ports/attendance-repository.port';
 import type { AttendanceRepositoryPort } from '../asistencia/domain/ports/attendance-repository.port';
+import { NOTIFICATION_PORT } from '../notifications/domain/notification.port';
+import type { NotificationPort } from '../notifications/domain/notification.port';
 import { CreateNovedadUseCase } from './application/create-novedad.use-case';
 import { ApproveNovedadUseCase } from './application/approve-novedad.use-case';
 import { RejectNovedadUseCase } from './application/reject-novedad.use-case';
@@ -42,7 +45,7 @@ import {
 } from './interface/novedad.controller';
 
 @Module({
-  imports: [PrismaModule, AuthModule, IamModule, AsistenciaModule],
+  imports: [PrismaModule, AuthModule, IamModule, AsistenciaModule, NotificationsModule],
   controllers: [NovedadController],
   providers: [
     // ── ScopedNovedadRepository — request-scoped (needs SCOPE_CONTEXT_HOLDER) ──
@@ -62,8 +65,9 @@ import {
         novedadRepo: NovedadRepositoryPort,
         attendanceRepo: AttendanceRepositoryPort,
         scopeHolder: ScopeContextHolder,
-      ) => new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder),
-      inject: [NOVEDAD_REPOSITORY_PORT, ATTENDANCE_REPOSITORY_PORT, SCOPE_CONTEXT_HOLDER],
+        notificationPort: NotificationPort,
+      ) => new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort),
+      inject: [NOVEDAD_REPOSITORY_PORT, ATTENDANCE_REPOSITORY_PORT, SCOPE_CONTEXT_HOLDER, NOTIFICATION_PORT],
     },
 
     // ── ApproveNovedadUseCase — REQUEST-SCOPED ─────────────────────────────────

@@ -742,4 +742,29 @@ describe('Org Management Integration Suite (D1–D4)', () => {
       });
     });
   });
+
+  describe('D5 — GET /org/users (admin user listing)', () => {
+    it('SYSTEM_ADMIN lists users without exposing passwordHash', async () => {
+      const resp = await request(app.getHttpServer())
+        .get('/org/users')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .expect(200);
+
+      const users = resp.body as Array<Record<string, unknown>>;
+      expect(Array.isArray(users)).toBe(true);
+      expect(users.length).toBeGreaterThan(0);
+      for (const u of users) {
+        expect(u).toHaveProperty('email');
+        expect(u).toHaveProperty('role');
+        expect(u).not.toHaveProperty('passwordHash');
+      }
+    });
+
+    it('SUPERVISOR is forbidden (403)', async () => {
+      await request(app.getHttpServer())
+        .get('/org/users')
+        .set('Authorization', `Bearer ${tokenSupervisor}`)
+        .expect(403);
+    });
+  });
 });

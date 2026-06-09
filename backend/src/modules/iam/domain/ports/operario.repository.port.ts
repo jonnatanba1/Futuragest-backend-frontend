@@ -43,6 +43,12 @@ export interface OperarioRepositoryPort {
   setDeactivatedAt(id: string, date: Date | null): Promise<Operario>;
 
   /**
+   * Reassigns an operario to a different supervisor.
+   * Throws Prisma P2003 if supervisorId does not reference a real Supervisor.
+   */
+  setSupervisor(id: string, supervisorId: string): Promise<Operario>;
+
+  /**
    * Bulk-creates operarios in a single $transaction.
    * Returns the count of successfully inserted rows.
    */

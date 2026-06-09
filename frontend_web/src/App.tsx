@@ -1,17 +1,16 @@
 import React from 'react';
-// Generated API types — updated by the contracts#generate turbo task.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { paths } from '@futuragest/contracts/generated/api';
-
-// Type alias to verify the generated types are importable
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type HealthPath = paths['/health'];
+import { BrowserRouter } from 'react-router-dom';
+import { AppProviders } from './app/providers';
+import { AppRoutes } from './app/router';
 
 export default function App() {
+  // BrowserRouter wraps the providers so AuthProvider (and any future
+  // auth-driven navigation) can use router hooks.
   return (
-    <div>
-      <h1>FuturaGest</h1>
-      <p>Login placeholder — coming in PR3 (Auth module)</p>
-    </div>
+    <BrowserRouter>
+      <AppProviders>
+        <AppRoutes />
+      </AppProviders>
+    </BrowserRouter>
   );
 }

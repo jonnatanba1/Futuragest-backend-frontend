@@ -31,6 +31,7 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: 'sig-key',
+    checkOutSignatureKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: 'CREF-Z',
     completedAt: new Date(),

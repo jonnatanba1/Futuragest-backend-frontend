@@ -35,6 +35,7 @@ export interface UpdateAttendanceData {
   checkOutAccuracy?: number | null;
   completedAt?: Date | null;
   signatureKey?: string | null;
+  checkOutSignatureKey?: string | null;
   checkOutClientRef?: string | null;
 }
 

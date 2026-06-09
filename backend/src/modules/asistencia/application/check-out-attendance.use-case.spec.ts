@@ -1,8 +1,8 @@
 /**
  * T-15 RED → T-16 GREEN: CheckOutAttendanceUseCase unit spec.
  * Covers:
- *   AT-18 (happy path with signature)
- *   AT-19 (no signature → 422)
+ *   AT-18 (happy path with checkOutSignatureKey present)
+ *   AT-19 (no checkOutSignatureKey → 422, even if signatureKey is set)
  *   AT-20 (already completed → 409 ImmutableAttendanceError)
  *   AT-21 (not in scope → 404)
  *   AT-23 (invalid GPS → 400)
@@ -10,9 +10,10 @@
  *   SI-15 (same checkOutClientRef on completed → idempotent 200, no update)
  *   SI-16 (different checkOutClientRef on completed → ImmutableAttendanceError)
  *   SI-17 (absent checkOutClientRef on completed → ImmutableAttendanceError)
- *   SI-18 (signature required check unchanged with checkOutClientRef present)
+ *   SI-18 (signature required check: checkOutSignatureKey null → 422 even with checkOutClientRef present)
  *   SI-30 (no checkOutClientRef on active → backward-compat checkout)
  *   SI-31 (by-clientRef lookup returns null → AttendanceNotFoundError)
+ *   AT-39 (signatureKey set but checkOutSignatureKey null → 422, checkout signature is what matters)
  */
 
 import { CheckOutAttendanceUseCase } from './check-out-attendance.use-case';
@@ -43,6 +44,8 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: 'signatures/S1/ATT-1.png',
+    // checkOutSignatureKey is required for check-out (SALIDA signature)
+    checkOutSignatureKey: 'signatures/S1/ATT-1-checkout.png',
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -94,9 +97,9 @@ describe('CheckOutAttendanceUseCase', () => {
     });
   });
 
-  describe('AT-19 — no signature uploaded → SignatureRequiredError (422)', () => {
-    it('throws SignatureRequiredError when signatureKey is null', async () => {
-      const att = makeAttendance({ signatureKey: null, completedAt: null });
+  describe('AT-19 — no checkout signature uploaded → SignatureRequiredError (422)', () => {
+    it('throws SignatureRequiredError when checkOutSignatureKey is null', async () => {
+      const att = makeAttendance({ checkOutSignatureKey: null, completedAt: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
@@ -132,7 +135,7 @@ describe('CheckOutAttendanceUseCase', () => {
 
   describe('AT-23 — invalid GPS on check-out → InvalidGpsError (400)', () => {
     it('throws InvalidGpsError for lat out of range', async () => {
-      const att = makeAttendance({ signatureKey: 'key', completedAt: null });
+      const att = makeAttendance({ checkOutSignatureKey: 'checkout-key', completedAt: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
@@ -145,7 +148,7 @@ describe('CheckOutAttendanceUseCase', () => {
 
   describe('AT-36 — success path sets completedAt and server timestamps (unit)', () => {
     it('repo.update is called with completedAt and checkOutReceivedAt as Dates', async () => {
-      const att = makeAttendance({ signatureKey: 'key', completedAt: null });
+      const att = makeAttendance({ checkOutSignatureKey: 'checkout-key', completedAt: null });
       const updatedAtt = { ...att, completedAt: new Date(), checkOutReceivedAt: new Date() };
       const repo = {
         ...makeMockRepo(att),
@@ -218,9 +221,9 @@ describe('CheckOutAttendanceUseCase', () => {
     });
   });
 
-  describe('SI-18 — signature required check unchanged when checkOutClientRef present', () => {
-    it('throws SignatureRequiredError when active record has no signature', async () => {
-      const att = makeAttendance({ completedAt: null, signatureKey: null });
+  describe('SI-18 — signature required check: checkOutSignatureKey null → 422 even with checkOutClientRef present', () => {
+    it('throws SignatureRequiredError when active record has no checkOutSignatureKey', async () => {
+      const att = makeAttendance({ completedAt: null, checkOutSignatureKey: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
@@ -233,7 +236,7 @@ describe('CheckOutAttendanceUseCase', () => {
 
   describe('SI-30 — no checkOutClientRef on active record → backward-compat checkout', () => {
     it('calls update with completedAt set; checkOutClientRef null in payload', async () => {
-      const att = makeAttendance({ completedAt: null, signatureKey: 'sig-key' });
+      const att = makeAttendance({ completedAt: null, checkOutSignatureKey: 'checkout-sig-key' });
       const updatedAtt = { ...att, completedAt: new Date() };
       const repo = {
         ...makeMockRepo(att),
@@ -261,6 +264,22 @@ describe('CheckOutAttendanceUseCase', () => {
       await expect(
         useCase.execute({ ...VALID_INPUT, checkOutClientRef: 'CREF-NEW' }),
       ).rejects.toThrow(AttendanceNotFoundError);
+    });
+  });
+
+  describe('AT-39 — signatureKey set but checkOutSignatureKey null → SignatureRequiredError (422)', () => {
+    it('rejects check-out when only checkin signature is present', async () => {
+      // signatureKey (ingreso) is set; checkOutSignatureKey (salida) is not
+      const att = makeAttendance({
+        signatureKey: 'signatures/S1/ATT-1.png',
+        checkOutSignatureKey: null,
+        completedAt: null,
+      });
+      const repo = makeMockRepo(att);
+      const useCase = new CheckOutAttendanceUseCase(repo);
+
+      await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(SignatureRequiredError);
+      expect(repo.update).not.toHaveBeenCalled();
     });
   });
 });

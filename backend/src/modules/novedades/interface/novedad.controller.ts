@@ -38,6 +38,8 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { NovedadResponseDto } from './response-dtos';
 import { IsISO8601, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -85,7 +87,7 @@ const READ_ROLES = [
 class ListNovedadesQuery {
   /** ISO 8601 cursor — return only records with updatedAt >= since (delta mode). */
   @IsOptional()
-  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  @IsISO8601({}, { message: 'since debe ser una fecha ISO 8601 válida' })
   since?: string;
 }
 
@@ -96,14 +98,17 @@ export class CreateNovedadBody {
    * Overtime hours — must be a positive number string <= 24.
    * Stored as Decimal(5,2) in DB; serialized as string in JSON responses.
    */
-  @IsNumberString({}, { message: 'horasExtra must be a numeric string (e.g. "2.50")' })
+  @ApiProperty({ description: 'Overtime hours as a numeric string, e.g. "2.50"', example: '2.50' })
+  @IsNumberString({}, { message: 'horasExtra debe ser una cadena numérica (por ejemplo, "2.50")' })
   horasExtra!: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   motivo?: string;
 
   /** Optional idempotency token for offline sync (e.g. UUID v4). */
+  @ApiPropertyOptional({ description: 'Idempotency token (UUID v4)' })
   @IsOptional()
   @IsString()
   clientRef?: string;
@@ -151,6 +156,8 @@ export class NovedadController {
 
   @Roles(...CREATE_ROLES)
   @Post('asistencia/:attendanceId/novedades')
+  @ApiCreatedResponse({ type: NovedadResponseDto, description: '201 on new record, 200 on idempotent clientRef hit' })
+  @ApiOkResponse({ type: NovedadResponseDto })
   async createNovedad(
     @Param('attendanceId') attendanceId: string,
     @Body() body: CreateNovedadBody,
@@ -174,6 +181,7 @@ export class NovedadController {
 
   @Roles(...READ_ROLES)
   @Get('novedades')
+  @ApiOkResponse({ type: NovedadResponseDto, isArray: true })
   async listNovedades(@Query() rawQuery: Record<string, string>) {
     // Validate query params
     const query = plainToInstance(ListNovedadesQuery, rawQuery);
@@ -191,6 +199,7 @@ export class NovedadController {
 
   @Roles(...READ_ROLES)
   @Get('novedades/:id')
+  @ApiOkResponse({ type: NovedadResponseDto })
   async getNovedad(@Param('id') id: string) {
     try {
       return await this.getUseCase.execute(id);
@@ -204,6 +213,7 @@ export class NovedadController {
   @Roles(...APPROVE_REJECT_ROLES)
   @Patch('novedades/:id/approve')
   @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: NovedadResponseDto })
   async approveNovedad(@Param('id') id: string) {
     try {
       return await this.approveUseCase.execute(id);
@@ -217,6 +227,7 @@ export class NovedadController {
   @Roles(...APPROVE_REJECT_ROLES)
   @Patch('novedades/:id/reject')
   @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: NovedadResponseDto })
   async rejectNovedad(@Param('id') id: string) {
     try {
       return await this.rejectUseCase.execute(id);

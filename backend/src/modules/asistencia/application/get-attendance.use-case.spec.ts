@@ -26,6 +26,7 @@ function makeAttendance(): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: null,
+    checkOutSignatureKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,

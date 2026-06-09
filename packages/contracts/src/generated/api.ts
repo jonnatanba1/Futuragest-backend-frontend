@@ -68,6 +68,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuthController_getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_registerPushToken"];
+        delete: operations["AuthController_unregisterPushToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/sessions/{deviceId}": {
         parameters: {
             query?: never;
@@ -93,7 +125,7 @@ export interface paths {
         };
         get: operations["IamController_listSupervisors"];
         put?: never;
-        post?: never;
+        post: operations["OperarioController_createSupervisor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -125,7 +157,7 @@ export interface paths {
         };
         get: operations["IamController_listOperarios"];
         put?: never;
-        post?: never;
+        post: operations["OperarioController_createOperario"];
         delete?: never;
         options?: never;
         head?: never;
@@ -145,7 +177,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["OperarioController_reassignOperario"];
         trace?: never;
     };
     "/iam/assignments": {
@@ -180,13 +212,657 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrgController_listZones"];
+        put?: never;
+        post: operations["OrgController_createZone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/municipios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrgController_listMunicipios"];
+        put?: never;
+        post: operations["OrgController_createMunicipio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrgController_listUsers"];
+        put?: never;
+        post: operations["OrgController_provisionUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/coordinadores/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OrgController_assignCoordinador"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/zones/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrgController_deleteZone"];
+        options?: never;
+        head?: never;
+        patch: operations["OrgController_updateZone"];
+        trace?: never;
+    };
+    "/org/municipios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["OrgController_deleteMunicipio"];
+        options?: never;
+        head?: never;
+        patch: operations["OrgController_updateMunicipio"];
+        trace?: never;
+    };
+    "/iam/operarios/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OperarioController_importOperarios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/operarios/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OperarioController_deactivateOperario"];
+        trace?: never;
+    };
+    "/iam/operarios/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OperarioController_reactivateOperario"];
+        trace?: never;
+    };
+    "/asistencia/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AttendanceController_checkIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia/by-client-ref/{clientRef}/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AttendanceController_checkOutByClientRef"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia/{id}/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AttendanceController_checkOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia/{id}/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AttendanceController_getSignatureUrl"];
+        put?: never;
+        post: operations["AttendanceController_uploadSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AttendanceController_listAttendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AttendanceController_getAttendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asistencia/{attendanceId}/novedades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NovedadController_createNovedad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/novedades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NovedadController_listNovedades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/novedades/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NovedadController_getNovedad"];
+        put?: never;
+        post?: never;
+        delete: operations["NovedadController_cancelNovedad"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/novedades/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["NovedadController_approveNovedad"];
+        trace?: never;
+    };
+    "/novedades/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["NovedadController_rejectNovedad"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        LoginDto: Record<string, never>;
-        RefreshDto: Record<string, never>;
-        ChangePasswordDto: Record<string, never>;
+        LoginDto: {
+            /**
+             * Format: email
+             * @example user@futuragest.co
+             */
+            email: string;
+            password: string;
+            /** @description Stable per-device id */
+            deviceId: string;
+            /** @description Human-readable device label */
+            deviceLabel?: string;
+        };
+        LoginResponseDto: {
+            accessToken: string;
+            refreshToken: string;
+            passwordChangeRequired: boolean;
+        };
+        RefreshDto: {
+            userId: string;
+            deviceId: string;
+            /** @description Opaque refresh token from login */
+            refreshToken: string;
+        };
+        RefreshResponseDto: {
+            accessToken: string;
+        };
+        ChangePasswordDto: {
+            oldPassword: string;
+            newPassword: string;
+        };
+        MessageResponseDto: {
+            message: string;
+        };
+        ZoneRefDto: {
+            id: string;
+            name: string;
+        };
+        MunicipioRefDto: {
+            id: string;
+            name: string;
+        };
+        MeSupervisorBlockDto: {
+            id: string;
+            area: string;
+            zone: components["schemas"]["ZoneRefDto"];
+            municipio: components["schemas"]["MunicipioRefDto"];
+        };
+        MeResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            mustChangePassword: boolean;
+            /** @description Role name. COORDINADOR and SUPERVISOR have role-specific scoped fields. */
+            role: string;
+            coordinatedZone: components["schemas"]["ZoneRefDto"] | null;
+            supervisor: components["schemas"]["MeSupervisorBlockDto"] | null;
+        };
+        PushTokenDto: {
+            pushToken: string;
+            pushPlatform?: string;
+        };
+        SupervisorResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            municipioId: string;
+            /** Format: uuid */
+            zoneId: string;
+            /** @description SupervisorArea: BARRIDO | RECOLECCION | SUPERNUMERARIO */
+            area: string;
+            /** Format: email */
+            email: string;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+        };
+        OperarioResponseDto: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            documento: string;
+            /** Format: uuid */
+            supervisorId: string;
+            /** @description Derived: deactivatedAt === null */
+            active: boolean;
+            /** @description ISO 8601 timestamp or null when active */
+            deactivatedAt: Record<string, never> | null;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+            /** @description ISO 8601 timestamp — delta cursor for ?since= queries */
+            updatedAt: string;
+        };
+        ZoneResponseDtoClass: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+            /** @description ISO 8601 timestamp — delta cursor for ?since= queries */
+            updatedAt: string;
+        };
+        MunicipioResponseDtoClass: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            zoneId: string;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+            /** @description ISO 8601 timestamp — delta cursor for ?since= queries */
+            updatedAt: string;
+        };
+        UserResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            /** @description Role enum (SYSTEM_ADMIN, GERENCIA, …) */
+            role: string;
+            mustChangePassword: boolean;
+            /** @description Zone coordinated (COORDINADOR only) */
+            coordinatedZoneId: string | null;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+        };
+        AssignCoordinadorBody: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            zoneId: string;
+        };
+        ProvisionUserBody: {
+            /** Format: email */
+            email: string;
+            password: string;
+            /** @enum {string} */
+            role: "GERENCIA" | "TALENTO_HUMANO" | "LIDER_OPERATIVO";
+        };
+        CreatedIdDto: {
+            /** Format: uuid */
+            id: string;
+        };
+        CreateZoneBody: {
+            /** @description Unique zone name */
+            name: string;
+        };
+        UpdateZoneBody: {
+            /** @description New zone name */
+            name: string;
+        };
+        CreateMunicipioBody: {
+            /** @description Municipio name (unique within zone) */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Zone this municipio belongs to
+             */
+            zoneId: string;
+        };
+        UpdateMunicipioBody: {
+            /** @description New municipio name */
+            name?: string;
+            /**
+             * Format: uuid
+             * @description New zone for this municipio
+             */
+            zoneId?: string;
+        };
+        CreateOperarioBody: {
+            fullName: string;
+            /** @description Unique national document number */
+            documento: string;
+            /** Format: uuid */
+            supervisorId: string;
+        };
+        ImportRowErrorDto: {
+            row: number;
+            documento: Record<string, never> | null;
+            reason: string;
+        };
+        ImportResultResponseDto: {
+            imported: number;
+            failed: number;
+            errors: components["schemas"]["ImportRowErrorDto"][];
+        };
+        ReassignOperarioBody: {
+            /**
+             * Format: uuid
+             * @description New supervisor id
+             */
+            supervisorId: string;
+        };
+        CreateSupervisorBody: {
+            /**
+             * Format: email
+             * @description Email for the new supervisor user account
+             */
+            email: string;
+            /** @description Temporary password (mustChangePassword=true) */
+            password: string;
+            /**
+             * @description Operational area: BARRIDO | RECOLECCION | SUPERNUMERARIO
+             * @enum {string}
+             */
+            area: "BARRIDO" | "RECOLECCION" | "SUPERNUMERARIO";
+            /**
+             * Format: uuid
+             * @description Zone the supervisor is assigned to
+             */
+            zoneId: string;
+            /**
+             * Format: uuid
+             * @description Municipio within the zone
+             */
+            municipioId: string;
+        };
+        CheckInBody: {
+            /** Format: uuid */
+            operarioId: string;
+            /**
+             * @description Colombia local date
+             * @example 2026-06-05
+             */
+            date: string;
+            /** Format: date-time */
+            checkInCapturedAt: string;
+            checkInLat: number;
+            checkInLng: number;
+            checkInAccuracy?: number;
+            /** @description Idempotency token */
+            clientRef: string;
+        };
+        AttendanceResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            supervisorId: string;
+            /** Format: uuid */
+            operarioId: string;
+            /** Format: uuid */
+            zoneId: string;
+            /** @description YYYY-MM-DD, client-computed Colombia local date */
+            date: string;
+            /** @description ISO 8601 timestamp */
+            checkInCapturedAt: string;
+            /** @description ISO 8601 server clock timestamp */
+            checkInReceivedAt: string;
+            checkInLat: number;
+            checkInLng: number;
+            checkInAccuracy: Record<string, never> | null;
+            /** @description ISO 8601 timestamp */
+            checkOutCapturedAt: Record<string, never> | null;
+            /** @description ISO 8601 timestamp */
+            checkOutReceivedAt: Record<string, never> | null;
+            checkOutLat: Record<string, never> | null;
+            checkOutLng: Record<string, never> | null;
+            checkOutAccuracy: Record<string, never> | null;
+            signatureKey: Record<string, never> | null;
+            checkOutSignatureKey: Record<string, never> | null;
+            /** @description Idempotency token */
+            clientRef: string;
+            checkOutClientRef: Record<string, never> | null;
+            /** @description ISO 8601 timestamp when both phases done */
+            completedAt: Record<string, never> | null;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+            /** @description ISO 8601 timestamp — delta cursor for ?since= queries */
+            updatedAt: string;
+        };
+        CheckOutBody: {
+            /** Format: date-time */
+            checkOutCapturedAt: string;
+            checkOutLat: number;
+            checkOutLng: number;
+            checkOutAccuracy?: number;
+            /** @description Idempotency token */
+            checkOutClientRef?: string;
+        };
+        SignatureUploadResponseDto: {
+            /** Format: uuid */
+            attendanceId: string;
+            signatureKey: string;
+        };
+        SignatureUrlDto: {
+            /** @description Presigned GET URL */
+            url: string;
+        };
+        CreateNovedadBody: {
+            /**
+             * @description Overtime hours as a numeric string, e.g. "2.50"
+             * @example 2.50
+             */
+            horasExtra: string;
+            motivo?: string;
+            /** @description Idempotency token (UUID v4) */
+            clientRef?: string;
+        };
+        NovedadResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            attendanceId: string;
+            /** Format: uuid */
+            supervisorId: string;
+            /** Format: uuid */
+            zoneId: string;
+            /**
+             * @description Overtime hours. Prisma Decimal serialized as string — parse as decimal, NOT double.
+             * @example 2.50
+             */
+            horasExtra: string;
+            motivo: Record<string, never> | null;
+            /** @description PENDING | APPROVED | REJECTED */
+            status: string;
+            /** @description Idempotency token for offline sync. Null when not provided. */
+            clientRef: Record<string, never> | null;
+            /** Format: uuid */
+            approvedByUserId: Record<string, never> | null;
+            /** @description ISO 8601 timestamp when approved/rejected. Null while PENDING. */
+            decidedAt: Record<string, never> | null;
+            /** @description ISO 8601 timestamp */
+            createdAt: string;
+            /** @description ISO 8601 timestamp — delta cursor for ?since= queries */
+            updatedAt: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -230,7 +906,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LoginResponseDto"];
+                };
             };
         };
     };
@@ -251,7 +929,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RefreshResponseDto"];
+                };
             };
         };
     };
@@ -269,6 +949,67 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_registerPushToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Push token registered successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_unregisterPushToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Push token unregistered successfully */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -291,7 +1032,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["MessageResponseDto"];
+                };
             };
         };
     };
@@ -308,7 +1051,33 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupervisorResponseDto"][];
+                };
+            };
+        };
+    };
+    OperarioController_createSupervisor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupervisorBody"];
+            };
+        };
+        responses: {
+            /** @description Returns the created Supervisor.id (not the User.id). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIdDto"];
+                };
             };
         };
     };
@@ -327,7 +1096,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupervisorResponseDto"];
+                };
             };
         };
     };
@@ -344,7 +1115,32 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OperarioResponseDto"][];
+                };
+            };
+        };
+    };
+    OperarioController_createOperario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOperarioBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIdDto"];
+                };
             };
         };
     };
@@ -363,7 +1159,34 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OperarioResponseDto"];
+                };
+            };
+        };
+    };
+    OperarioController_reassignOperario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReassignOperarioBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperarioResponseDto"];
+                };
             };
         };
     };
@@ -400,6 +1223,608 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    OrgController_listZones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneResponseDtoClass"][];
+                };
+            };
+        };
+    };
+    OrgController_createZone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateZoneBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIdDto"];
+                };
+            };
+        };
+    };
+    OrgController_listMunicipios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MunicipioResponseDtoClass"][];
+                };
+            };
+        };
+    };
+    OrgController_createMunicipio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMunicipioBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIdDto"];
+                };
+            };
+        };
+    };
+    OrgController_listUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponseDto"][];
+                };
+            };
+        };
+    };
+    OrgController_provisionUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProvisionUserBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedIdDto"];
+                };
+            };
+        };
+    };
+    OrgController_assignCoordinador: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignCoordinadorBody"];
+            };
+        };
+        responses: {
+            /** @description Coordinator assigned successfully (no body) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgController_deleteZone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Zone deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgController_updateZone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateZoneBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneResponseDtoClass"];
+                };
+            };
+        };
+    };
+    OrgController_deleteMunicipio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Municipio deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgController_updateMunicipio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMunicipioBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MunicipioResponseDtoClass"];
+                };
+            };
+        };
+    };
+    OperarioController_importOperarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResultResponseDto"];
+                };
+            };
+        };
+    };
+    OperarioController_deactivateOperario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperarioResponseDto"];
+                };
+            };
+        };
+    };
+    OperarioController_reactivateOperario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperarioResponseDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_checkIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"];
+                };
+            };
+            /** @description 201 on new record, 200 on idempotent clientRef hit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_checkOutByClientRef: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientRef: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckOutBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_checkOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckOutBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_getSignatureUrl: {
+        parameters: {
+            query: {
+                phase: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureUrlDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_uploadSignature: {
+        parameters: {
+            query: {
+                phase: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureUploadResponseDto"];
+                };
+            };
+        };
+    };
+    AttendanceController_listAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"][];
+                };
+            };
+        };
+    };
+    AttendanceController_getAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResponseDto"];
+                };
+            };
+        };
+    };
+    NovedadController_createNovedad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attendanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNovedadBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"];
+                };
+            };
+            /** @description 201 on new record, 200 on idempotent clientRef hit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"];
+                };
+            };
+        };
+    };
+    NovedadController_listNovedades: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"][];
+                };
+            };
+        };
+    };
+    NovedadController_getNovedad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"];
+                };
+            };
+        };
+    };
+    NovedadController_cancelNovedad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NovedadController_approveNovedad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"];
+                };
+            };
+        };
+    };
+    NovedadController_rejectNovedad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovedadResponseDto"];
+                };
             };
         };
     };

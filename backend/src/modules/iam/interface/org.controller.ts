@@ -33,14 +33,24 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Inject,
   NotFoundException,
+  Param,
+  Patch,
   Post,
 } from '@nestjs/common';
-import { IsIn, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import {
+  ZoneResponseDtoClass,
+  MunicipioResponseDtoClass,
+  CreatedIdDto,
+  UserResponseDto,
+} from './response-dtos';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import type { Role } from '@prisma/client';
 import { Roles } from './roles.decorator';
 import type { AssignCoordinadorToZoneUseCase } from '../application/assign-coordinador-to-zone.use-case';
@@ -48,10 +58,15 @@ import type { ProvisionManagementUserUseCase } from '../application/provision-ma
 import type { OrgRepositoryPort } from '../domain/ports/org-repository.port';
 import {
   ZoneNotFoundError,
+  ZoneNameInUseError,
+  ZoneHasDependentsError,
   UserNotFoundError,
   InvalidCoordinadorRoleError,
   UnsupportedProvisionRoleError,
   EmailInUseError,
+  MunicipioNotFoundError,
+  MunicipioNameInUseError,
+  MunicipioHasDependentsError,
 } from '../domain/org.errors';
 
 // ─── Injection tokens ─────────────────────────────────────────────────────────
@@ -95,22 +110,61 @@ export const PROVISIONABLE_ROLES = ['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATI
 // without them, all fields are stripped and arrive as undefined.
 
 export class AssignCoordinadorBody {
+  @ApiProperty({ format: 'uuid' })
   @IsString()
   userId!: string;
 
+  @ApiProperty({ format: 'uuid' })
   @IsString()
   zoneId!: string;
 }
 
 export class ProvisionUserBody {
+  @ApiProperty({ format: 'email' })
   @IsString()
   email!: string;
 
+  @ApiProperty()
   @IsString()
   password!: string;
 
+  @ApiProperty({ enum: PROVISIONABLE_ROLES })
   @IsIn(PROVISIONABLE_ROLES)
   role!: string;
+}
+
+export class CreateZoneBody {
+  @ApiProperty({ description: 'Unique zone name' })
+  @IsString()
+  name!: string;
+}
+
+export class UpdateZoneBody {
+  @ApiProperty({ description: 'New zone name' })
+  @IsString()
+  name!: string;
+}
+
+export class CreateMunicipioBody {
+  @ApiProperty({ description: 'Municipio name (unique within zone)' })
+  @IsString()
+  name!: string;
+
+  @ApiProperty({ format: 'uuid', description: 'Zone this municipio belongs to' })
+  @IsString()
+  zoneId!: string;
+}
+
+export class UpdateMunicipioBody {
+  @ApiPropertyOptional({ description: 'New municipio name' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'New zone for this municipio' })
+  @IsOptional()
+  @IsString()
+  zoneId?: string;
 }
 
 // ─── Controller ──────────────────────────────────────────────────────────────
@@ -129,14 +183,23 @@ export class OrgController {
 
   @Roles(...ORG_READ_ROLES)
   @Get('zones')
+  @ApiOkResponse({ type: ZoneResponseDtoClass, isArray: true })
   async listZones() {
     return this.orgRepo.findZones();
   }
 
   @Roles(...ORG_READ_ROLES)
   @Get('municipios')
+  @ApiOkResponse({ type: MunicipioResponseDtoClass, isArray: true })
   async listMunicipios() {
     return this.orgRepo.findMunicipios();
+  }
+
+  @Roles(...ORG_WRITE_ROLES)
+  @Get('users')
+  @ApiOkResponse({ type: UserResponseDto, isArray: true })
+  async listUsers() {
+    return this.orgRepo.findUsers();
   }
 
   // ─── Write endpoints ───────────────────────────────────────────────────────
@@ -144,6 +207,7 @@ export class OrgController {
   @Roles(...ORG_WRITE_ROLES)
   @Post('coordinadores/assign')
   @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Coordinator assigned successfully (no body)' })
   async assignCoordinador(@Body() body: AssignCoordinadorBody): Promise<void> {
     try {
       await this.assignUseCase.execute({ userId: body.userId, zoneId: body.zoneId });
@@ -161,6 +225,7 @@ export class OrgController {
   @Roles(...ORG_WRITE_ROLES)
   @Post('users')
   @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({ type: CreatedIdDto })
   async provisionUser(@Body() body: ProvisionUserBody): Promise<{ id: string }> {
     try {
       return await this.provisionUseCase.execute({
@@ -176,6 +241,162 @@ export class OrgController {
         throw new ConflictException(err.message);
       }
       // ForbiddenException from privilege-escalation guard — re-throw as-is
+      throw err;
+    }
+  }
+
+  // ─── Zone CRUD ─────────────────────────────────────────────────────────────
+
+  /**
+   * POST /org/zones — create a zone.
+   * Error mapping:
+   *   ZoneNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Post('zones')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({ type: CreatedIdDto })
+  async createZone(@Body() body: CreateZoneBody): Promise<{ id: string }> {
+    try {
+      return await this.orgRepo.createZone({ name: body.name });
+    } catch (err) {
+      if (err instanceof ZoneNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * PATCH /org/zones/:id — update a zone's name.
+   * Error mapping:
+   *   ZoneNotFoundError  → 404 NotFoundException
+   *   ZoneNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Patch('zones/:id')
+  @ApiOkResponse({ type: ZoneResponseDtoClass })
+  async updateZone(
+    @Param('id') id: string,
+    @Body() body: UpdateZoneBody,
+  ): Promise<ZoneResponseDtoClass> {
+    try {
+      return await this.orgRepo.updateZone(id, { name: body.name }) as unknown as ZoneResponseDtoClass;
+    } catch (err) {
+      if (err instanceof ZoneNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof ZoneNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * DELETE /org/zones/:id — delete a zone.
+   * Error mapping:
+   *   ZoneNotFoundError      → 404 NotFoundException
+   *   ZoneHasDependentsError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Delete('zones/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Zone deleted' })
+  async deleteZone(@Param('id') id: string): Promise<void> {
+    try {
+      await this.orgRepo.deleteZone(id);
+    } catch (err) {
+      if (err instanceof ZoneNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof ZoneHasDependentsError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  // ─── Municipio CRUD ────────────────────────────────────────────────────────
+
+  /**
+   * POST /org/municipios — create a municipio.
+   * Error mapping:
+   *   ZoneNotFoundError       → 400 BadRequestException (zone must exist)
+   *   MunicipioNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Post('municipios')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({ type: CreatedIdDto })
+  async createMunicipio(@Body() body: CreateMunicipioBody): Promise<{ id: string }> {
+    try {
+      return await this.orgRepo.createMunicipio({ name: body.name, zoneId: body.zoneId });
+    } catch (err) {
+      if (err instanceof ZoneNotFoundError) {
+        // Zone must exist — this is a bad input (invalid zoneId), map to 400
+        throw new BadRequestException(err.message);
+      }
+      if (err instanceof MunicipioNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * PATCH /org/municipios/:id — update a municipio.
+   * Error mapping:
+   *   MunicipioNotFoundError  → 404 NotFoundException
+   *   ZoneNotFoundError       → 400 BadRequestException (new zoneId not found)
+   *   MunicipioNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Patch('municipios/:id')
+  @ApiOkResponse({ type: MunicipioResponseDtoClass })
+  async updateMunicipio(
+    @Param('id') id: string,
+    @Body() body: UpdateMunicipioBody,
+  ): Promise<MunicipioResponseDtoClass> {
+    try {
+      return await this.orgRepo.updateMunicipio(id, {
+        name: body.name,
+        zoneId: body.zoneId,
+      }) as unknown as MunicipioResponseDtoClass;
+    } catch (err) {
+      if (err instanceof MunicipioNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof ZoneNotFoundError) {
+        throw new BadRequestException(err.message);
+      }
+      if (err instanceof MunicipioNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * DELETE /org/municipios/:id — delete a municipio.
+   * Error mapping:
+   *   MunicipioNotFoundError      → 404 NotFoundException
+   *   MunicipioHasDependentsError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Delete('municipios/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Municipio deleted' })
+  async deleteMunicipio(@Param('id') id: string): Promise<void> {
+    try {
+      await this.orgRepo.deleteMunicipio(id);
+    } catch (err) {
+      if (err instanceof MunicipioNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof MunicipioHasDependentsError) {
+        throw new ConflictException(err.message);
+      }
       throw err;
     }
   }

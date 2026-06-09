@@ -1,7 +1,13 @@
 /**
  * T-27 RED → T-28 GREEN: UploadSignatureUseCase unit spec.
- * Covers AT-11 (happy path), AT-13 (attendance not found → 404),
- * AT-15 (completed record → 409), AT-17 (wrong mime → 422), AT-18 (file > 2MB → 422).
+ * Covers:
+ *   AT-11 (happy path — checkin phase default)
+ *   AT-13 (attendance not found → 404)
+ *   AT-15 (completed record → 409)
+ *   AT-17 (wrong mime → 422)
+ *   AT-18 (file > 2MB → 422)
+ *   AT-40 (phase=checkin → writes signatureKey with .png key)
+ *   AT-41 (phase=checkout → writes checkOutSignatureKey with -checkout.png key)
  */
 
 import { UploadSignatureUseCase } from './upload-signature.use-case';
@@ -32,6 +38,7 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: null,
+    checkOutSignatureKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -147,6 +154,57 @@ describe('UploadSignatureUseCase', () => {
         }),
       ).rejects.toThrow(SignatureRequiredError);
       expect(storage.putObject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AT-40 — phase=checkin writes signatureKey with base .png key', () => {
+    it('stores checkin key and updates signatureKey', async () => {
+      const att = makeAttendance({ id: 'ATT-123', supervisorId: 'S1', completedAt: null });
+      const repo = makeMockRepo(att);
+      const storage = makeMockStorage();
+      const useCase = new UploadSignatureUseCase(repo, storage);
+
+      const result = await useCase.execute({ id: 'ATT-123', phase: 'checkin', file: VALID_FILE });
+
+      const expectedKey = 'signatures/S1/ATT-123.png';
+      expect(storage.putObject).toHaveBeenCalledWith('futuragest', expectedKey, VALID_FILE.buffer, 'image/png');
+      expect(repo.update).toHaveBeenCalledWith('ATT-123', { signatureKey: expectedKey });
+      expect(result).toEqual({ attendanceId: 'ATT-123', signatureKey: expectedKey });
+    });
+  });
+
+  describe('AT-41 — phase=checkout writes checkOutSignatureKey with -checkout.png key', () => {
+    it('stores checkout key and updates checkOutSignatureKey', async () => {
+      const att = makeAttendance({ id: 'ATT-123', supervisorId: 'S1', completedAt: null });
+      const repo = {
+        ...makeMockRepo(att),
+        update: jest.fn().mockResolvedValue({ ...att, checkOutSignatureKey: 'signatures/S1/ATT-123-checkout.png' }),
+      };
+      const storage = makeMockStorage();
+      const useCase = new UploadSignatureUseCase(repo, storage);
+
+      const result = await useCase.execute({ id: 'ATT-123', phase: 'checkout', file: VALID_FILE });
+
+      const expectedKey = 'signatures/S1/ATT-123-checkout.png';
+      expect(storage.putObject).toHaveBeenCalledWith('futuragest', expectedKey, VALID_FILE.buffer, 'image/png');
+      expect(repo.update).toHaveBeenCalledWith('ATT-123', { checkOutSignatureKey: expectedKey });
+      expect(result).toEqual({ attendanceId: 'ATT-123', signatureKey: expectedKey });
+    });
+  });
+
+  describe('AT-41b — phase absent (default) → same as checkin', () => {
+    it('defaults to checkin behavior when phase is omitted', async () => {
+      const att = makeAttendance({ id: 'ATT-123', supervisorId: 'S1', completedAt: null });
+      const repo = makeMockRepo(att);
+      const storage = makeMockStorage();
+      const useCase = new UploadSignatureUseCase(repo, storage);
+
+      // No phase field
+      const result = await useCase.execute({ id: 'ATT-123', file: VALID_FILE });
+
+      const expectedKey = 'signatures/S1/ATT-123.png';
+      expect(repo.update).toHaveBeenCalledWith('ATT-123', { signatureKey: expectedKey });
+      expect(result.signatureKey).toBe(expectedKey);
     });
   });
 });

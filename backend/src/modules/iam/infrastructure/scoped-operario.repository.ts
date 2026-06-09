@@ -89,6 +89,14 @@ export class ScopedOperarioRepository
     });
   }
 
+  /** Reassigns an operario to a different supervisor (FK enforced → P2003). */
+  setSupervisor(id: string, supervisorId: string): Promise<Operario> {
+    return this.prismaService.operario.update({
+      where: { id },
+      data: { supervisorId },
+    });
+  }
+
   /**
    * Bulk-creates operarios in a single $transaction.
    * Returns the count of successfully inserted rows.

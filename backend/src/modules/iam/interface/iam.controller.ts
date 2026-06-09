@@ -35,16 +35,35 @@ import {
 import { IsISO8601, IsOptional } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import { ScopedSupervisorRepository } from '../infrastructure/scoped-supervisor.repository';
+import type { SupervisorDto } from '@futuragest/contracts';
+import { ApiOkResponse } from '@nestjs/swagger';
+import { SupervisorResponseDto, OperarioResponseDto } from './response-dtos';
+import {
+  ScopedSupervisorRepository,
+  type SupervisorWithUser,
+} from '../infrastructure/scoped-supervisor.repository';
 import { ScopedOperarioRepository } from '../infrastructure/scoped-operario.repository';
 import { ScopedAssignmentRepository } from '../infrastructure/scoped-assignment.repository';
 import { Roles } from './roles.decorator';
+
+/** Map an enriched supervisor row to the public SupervisorDto (email flattened). */
+function toSupervisorDto(s: SupervisorWithUser): SupervisorDto {
+  return {
+    id: s.id,
+    userId: s.userId,
+    municipioId: s.municipioId,
+    zoneId: s.zoneId,
+    area: s.area,
+    email: s.user.email,
+    createdAt: s.createdAt.toISOString(),
+  };
+}
 
 // ─── Query DTOs ──────────────────────────────────────────────────────────────
 
 class ListOperariosQuery {
   @IsOptional()
-  @IsISO8601({}, { message: 'since must be a valid ISO 8601 date string' })
+  @IsISO8601({}, { message: 'since debe ser una fecha ISO 8601 válida' })
   since?: string;
 
   @IsOptional()
@@ -54,12 +73,16 @@ class ListOperariosQuery {
 /**
  * Roles permitted to access IAM read endpoints.
  * Design §3.4: both layers required — coarse gate (here) + row filter (ScopedRepository).
- * LIDER_OPERATIVO intentionally excluded: global-scope but no IAM list operational need.
+ * LIDER_OPERATIVO is included so it can resolve operario/supervisor names when
+ * reviewing attendance/novedades (it approves novedades and must see who they
+ * belong to). All roles read IAM at their scope (globals see all; COORDINADOR and
+ * SUPERVISOR are row-filtered by ScopedRepository).
  */
 const IAM_READ_ROLES = [
   'SYSTEM_ADMIN',
   'GERENCIA',
   'TALENTO_HUMANO',
+  'LIDER_OPERATIVO',
   'COORDINADOR',
   'SUPERVISOR',
 ] as const;
@@ -76,24 +99,28 @@ export class IamController {
 
   @Roles(...IAM_READ_ROLES)
   @Get('supervisors')
-  async listSupervisors() {
-    return this.supervisorRepo.findMany();
+  @ApiOkResponse({ type: SupervisorResponseDto, isArray: true })
+  async listSupervisors(): Promise<SupervisorDto[]> {
+    const supervisors = await this.supervisorRepo.findManyWithUser();
+    return supervisors.map(toSupervisorDto);
   }
 
   @Roles(...IAM_READ_ROLES)
   @Get('supervisors/:id')
-  async getSupervisor(@Param('id') id: string) {
-    const supervisor = await this.supervisorRepo.findById(id);
+  @ApiOkResponse({ type: SupervisorResponseDto })
+  async getSupervisor(@Param('id') id: string): Promise<SupervisorDto> {
+    const supervisor = await this.supervisorRepo.findByIdWithUser(id);
     if (!supervisor) {
-      throw new NotFoundException('Supervisor not found');
+      throw new NotFoundException('Supervisor no encontrado');
     }
-    return supervisor;
+    return toSupervisorDto(supervisor);
   }
 
   // ─── Operarios ───────────────────────────────────────────────────────────
 
   @Roles(...IAM_READ_ROLES)
   @Get('operarios')
+  @ApiOkResponse({ type: OperarioResponseDto, isArray: true })
   async listOperarios(@Query() rawQuery: Record<string, string>) {
     // Validate query params manually (global ValidationPipe only handles @Body — @Query
     // with a DTO class needs explicit class-transformer + class-validator round-trip)
@@ -119,10 +146,11 @@ export class IamController {
 
   @Roles(...IAM_READ_ROLES)
   @Get('operarios/:id')
+  @ApiOkResponse({ type: OperarioResponseDto })
   async getOperario(@Param('id') id: string) {
     const operario = await this.operarioRepo.findById(id);
     if (!operario) {
-      throw new NotFoundException('Operario not found');
+      throw new NotFoundException('Operario no encontrado');
     }
     return operario;
   }
@@ -140,7 +168,7 @@ export class IamController {
   async getAssignment(@Param('id') id: string) {
     const assignment = await this.assignmentRepo.findById(id);
     if (!assignment) {
-      throw new NotFoundException('Assignment not found');
+      throw new NotFoundException('Asignación no encontrada');
     }
     return assignment;
   }

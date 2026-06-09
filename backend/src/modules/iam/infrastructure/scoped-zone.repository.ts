@@ -11,6 +11,10 @@
  *
  * W4 constraint: must NOT use include:{ municipios } or include:{ supervisors }
  * — those are scoped relations. Issue separate scoped queries if needed.
+ *
+ * Write methods (create/update/delete/findUniqueForWrite) are defined here
+ * because this file is the only sanctioned location for direct prisma.zone.* calls.
+ * PrismaOrgRepository delegates to these methods for zone CRUD.
  */
 
 import { Injectable } from '@nestjs/common';
@@ -26,9 +30,20 @@ export class ScopedZoneRepository extends ScopedRepository<
 > {
   protected readonly model = 'Zone';
 
-  constructor(prisma: PrismaService, scopeHolder: ScopeContextHolder) {
+  // Keep a reference to the PrismaService for write operations that go through
+  // the raw delegate — the delegate is PrismaService['zone'] (the Prisma model
+  // delegate), so we store it separately for type-safe writes.
+  private readonly prismaZone: PrismaService['zone'];
+
+  constructor(
+    private readonly prisma: PrismaService,
+    scopeHolder: ScopeContextHolder,
+  ) {
     super(prisma.zone, scopeHolder);
+    this.prismaZone = prisma.zone;
   }
+
+  // ─── Read ──────────────────────────────────────────────────────────────────
 
   /**
    * List zones visible to the current principal.
@@ -44,5 +59,54 @@ export class ScopedZoneRepository extends ScopedRepository<
    */
   findById(id: string): Promise<Zone | null> {
     return this.findFirstScoped({ where: { id } });
+  }
+
+  // ─── Write (sanctioned — this file is the only allowed caller of prisma.zone.*) ─
+
+  /**
+   * Find a zone by id WITHOUT scope restriction — for write-path existence checks.
+   * ADMIN writes must target any zone regardless of the caller's scope context.
+   */
+  findByIdForWrite(id: string): Promise<Zone | null> {
+    return this.prismaZone.findUnique({ where: { id } });
+  }
+
+  /** Create a new zone. */
+  create(data: { name: string }): Promise<Zone> {
+    return this.prismaZone.create({ data });
+  }
+
+  /** Update a zone. */
+  update(id: string, data: { name: string }): Promise<Zone> {
+    return this.prismaZone.update({ where: { id }, data });
+  }
+
+  /**
+   * Check zone dependents for referential guard before delete.
+   * Returns counts of related entities that block deletion.
+   */
+  async countDependents(id: string): Promise<{
+    municipios: number;
+    supervisors: number;
+    coordinador: boolean;
+  }> {
+    const zone = await this.prismaZone.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { municipios: true, supervisors: true } },
+        coordinador: { select: { id: true } },
+      },
+    });
+    if (!zone) return { municipios: 0, supervisors: 0, coordinador: false };
+    return {
+      municipios: zone._count.municipios,
+      supervisors: zone._count.supervisors,
+      coordinador: zone.coordinador !== null,
+    };
+  }
+
+  /** Delete a zone by id. */
+  delete(id: string): Promise<Zone> {
+    return this.prismaZone.delete({ where: { id } });
   }
 }

@@ -58,6 +58,7 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLng: null,
     checkOutAccuracy: null,
     signatureKey: null,
+    checkOutSignatureKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -225,7 +226,7 @@ describe('AttendanceController — error→HTTP mapping', () => {
 
   // ── Signature upload ──────────────────────────────────────────────────────
 
-  it('AT-11 — uploadSignature happy path → returns { attendanceId, signatureKey }', async () => {
+  it('AT-11 — uploadSignature happy path (no phase → default checkin) → returns { attendanceId, signatureKey }', async () => {
     mockUploadSignature.execute.mockResolvedValue({
       attendanceId: 'ATT-1',
       signatureKey: 'signatures/S1/ATT-1.png',
@@ -237,6 +238,24 @@ describe('AttendanceController — error→HTTP mapping', () => {
     } as Express.Multer.File;
     const result = await controller.uploadSignature('ATT-1', file);
     expect(result).toEqual({ attendanceId: 'ATT-1', signatureKey: 'signatures/S1/ATT-1.png' });
+    expect(mockUploadSignature.execute).toHaveBeenCalledWith(expect.objectContaining({ phase: 'checkin' }));
+  });
+
+  it('AT-11b — uploadSignature phase=checkout → passes phase to use-case', async () => {
+    mockUploadSignature.execute.mockResolvedValue({
+      attendanceId: 'ATT-1',
+      signatureKey: 'signatures/S1/ATT-1-checkout.png',
+    });
+    const file = { buffer: Buffer.from('png'), mimetype: 'image/png', size: 100 } as Express.Multer.File;
+    const result = await controller.uploadSignature('ATT-1', file, 'checkout');
+    expect(result).toEqual({ attendanceId: 'ATT-1', signatureKey: 'signatures/S1/ATT-1-checkout.png' });
+    expect(mockUploadSignature.execute).toHaveBeenCalledWith(expect.objectContaining({ phase: 'checkout' }));
+  });
+
+  it('AT-11c — uploadSignature phase=invalid → 400 BadRequestException (before use-case)', async () => {
+    const file = { buffer: Buffer.from('png'), mimetype: 'image/png', size: 100 } as Express.Multer.File;
+    await expect(controller.uploadSignature('ATT-1', file, 'invalid')).rejects.toThrow(BadRequestException);
+    expect(mockUploadSignature.execute).not.toHaveBeenCalled();
   });
 
   it('AT-15 — uploadSignature to completed record → 409 ConflictException', async () => {

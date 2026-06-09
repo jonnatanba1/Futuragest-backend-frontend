@@ -50,7 +50,7 @@ export class MustChangePasswordGuard implements CanActivate {
       throw new ForbiddenException({
         statusCode: 403,
         code: 'PASSWORD_CHANGE_REQUIRED',
-        message: 'You must change your password before accessing this resource',
+        message: 'Debe cambiar su contraseña antes de acceder a este recurso',
       });
     }
 

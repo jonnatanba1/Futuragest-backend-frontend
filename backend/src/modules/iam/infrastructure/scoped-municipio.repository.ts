@@ -11,6 +11,10 @@
  *
  * W4 constraint: must NOT use include:{ zone } or include:{ supervisors }
  * — those are scoped relations. Issue separate scoped queries if needed.
+ *
+ * Write methods (create/update/delete/findUniqueForWrite) are defined here
+ * because this file is the only sanctioned location for direct prisma.municipio.* calls.
+ * PrismaOrgRepository delegates to these methods for municipio CRUD.
  */
 
 import { Injectable } from '@nestjs/common';
@@ -26,9 +30,17 @@ export class ScopedMunicipioRepository extends ScopedRepository<
 > {
   protected readonly model = 'Municipio';
 
-  constructor(prisma: PrismaService, scopeHolder: ScopeContextHolder) {
+  private readonly prismaMunicipio: PrismaService['municipio'];
+
+  constructor(
+    private readonly prisma: PrismaService,
+    scopeHolder: ScopeContextHolder,
+  ) {
     super(prisma.municipio, scopeHolder);
+    this.prismaMunicipio = prisma.municipio;
   }
+
+  // ─── Read ──────────────────────────────────────────────────────────────────
 
   /**
    * List municipios visible to the current principal.
@@ -44,5 +56,40 @@ export class ScopedMunicipioRepository extends ScopedRepository<
    */
   findById(id: string): Promise<Municipio | null> {
     return this.findFirstScoped({ where: { id } });
+  }
+
+  // ─── Write (sanctioned — this file is the only allowed caller of prisma.municipio.*) ─
+
+  /**
+   * Find a municipio by id WITHOUT scope restriction — for write-path existence checks.
+   */
+  findByIdForWrite(id: string): Promise<Municipio | null> {
+    return this.prismaMunicipio.findUnique({ where: { id } });
+  }
+
+  /** Create a new municipio. */
+  create(data: { name: string; zoneId: string }): Promise<Municipio> {
+    return this.prismaMunicipio.create({ data });
+  }
+
+  /** Update a municipio. */
+  update(id: string, data: { name?: string; zoneId?: string }): Promise<Municipio> {
+    return this.prismaMunicipio.update({ where: { id }, data });
+  }
+
+  /**
+   * Count supervisors in this municipio — used for referential guard before delete.
+   */
+  async countSupervisors(id: string): Promise<number> {
+    const result = await this.prismaMunicipio.findUnique({
+      where: { id },
+      include: { _count: { select: { supervisors: true } } },
+    });
+    return result?._count.supervisors ?? 0;
+  }
+
+  /** Delete a municipio by id. */
+  delete(id: string): Promise<Municipio> {
+    return this.prismaMunicipio.delete({ where: { id } });
   }
 }

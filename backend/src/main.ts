@@ -6,6 +6,20 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // CORS — required for the web admin panel (the browser enforces it; the
+  // Flutter app is native and unaffected). Origins are configurable via
+  // CORS_ORIGINS (comma-separated); defaults cover the Vite dev + preview ports.
+  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   // Swagger / OpenAPI setup
   const config = new DocumentBuilder()
     .setTitle('FuturaGest API')

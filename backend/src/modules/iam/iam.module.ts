@@ -50,6 +50,8 @@ import { CreateOperarioUseCase } from './application/create-operario.use-case';
 import { DeactivateOperarioUseCase } from './application/deactivate-operario.use-case';
 import { ReactivateOperarioUseCase } from './application/reactivate-operario.use-case';
 import { BulkImportOperariosUseCase } from './application/bulk-import-operarios.use-case';
+import { CreateSupervisorUseCase } from './application/create-supervisor.use-case';
+import { ReassignOperarioUseCase } from './application/reassign-operario.use-case';
 import { ORG_REPOSITORY_PORT } from './domain/ports/org-repository.port';
 import type { OrgRepositoryPort } from './domain/ports/org-repository.port';
 import { OPERARIO_REPOSITORY } from './domain/ports/operario.repository.port';
@@ -63,6 +65,8 @@ import {
   DEACTIVATE_OPERARIO_USE_CASE,
   REACTIVATE_OPERARIO_USE_CASE,
   BULK_IMPORT_OPERARIOS_USE_CASE,
+  CREATE_SUPERVISOR_USE_CASE,
+  REASSIGN_OPERARIO_USE_CASE,
 } from './interface/operario.controller';
 import { RolesGuard } from './interface/roles.guard';
 
@@ -234,6 +238,14 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
       inject: [OPERARIO_REPOSITORY],
     },
 
+    // ── ReassignOperarioUseCase — REQUEST-SCOPED ──────────────────────────
+    {
+      provide: REASSIGN_OPERARIO_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (repo: OperarioRepositoryPort) => new ReassignOperarioUseCase(repo),
+      inject: [OPERARIO_REPOSITORY],
+    },
+
     // ── BulkImportOperariosUseCase — REQUEST-SCOPED ────────────────────────
     // Parser (parseOperarioImport) is a pure function — imported directly in the
     // controller; this use-case only receives pre-parsed rows.
@@ -242,6 +254,21 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
       scope: Scope.REQUEST,
       useFactory: (repo: OperarioRepositoryPort) => new BulkImportOperariosUseCase(repo),
       inject: [OPERARIO_REPOSITORY],
+    },
+
+    // ── CreateSupervisorUseCase — REQUEST-SCOPED ────────────────────────────
+    // Depends on ScopedSupervisorRepository (compound write), ScopedZoneRepository,
+    // ScopedMunicipioRepository, and PasswordHasherPort (from AuthModule).
+    {
+      provide: CREATE_SUPERVISOR_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (
+        supervisorRepo: ScopedSupervisorRepository,
+        zoneRepo: ScopedZoneRepository,
+        municipioRepo: ScopedMunicipioRepository,
+        hasher: PasswordHasherPort,
+      ) => new CreateSupervisorUseCase(supervisorRepo, zoneRepo, municipioRepo, hasher),
+      inject: [ScopedSupervisorRepository, ScopedZoneRepository, ScopedMunicipioRepository, PASSWORD_HASHER_PORT],
     },
 
     // ── Guards ─────────────────────────────────────────────────────────────

@@ -34,6 +34,8 @@ function makeRepo(user: AuthUser = makeUser()): jest.Mocked<AuthRepositoryPort> 
     updatePassword: jest.fn().mockResolvedValue(undefined),
     clearMustChangePassword: jest.fn().mockResolvedValue(undefined),
     findUserWithScope: jest.fn(),
+    updatePushToken: jest.fn(),
+    clearPushToken: jest.fn(),
   };
 }
 

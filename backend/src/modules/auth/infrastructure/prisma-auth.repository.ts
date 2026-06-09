@@ -19,7 +19,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
   async findUserByEmail(email: string): Promise<AuthUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { supervisor: { select: { id: true } } },
+      include: { supervisor: { select: { id: true, zoneId: true } } },
     });
 
     if (!user) return null;
@@ -29,7 +29,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
   async findUserById(id: string): Promise<AuthUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { supervisor: { select: { id: true } } },
+      include: { supervisor: { select: { id: true, zoneId: true } } },
     });
 
     if (!user) return null;
@@ -114,6 +114,26 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     });
   }
 
+  async updatePushToken(userId: string, deviceId: string, pushToken: string, platform?: string): Promise<void> {
+    await this.prisma.deviceSession.updateMany({
+      where: { userId, deviceId },
+      data: {
+        pushToken,
+        pushPlatform: platform ?? null,
+      },
+    });
+  }
+
+  async clearPushToken(userId: string, deviceId: string): Promise<void> {
+    await this.prisma.deviceSession.updateMany({
+      where: { userId, deviceId },
+      data: {
+        pushToken: null,
+        pushPlatform: null,
+      },
+    });
+  }
+
   async findUserWithScope(userId: string): Promise<UserProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -145,7 +165,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     role: string;
     mustChangePassword: boolean;
     coordinatedZoneId: string | null;
-    supervisor: { id: string } | null;
+    supervisor: { id: string; zoneId: string } | null;
   }): AuthUser {
     return {
       id: user.id,
@@ -155,6 +175,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
       mustChangePassword: user.mustChangePassword,
       coordinatedZoneId: user.coordinatedZoneId,
       supervisorId: user.supervisor?.id ?? null,
+      supervisorZoneId: user.supervisor?.zoneId ?? null,
     };
   }
 
@@ -167,6 +188,8 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     revokedAt: Date | null;
     lastSeenAt: Date;
     createdAt: Date;
+    pushToken?: string | null;
+    pushPlatform?: string | null;
   }): DeviceSessionData {
     return {
       id: session.id,

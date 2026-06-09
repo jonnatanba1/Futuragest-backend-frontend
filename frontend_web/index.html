@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FuturaGest</title>
+    <!-- Apply the persisted Mantine color scheme before first paint to avoid a
+         flash of the wrong theme on reload. Only acts on an explicit user choice
+         (light/dark); 'auto'/unset is left to Mantine's media-query handling. -->
+    <script>
+      try {
+        var s = localStorage.getItem('mantine-color-scheme-value');
+        if (s === 'dark' || s === 'light') {
+          document.documentElement.setAttribute('data-mantine-color-scheme', s);
+        }
+      } catch (e) {
+        /* localStorage unavailable — ignore */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

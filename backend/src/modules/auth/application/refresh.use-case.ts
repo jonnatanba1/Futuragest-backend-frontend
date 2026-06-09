@@ -61,6 +61,10 @@ export class RefreshUseCase {
       claims.zoneId = user.coordinatedZoneId;
     } else if (user.role === 'SUPERVISOR' && user.supervisorId) {
       claims.supervisorId = user.supervisorId;
+      // Keep zoneId in scope on refresh too — attendance writes need it.
+      if (user.supervisorZoneId) {
+        claims.zoneId = user.supervisorZoneId;
+      }
     }
 
     if (user.mustChangePassword) {

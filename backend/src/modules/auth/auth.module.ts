@@ -29,6 +29,8 @@ import { ChangePasswordUseCase } from './application/change-password.use-case';
 import { RefreshUseCase } from './application/refresh.use-case';
 import { RevokeDeviceUseCase } from './application/revoke-device.use-case';
 import { GetMeUseCase } from './application/get-me.use-case';
+import { RegisterPushTokenUseCase } from './application/register-push-token.use-case';
+import { UnregisterPushTokenUseCase } from './application/unregister-push-token.use-case';
 
 import { AuthController } from './interface/auth.controller';
 import { AuthGuard } from './interface/auth.guard';
@@ -43,6 +45,8 @@ import {
   REFRESH_USE_CASE,
   REVOKE_DEVICE_USE_CASE,
   GET_ME_USE_CASE,
+  REGISTER_PUSH_TOKEN_USE_CASE,
+  UNREGISTER_PUSH_TOKEN_USE_CASE,
 } from './interface/auth.controller';
 
 /** Safe dev-only fallback secret — NEVER used in production. */
@@ -115,6 +119,16 @@ function resolveJwtSecret(): string {
     {
       provide: GET_ME_USE_CASE,
       useFactory: (repo: PrismaAuthRepository) => new GetMeUseCase(repo),
+      inject: [AUTH_REPOSITORY_PORT],
+    },
+    {
+      provide: REGISTER_PUSH_TOKEN_USE_CASE,
+      useFactory: (repo: PrismaAuthRepository) => new RegisterPushTokenUseCase(repo),
+      inject: [AUTH_REPOSITORY_PORT],
+    },
+    {
+      provide: UNREGISTER_PUSH_TOKEN_USE_CASE,
+      useFactory: (repo: PrismaAuthRepository) => new UnregisterPushTokenUseCase(repo),
       inject: [AUTH_REPOSITORY_PORT],
     },
 

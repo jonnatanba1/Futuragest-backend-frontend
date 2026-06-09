@@ -895,4 +895,34 @@ describe('Operario Management Integration Suite (PR-1)', () => {
       expect(inactiveEntry).toBeDefined();
     });
   });
+
+  describe('PATCH /iam/operarios/:id — reassign supervisor', () => {
+    it('SYSTEM_ADMIN reassigns an operario to another supervisor → 200', async () => {
+      const opId = await createOperario(s1Id, '90000001', 'Reassign Me');
+      const resp = await request(app.getHttpServer())
+        .patch(`/iam/operarios/${opId}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ supervisorId: s2Id })
+        .expect(200);
+      expect((resp.body as { supervisorId: string }).supervisorId).toBe(s2Id);
+    });
+
+    it('reassign to a non-existent supervisor → 400', async () => {
+      const opId = await createOperario(s1Id, '90000002', 'Bad Reassign');
+      await request(app.getHttpServer())
+        .patch(`/iam/operarios/${opId}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ supervisorId: '00000000-0000-0000-0000-000000000000' })
+        .expect(400);
+    });
+
+    it('COORDINADOR (non write-role) is forbidden → 403', async () => {
+      const opId = await createOperario(s1Id, '90000003', 'No Perms');
+      await request(app.getHttpServer())
+        .patch(`/iam/operarios/${opId}`)
+        .set('Authorization', `Bearer ${tokenCoord}`)
+        .send({ supervisorId: s2Id })
+        .expect(403);
+    });
+  });
 });

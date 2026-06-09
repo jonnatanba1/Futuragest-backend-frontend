@@ -48,3 +48,14 @@ prisma/migrations/
 *.local
 
 # Docker
+
+# AI agent tooling — local only
+.agents/
+skills-lock.json
+
+# Nested git repo — managed separately (has its own .git)
+frontend_flutter/
+
+# Office temp/lock files
+~$*
+doc/~$*

@@ -18,6 +18,8 @@ const PRESIGNED_TTL_SECONDS = 300;
 
 export interface GetSignatureUrlInput {
   id: string;
+  /** Which signature to fetch. Defaults to 'checkin' for backward compatibility. */
+  phase?: 'checkin' | 'checkout';
 }
 
 export interface GetSignatureUrlOutput {
@@ -37,17 +39,17 @@ export class GetSignatureUrlUseCase {
       throw new AttendanceNotFoundError(input.id);
     }
 
-    // 2. Signature existence check — null = not yet uploaded → 404
-    if (!attendance.signatureKey) {
-      throw new AttendanceNotFoundError(`${input.id} (no signature uploaded)`);
+    // 2. Pick the requested signature key (default: check-in).
+    const phase = input.phase ?? 'checkin';
+    const key = phase === 'checkout' ? attendance.checkOutSignatureKey : attendance.signatureKey;
+
+    // 3. Signature existence check — null = not yet uploaded → 404
+    if (!key) {
+      throw new AttendanceNotFoundError(`${input.id} (no ${phase} signature uploaded)`);
     }
 
-    // 3. Get presigned URL (~300s TTL)
-    const url = await this.storage.getPresignedGetUrl(
-      BUCKET,
-      attendance.signatureKey,
-      PRESIGNED_TTL_SECONDS,
-    );
+    // 4. Get presigned URL (~300s TTL)
+    const url = await this.storage.getPresignedGetUrl(BUCKET, key, PRESIGNED_TTL_SECONDS);
 
     return { url };
   }

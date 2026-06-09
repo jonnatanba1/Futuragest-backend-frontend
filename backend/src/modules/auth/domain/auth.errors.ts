@@ -7,56 +7,56 @@
 
 export class InvalidCredentialsError extends Error {
   constructor() {
-    super('Invalid email or password');
+    super('Correo o contraseña incorrectos');
     this.name = 'InvalidCredentialsError';
   }
 }
 
 export class PasswordMismatchError extends Error {
   constructor() {
-    super('Current password is incorrect');
+    super('La contraseña actual es incorrecta');
     this.name = 'PasswordMismatchError';
   }
 }
 
 export class SamePasswordError extends Error {
   constructor() {
-    super('New password must differ from the current password');
+    super('La contraseña nueva debe ser distinta de la actual');
     this.name = 'SamePasswordError';
   }
 }
 
 export class DeviceNotBoundError extends Error {
   constructor(deviceId: string) {
-    super(`Device '${deviceId}' is not bound to this user`);
+    super(`El dispositivo '${deviceId}' no está vinculado a este usuario`);
     this.name = 'DeviceNotBoundError';
   }
 }
 
 export class DeviceRevokedError extends Error {
   constructor(deviceId: string) {
-    super(`Device '${deviceId}' has been revoked`);
+    super(`El dispositivo '${deviceId}' ha sido revocado`);
     this.name = 'DeviceRevokedError';
   }
 }
 
 export class SessionNotFoundError extends Error {
   constructor() {
-    super('Session not found');
+    super('Sesión no encontrada');
     this.name = 'SessionNotFoundError';
   }
 }
 
 export class MaxDevicesExceededError extends Error {
   constructor(max: number) {
-    super(`Maximum number of active devices (${max}) exceeded`);
+    super(`Se superó el número máximo de dispositivos activos (${max})`);
     this.name = 'MaxDevicesExceededError';
   }
 }
 
 export class UserNotFoundError extends Error {
   constructor() {
-    super('User not found');
+    super('Usuario no encontrado');
     this.name = 'UserNotFoundError';
   }
 }

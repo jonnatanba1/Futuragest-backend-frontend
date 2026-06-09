@@ -415,11 +415,15 @@ describe('Scope Isolation Integration Suite (PR4 SECURITY GATE)', () => {
         .set('Authorization', `Bearer ${tokenGerencia}`)
         .expect(200);
 
-      const supervisors = resp.body as Array<{ id: string }>;
+      const supervisors = resp.body as Array<{ id: string; email: string }>;
       const ids = supervisors.map((s) => s.id);
       expect(ids).toContain(supA1Id);
       expect(ids).toContain(supA2Id);
       expect(ids).toContain(supB1Id);
+
+      // Each supervisor carries its user's email for display (Change: web panel).
+      const supA1 = supervisors.find((s) => s.id === supA1Id);
+      expect(supA1?.email).toBe('sup-a1-scope-test@futuragest.co');
     });
 
     it('TALENTO_HUMANO sees supervisors from BOTH zones', async () => {
@@ -483,11 +487,12 @@ describe('Scope Isolation Integration Suite (PR4 SECURITY GATE)', () => {
   // that are not listed in @Roles() BEFORE the scope filter even runs.
 
   describe('C2 — RolesGuard coarse role gate', () => {
-    // IAM read routes require specific roles. LIDER_OPERATIVO is intentionally
-    // excluded from IAM supervisor/operario routes per design §3.4 (they have
-    // global scope but no operational need to list supervisors/operarios via IAM).
-    // We use LIDER_OPERATIVO as the canary "not permitted" role for these tests.
+    // IAM read routes require a role in IAM_READ_ROLES (now all 6 real roles).
+    // To prove RolesGuard still rejects a role NOT in the allowlist, we use a
+    // fabricated role (GHOST_ROLE) as the canary. LIDER_OPERATIVO is now PERMITTED
+    // (it must resolve operario/supervisor names when reviewing novedades).
     let tokenLiderOp: string;
+    let tokenGhost: string;
     let liderUserId: string;
 
     beforeAll(async () => {
@@ -515,20 +520,29 @@ describe('Scope Isolation Integration Suite (PR4 SECURITY GATE)', () => {
       });
 
       tokenLiderOp = mintToken({ sub: liderUserId, role: 'LIDER_OPERATIVO' });
+      // Same valid session/sub, but a role NOT present in any allowlist.
+      tokenGhost = mintToken({ sub: liderUserId, role: 'GHOST_ROLE' });
     });
 
-    it('LIDER_OPERATIVO is rejected by RolesGuard on GET /iam/supervisors (403)', async () => {
+    it('a role not in the allowlist (GHOST_ROLE) is rejected by RolesGuard (403)', async () => {
+      await request(app.getHttpServer())
+        .get('/iam/supervisors')
+        .set('Authorization', `Bearer ${tokenGhost}`)
+        .expect(403);
+    });
+
+    it('LIDER_OPERATIVO is allowed by RolesGuard on GET /iam/supervisors (200)', async () => {
       await request(app.getHttpServer())
         .get('/iam/supervisors')
         .set('Authorization', `Bearer ${tokenLiderOp}`)
-        .expect(403);
+        .expect(200);
     });
 
-    it('LIDER_OPERATIVO is rejected by RolesGuard on GET /iam/operarios (403)', async () => {
+    it('LIDER_OPERATIVO is allowed by RolesGuard on GET /iam/operarios (200)', async () => {
       await request(app.getHttpServer())
         .get('/iam/operarios')
         .set('Authorization', `Bearer ${tokenLiderOp}`)
-        .expect(403);
+        .expect(200);
     });
 
     it('COORDINADOR is allowed by RolesGuard on GET /iam/supervisors (200)', async () => {

@@ -20,8 +20,8 @@ export class DuplicateDocumentoError extends Error {
 
   constructor(documento: string) {
     super(
-      `[operario] An operario with documento "${documento}" already exists. ` +
-        `documento must be unique across all operarios.`,
+      `Ya existe un operario con el documento "${documento}". ` +
+        `El documento debe ser único.`,
     );
     this.name = 'DuplicateDocumentoError';
   }
@@ -35,8 +35,8 @@ export class OperarioSupervisorNotFoundError extends Error {
 
   constructor(supervisorEmail: string) {
     super(
-      `[operario] Supervisor with email "${supervisorEmail}" not found. ` +
-        `Provide a valid supervisor email address.`,
+      `El supervisor con correo "${supervisorEmail}" no fue encontrado. ` +
+        `Proporcione un correo de supervisor válido.`,
     );
     this.name = 'OperarioSupervisorNotFoundError';
   }
@@ -51,8 +51,7 @@ export class AlreadyInactiveError extends Error {
 
   constructor(operarioId: string) {
     super(
-      `[operario] Operario "${operarioId}" is already inactive. ` +
-        `Cannot deactivate an already-inactive operario.`,
+      `El operario "${operarioId}" ya está inactivo. No es posible desactivar un operario que ya está inactivo.`,
     );
     this.name = 'AlreadyInactiveError';
   }
@@ -67,8 +66,7 @@ export class AlreadyActiveError extends Error {
 
   constructor(operarioId: string) {
     super(
-      `[operario] Operario "${operarioId}" is already active. ` +
-        `Cannot reactivate an already-active operario.`,
+      `El operario "${operarioId}" ya está activo. No es posible reactivar un operario que ya está activo.`,
     );
     this.name = 'AlreadyActiveError';
   }
@@ -82,7 +80,7 @@ export class OperarioNotFoundError extends Error {
 
   constructor(operarioId: string) {
     super(
-      `[operario] Operario "${operarioId}" not found or not accessible in current scope.`,
+      `El operario "${operarioId}" no fue encontrado o no es accesible en el ámbito actual.`,
     );
     this.name = 'OperarioNotFoundError';
   }

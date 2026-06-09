@@ -13,7 +13,7 @@ import type { OrgRepositoryPort } from './org-repository.port';
 import type { Zone, Municipio } from '@prisma/client';
 
 // A minimal stub that satisfies the interface shape — proves the interface
-// declares the four required methods with compatible signatures.
+// declares the required methods with compatible signatures.
 class StubOrgRepository implements OrgRepositoryPort {
   createManagementUser(_params: Parameters<OrgRepositoryPort['createManagementUser']>[0]): Promise<{ id: string }> {
     return Promise.resolve({ id: 'stub-id' });
@@ -28,6 +28,34 @@ class StubOrgRepository implements OrgRepositoryPort {
   }
 
   findMunicipios(): Promise<Municipio[]> {
+    return Promise.resolve([]);
+  }
+
+  createZone(_params: Parameters<OrgRepositoryPort['createZone']>[0]): Promise<{ id: string }> {
+    return Promise.resolve({ id: 'stub-zone-id' });
+  }
+
+  updateZone(_id: string, _params: Parameters<OrgRepositoryPort['updateZone']>[1]): Promise<Zone> {
+    return Promise.resolve({ id: 'stub-zone-id', name: 'stub', createdAt: new Date(), updatedAt: new Date() });
+  }
+
+  deleteZone(_id: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  createMunicipio(_params: Parameters<OrgRepositoryPort['createMunicipio']>[0]): Promise<{ id: string }> {
+    return Promise.resolve({ id: 'stub-muni-id' });
+  }
+
+  updateMunicipio(_id: string, _params: Parameters<OrgRepositoryPort['updateMunicipio']>[1]): Promise<Municipio> {
+    return Promise.resolve({ id: 'stub-muni-id', name: 'stub', zoneId: 'stub-zone-id', createdAt: new Date(), updatedAt: new Date() });
+  }
+
+  deleteMunicipio(_id: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  findUsers(): Promise<Awaited<ReturnType<OrgRepositoryPort['findUsers']>>> {
     return Promise.resolve([]);
   }
 }

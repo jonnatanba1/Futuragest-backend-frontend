@@ -44,10 +44,26 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     createManagementUser: jest.fn().mockResolvedValue({ id: 'new-id' }),
     assignCoordinador: jest.fn().mockResolvedValue(undefined),
     findZones: jest.fn().mockResolvedValue([
-      { id: 'zone-1', name: 'Zona Urabá', createdAt: new Date() },
+      { id: 'zone-1', name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() },
     ]),
     findMunicipios: jest.fn().mockResolvedValue([
-      { id: 'mun-1', name: 'Apartadó', zoneId: 'zone-1', createdAt: new Date() },
+      { id: 'mun-1', name: 'Apartadó', zoneId: 'zone-1', createdAt: new Date(), updatedAt: new Date() },
+    ]),
+    createZone: jest.fn().mockResolvedValue({ id: 'new-zone-id' }),
+    updateZone: jest.fn().mockResolvedValue({ id: 'zone-1', name: 'Renamed', createdAt: new Date(), updatedAt: new Date() }),
+    deleteZone: jest.fn().mockResolvedValue(undefined),
+    createMunicipio: jest.fn().mockResolvedValue({ id: 'new-muni-id' }),
+    updateMunicipio: jest.fn().mockResolvedValue({ id: 'mun-1', name: 'Renamed', zoneId: 'zone-1', createdAt: new Date(), updatedAt: new Date() }),
+    deleteMunicipio: jest.fn().mockResolvedValue(undefined),
+    findUsers: jest.fn().mockResolvedValue([
+      {
+        id: 'user-1',
+        email: 'admin@futuragest.co',
+        role: 'SYSTEM_ADMIN',
+        mustChangePassword: false,
+        coordinatedZoneId: null,
+        createdAt: new Date(),
+      },
     ]),
   };
 }

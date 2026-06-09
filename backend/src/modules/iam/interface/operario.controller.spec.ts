@@ -15,6 +15,8 @@ import {
   DEACTIVATE_OPERARIO_USE_CASE,
   REACTIVATE_OPERARIO_USE_CASE,
   BULK_IMPORT_OPERARIOS_USE_CASE,
+  CREATE_SUPERVISOR_USE_CASE,
+  REASSIGN_OPERARIO_USE_CASE,
 } from './operario.controller';
 import {
   DuplicateDocumentoError,
@@ -56,6 +58,8 @@ describe('OperarioController', () => {
   let deactivateUseCase: { execute: jest.Mock };
   let reactivateUseCase: { execute: jest.Mock };
   let bulkImportUseCase: { execute: jest.Mock };
+  let createSupervisorUseCase: { execute: jest.Mock };
+  let reassignUseCase: { execute: jest.Mock };
 
   const sampleImportResult = { imported: 2, failed: 0, errors: [] };
 
@@ -64,6 +68,8 @@ describe('OperarioController', () => {
     deactivateUseCase = { execute: jest.fn().mockResolvedValue({ ...sampleDto, active: false, deactivatedAt: new Date().toISOString() }) };
     reactivateUseCase = { execute: jest.fn().mockResolvedValue({ ...sampleDto, active: true, deactivatedAt: null }) };
     bulkImportUseCase = { execute: jest.fn().mockResolvedValue(sampleImportResult) };
+    createSupervisorUseCase = { execute: jest.fn().mockResolvedValue({ id: 'sup-1' }) };
+    reassignUseCase = { execute: jest.fn().mockResolvedValue(sampleDto) };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OperarioController],
@@ -72,6 +78,8 @@ describe('OperarioController', () => {
         { provide: DEACTIVATE_OPERARIO_USE_CASE, useValue: deactivateUseCase },
         { provide: REACTIVATE_OPERARIO_USE_CASE, useValue: reactivateUseCase },
         { provide: BULK_IMPORT_OPERARIOS_USE_CASE, useValue: bulkImportUseCase },
+        { provide: CREATE_SUPERVISOR_USE_CASE, useValue: createSupervisorUseCase },
+        { provide: REASSIGN_OPERARIO_USE_CASE, useValue: reassignUseCase },
         Reflector,
       ],
     })
