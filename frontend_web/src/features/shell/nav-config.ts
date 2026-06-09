@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Operarios', path: '/operarios', roles: OPERARIO_READ_ROLES },
   { label: 'Asistencia', path: '/asistencia', roles: OFFICE_ROLES },
   { label: 'Novedades', path: '/novedades', roles: OFFICE_ROLES },
+  { label: 'Compensación', path: '/compensacion', roles: OFFICE_ROLES },
   { label: 'Administración', path: '/admin', roles: ADMIN_ROLES },
 ];
 

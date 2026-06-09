@@ -22,6 +22,9 @@ const NovedadesPage = lazy(() =>
 const AdminPage = lazy(() =>
   import('../features/admin/AdminPage').then((m) => ({ default: m.AdminPage })),
 );
+const CompensacionPage = lazy(() =>
+  import('../features/compensacion/CompensacionPage').then((m) => ({ default: m.CompensacionPage })),
+);
 
 export function AppRoutes() {
   return (
@@ -80,6 +83,14 @@ export function AppRoutes() {
           element={
             <RequireAuth roles={ADMIN_ROLES}>
               <AdminPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="compensacion"
+          element={
+            <RequireAuth roles={OFFICE_ROLES}>
+              <CompensacionPage />
             </RequireAuth>
           }
         />
