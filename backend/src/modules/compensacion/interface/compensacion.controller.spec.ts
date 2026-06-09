@@ -144,6 +144,18 @@ describe('CompensacionController', () => {
       expect(result.breakdown).toHaveLength(1);
     });
 
+    it('EP-01e — balance response includes carryIn as decimal string', async () => {
+      const balance = makeBalance(-0.5);
+      mockGetBalance.mockResolvedValue(balance);
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', mockRes);
+
+      // carryIn must be present and be a string (makeBalance sets carryIn to Decimal(0))
+      expect(result.carryIn).toEqual(expect.any(String));
+      expect(result.carryIn).toBe('0');
+    });
+
     it('EP-01b — use-case throws OperarioNotInScopeError → NotFoundException (404)', async () => {
       mockGetBalance.mockRejectedValue(new OperarioNotInScopeError('OUT-OF-SCOPE'));
 

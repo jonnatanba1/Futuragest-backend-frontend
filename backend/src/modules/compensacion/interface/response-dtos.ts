@@ -112,6 +112,9 @@ export class PeriodBalanceResponseDto {
   @ApiProperty({ description: 'Σ |negative deltas| (hours). Decimal string.', example: '1.00' })
   debitosHoras!: string;
 
+  @ApiProperty({ description: 'carryIn from previous CARRY_OVER period (≤ 0). Decimal string.', example: '0.00' })
+  carryIn!: string;
+
   @ApiProperty({ description: 'carryIn + creditos - debitos. Decimal string.', example: '-0.25' })
   saldoHoras!: string;
 

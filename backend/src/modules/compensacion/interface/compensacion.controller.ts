@@ -203,6 +203,7 @@ function serializeBalance(
     hasta,
     creditosHoras: balance.creditos.toString(),
     debitosHoras: balance.debitos.toString(),
+    carryIn: balance.carryIn.toString(),
     saldoHoras: balance.saldo.toString(),
     breakdown,
   };
