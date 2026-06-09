@@ -28,28 +28,44 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiProperty } from '@nestjs/swagger';
-import { IsNumber as IsNumberValidator, Max, Min, Matches as MatchesValidator } from 'class-validator';
-import type { Response } from 'express';
+import {
+  IsNumber as IsNumberValidator,
+  Max,
+  Min,
+  Matches as MatchesValidator,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
+import type { Request, Response } from 'express';
 import { Roles } from '../../iam/interface/roles.decorator';
 import type { GetPeriodBalanceUseCase } from '../application/get-period-balance.use-case';
 import type { SetJornadaPolicyUseCase } from '../application/set-jornada-policy.use-case';
 import type { GetJornadaPolicyTimelineUseCase } from '../application/get-jornada-policy-timeline.use-case';
+import type { CloseCompensationPeriodUseCase } from '../application/close-compensation-period.use-case';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import type {
+  CompensationPeriodRecord,
+  CompensationDisposition,
+} from '../domain/ports/compensation-period-repository.port';
 import {
   NoPolicyForDateError,
   JornadaPolicyOverlapsLiquidatedPeriodError,
   JornadaPolicyDuplicateEffectiveDateError,
   JornadaPolicyInvalidHorasError,
+  CompensationPeriodAlreadyClosedError,
+  DispositionRequiredError,
 } from '../domain/compensacion.errors';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import {
   PeriodBalanceResponseDto,
   JornadaPolicyResponseDto,
+  CompensationPeriodResponseDto,
   DayBreakdownDto,
 } from './response-dtos';
 
@@ -58,6 +74,7 @@ import {
 export const GET_PERIOD_BALANCE_USE_CASE = Symbol('GetPeriodBalanceUseCase');
 export const SET_JORNADA_POLICY_USE_CASE = Symbol('SetJornadaPolicyUseCase');
 export const GET_JORNADA_POLICY_TIMELINE_USE_CASE = Symbol('GetJornadaPolicyTimelineUseCase');
+export const CLOSE_COMPENSATION_PERIOD_USE_CASE = Symbol('CloseCompensationPeriodUseCase');
 
 // ─── Role constants ────────────────────────────────────────────────────────────
 
@@ -78,6 +95,12 @@ const READ_ROLES = [
  */
 const WRITE_POLICY_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
 
+/**
+ * Only TALENTO_HUMANO and SYSTEM_ADMIN may close a fortnight and decide disposition.
+ * Decision #174-5 (REQ-RBAC-03): fortnight close requires HR authority.
+ */
+const CLOSE_PERIOD_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
+
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export class SetJornadaPolicyBody {
@@ -92,6 +115,29 @@ export class SetJornadaPolicyBody {
     message: 'vigenteDesde debe tener el formato YYYY-MM-DD',
   })
   vigenteDesde!: string;
+}
+
+export class CloseFortnightBody {
+  @ApiProperty({ description: 'Fortnight start — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-01' })
+  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener el formato YYYY-MM-DD' })
+  desde!: string;
+
+  @ApiProperty({ description: 'Fortnight end — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-15' })
+  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener el formato YYYY-MM-DD' })
+  hasta!: string;
+
+  @ApiProperty({
+    description: 'Required when saldo < 0. CARRY_OVER rolls debt to next period; PAYROLL_DEDUCTION settles in payroll.',
+    enum: ['CARRY_OVER', 'PAYROLL_DEDUCTION'],
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(['CARRY_OVER', 'PAYROLL_DEDUCTION'], { message: 'disposition debe ser CARRY_OVER o PAYROLL_DEDUCTION' })
+  disposition?: CompensationDisposition | null;
+
+  @ApiProperty({ description: 'Optional client idempotency token', required: false })
+  @IsOptional()
+  clientRef?: string | null;
 }
 
 // ─── Error → HTTP helper ──────────────────────────────────────────────────────
@@ -111,6 +157,13 @@ function mapDomainError(err: unknown): never {
   }
   if (err instanceof OperarioNotInScopeError) {
     throw new NotFoundException(err.message);
+  }
+  // PR-B errors
+  if (err instanceof CompensationPeriodAlreadyClosedError) {
+    throw new ConflictException({ error: err.code, message: err.message });
+  }
+  if (err instanceof DispositionRequiredError) {
+    throw new UnprocessableEntityException({ error: err.code, message: err.message });
   }
   throw err;
 }
@@ -150,6 +203,26 @@ function serializePolicy(policy: JornadaPolicyRecord): JornadaPolicyResponseDto 
   };
 }
 
+function serializePeriod(period: CompensationPeriodRecord): CompensationPeriodResponseDto {
+  return {
+    id: period.id,
+    operarioId: period.operarioId,
+    periodKey: period.periodKey,
+    desde: period.desde,
+    hasta: period.hasta,
+    creditosHoras: period.creditos.toString(),
+    debitosHoras: period.debitos.toString(),
+    carryIn: period.carryIn.toString(),
+    saldoHoras: period.saldo.toString(),
+    disposition: period.disposition,
+    approvedByUserId: period.approvedByUserId,
+    decidedAt: period.decidedAt?.toISOString() ?? null,
+    closedAt: period.closedAt.toISOString(),
+    clientRef: period.clientRef,
+    createdAt: period.createdAt.toISOString(),
+  };
+}
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 
 @Controller()
@@ -161,6 +234,8 @@ export class CompensacionController {
     private readonly setJornadaPolicyUseCase: Pick<SetJornadaPolicyUseCase, 'execute'>,
     @Inject(GET_JORNADA_POLICY_TIMELINE_USE_CASE)
     private readonly getTimelineUseCase: Pick<GetJornadaPolicyTimelineUseCase, 'execute'>,
+    @Inject(CLOSE_COMPENSATION_PERIOD_USE_CASE)
+    private readonly closeUseCase: Pick<CloseCompensationPeriodUseCase, 'execute'>,
   ) {}
 
   // ── GET /compensacion/:operarioId?desde&hasta ─────────────────────────────
@@ -223,5 +298,51 @@ export class CompensacionController {
   async getJornadaPolicyTimeline(): Promise<JornadaPolicyResponseDto[]> {
     const timeline = await this.getTimelineUseCase.execute();
     return timeline.map(serializePolicy);
+  }
+
+  // ── POST /compensacion/:operarioId/close ─────────────────────────────────
+  // Closes a fortnight for an operario (immutable snapshot).
+  // Returns HTTP 201 (new close) or HTTP 200 (idempotent replay) — both passthrough @Res.
+  // approvedByUserId is taken from the JWT subject (req.user.sub).
+
+  @Roles(...CLOSE_PERIOD_ROLES)
+  @Post('compensacion/:operarioId/close')
+  @ApiCreatedResponse({ type: CompensationPeriodResponseDto })
+  @ApiOkResponse({ type: CompensationPeriodResponseDto })
+  async closeFortnight(
+    @Param('operarioId') operarioId: string,
+    @Body() body: CloseFortnightBody,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ): Promise<CompensationPeriodResponseDto> {
+    // Validate date fields
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!body.desde || !dateRegex.test(body.desde) || !body.hasta || !dateRegex.test(body.hasta)) {
+      throw new BadRequestException(
+        'Los campos "desde" y "hasta" son requeridos en formato YYYY-MM-DD',
+      );
+    }
+    if (body.desde > body.hasta) {
+      throw new BadRequestException('"desde" no puede ser posterior a "hasta"');
+    }
+
+    // Extract authenticated user id from JWT subject (set by AuthGuard)
+    const approvedByUserId = (req as unknown as { user?: { sub?: string } }).user?.sub ?? 'unknown';
+
+    try {
+      const { period, idempotent } = await this.closeUseCase.execute({
+        operarioId,
+        desde: body.desde,
+        hasta: body.hasta,
+        disposition: body.disposition ?? null,
+        approvedByUserId,
+        clientRef: body.clientRef ?? null,
+      });
+
+      res.status(idempotent ? HttpStatus.OK : HttpStatus.CREATED);
+      return serializePeriod(period);
+    } catch (err) {
+      mapDomainError(err);
+    }
   }
 }

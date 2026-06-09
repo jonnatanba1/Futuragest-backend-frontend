@@ -6,6 +6,7 @@
  */
 
 import { ApiProperty } from '@nestjs/swagger';
+import type { CompensationDisposition } from '../domain/ports/compensation-period-repository.port';
 
 // ─── GET /jornada-policy ──────────────────────────────────────────────────────
 
@@ -37,6 +38,60 @@ export class DayBreakdownDto {
 
   @ApiProperty({ description: 'horasReales - jornadaHoras. Decimal string.', example: '0.50' })
   delta!: string;
+}
+
+// ─── POST /compensacion/:operarioId/close ─────────────────────────────────────
+
+export class CompensationPeriodResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  operarioId!: string;
+
+  @ApiProperty({ description: 'Canonical fortnight identifier e.g. "2026-05-Q1"' })
+  periodKey!: string;
+
+  @ApiProperty({ description: 'YYYY-MM-DD Colombia local (inclusive)' })
+  desde!: string;
+
+  @ApiProperty({ description: 'YYYY-MM-DD Colombia local (inclusive)' })
+  hasta!: string;
+
+  @ApiProperty({ description: 'Σ positive deltas (hours). Decimal string.', example: '0.75' })
+  creditosHoras!: string;
+
+  @ApiProperty({ description: 'Σ |negative deltas| (hours). Decimal string.', example: '1.00' })
+  debitosHoras!: string;
+
+  @ApiProperty({ description: 'carryIn from previous CARRY_OVER period (≤ 0). Decimal string.', example: '0.00' })
+  carryIn!: string;
+
+  @ApiProperty({ description: 'carryIn + creditos - debitos. Decimal string.', example: '-0.50' })
+  saldoHoras!: string;
+
+  @ApiProperty({
+    description: 'Disposition decision at close. Null when saldo >= 0 (no action needed).',
+    enum: ['CARRY_OVER', 'PAYROLL_DEDUCTION'],
+    nullable: true,
+    example: 'CARRY_OVER',
+  })
+  disposition!: CompensationDisposition | null;
+
+  @ApiProperty({ format: 'uuid', nullable: true })
+  approvedByUserId!: string | null;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp — when the close decision was made', nullable: true })
+  decidedAt!: string | null;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp — immutability lock (server time at close)' })
+  closedAt!: string;
+
+  @ApiProperty({ description: 'Client-provided idempotency token', nullable: true })
+  clientRef!: string | null;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp' })
+  createdAt!: string;
 }
 
 // ─── GET /compensacion/:operarioId ────────────────────────────────────────────

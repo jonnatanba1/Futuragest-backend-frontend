@@ -10,6 +10,11 @@
  *             [TALENTO_HUMANO, SYSTEM_ADMIN] per decision #174.
  *             COORDINADOR and SUPERVISOR must NOT be in that set.
  *
+ * B8.2 PR-B additions:
+ *   EP-04a  — POST /compensacion/:operarioId/close → 201 with period snapshot.
+ *   EP-04b  — Idempotent re-close (same clientRef) → 200 with existing period.
+ *   EP-04d  — Unauthorized role → tested via role metadata assertion.
+ *
  * Uses NestJS Testing module + Reflector for metadata assertions. Mocks use-cases
  * via injection tokens.
  */
@@ -23,11 +28,13 @@ import {
   GET_PERIOD_BALANCE_USE_CASE,
   SET_JORNADA_POLICY_USE_CASE,
   GET_JORNADA_POLICY_TIMELINE_USE_CASE,
+  CLOSE_COMPENSATION_PERIOD_USE_CASE,
 } from './compensacion.controller';
 import { ROLES_KEY } from '../../iam/interface/roles.decorator';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import type { CompensationPeriodRecord } from '../domain/ports/compensation-period-repository.port';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -58,16 +65,42 @@ function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
   };
 }
 
+function makePeriodRecord(overrides: Partial<CompensationPeriodRecord> = {}): CompensationPeriodRecord {
+  return {
+    id: 'cp-1',
+    operarioId: 'O1',
+    zoneId: 'zone-1',
+    supervisorId: 'sup-1',
+    periodKey: '2026-05-Q1',
+    desde: '2026-05-01',
+    hasta: '2026-05-15',
+    creditos: new Decimal('0.50'),
+    debitos: new Decimal('1.00'),
+    carryIn: new Decimal('0.00'),
+    saldo: new Decimal('-0.50'),
+    disposition: 'CARRY_OVER',
+    approvedByUserId: 'admin-user',
+    decidedAt: new Date(),
+    closedAt: new Date(),
+    clientRef: 'ref-abc',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
 describe('CompensacionController', () => {
   let controller: CompensacionController;
   let mockGetBalance: jest.Mock;
   let mockSetPolicy: jest.Mock;
   let mockGetTimeline: jest.Mock;
+  let mockClosePeriod: jest.Mock;
 
   beforeEach(async () => {
     mockGetBalance = jest.fn();
     mockSetPolicy = jest.fn();
     mockGetTimeline = jest.fn();
+    mockClosePeriod = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompensacionController],
@@ -75,6 +108,7 @@ describe('CompensacionController', () => {
         { provide: GET_PERIOD_BALANCE_USE_CASE, useValue: { execute: mockGetBalance } },
         { provide: SET_JORNADA_POLICY_USE_CASE, useValue: { execute: mockSetPolicy } },
         { provide: GET_JORNADA_POLICY_TIMELINE_USE_CASE, useValue: { execute: mockGetTimeline } },
+        { provide: CLOSE_COMPENSATION_PERIOD_USE_CASE, useValue: { execute: mockClosePeriod } },
       ],
     })
       .overrideGuard(require('../../auth/interface/auth.guard').AuthGuard)
@@ -185,6 +219,68 @@ describe('CompensacionController', () => {
       expect(roles).not.toContain('COORDINADOR');
 
       // SUPERVISOR must never author policy
+      expect(roles).not.toContain('SUPERVISOR');
+    });
+  });
+
+  // ── B8.2 POST /compensacion/:operarioId/close ──────────────────────────────
+
+  describe('closeFortnight', () => {
+    it('EP-04a — first close → 201 with CompensationPeriodResponseDto', async () => {
+      const period = makePeriodRecord();
+      mockClosePeriod.mockResolvedValue({ period, idempotent: false });
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const mockReq = { user: { sub: 'admin-user' } } as any;
+
+      const result = await controller.closeFortnight(
+        'O1',
+        {
+          desde: '2026-05-01',
+          hasta: '2026-05-15',
+          disposition: 'CARRY_OVER',
+          clientRef: 'ref-abc',
+        },
+        mockRes,
+        mockReq,
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect(result.periodKey).toBe('2026-05-Q1');
+      expect(result.disposition).toBe('CARRY_OVER');
+      expect(result.saldoHoras).toBe('-0.5');
+    });
+
+    it('EP-04b — idempotent re-close (same clientRef) → 200 with existing period', async () => {
+      const period = makePeriodRecord();
+      mockClosePeriod.mockResolvedValue({ period, idempotent: true });
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const mockReq = { user: { sub: 'admin-user' } } as any;
+
+      const result = await controller.closeFortnight(
+        'O1',
+        {
+          desde: '2026-05-01',
+          hasta: '2026-05-15',
+          disposition: 'CARRY_OVER',
+          clientRef: 'ref-abc',
+        },
+        mockRes,
+        mockReq,
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.OK);
+      expect(result.periodKey).toBe('2026-05-Q1');
+    });
+
+    it('EP-04d — CLOSE_ROLES metadata: only TALENTO_HUMANO and SYSTEM_ADMIN', () => {
+      const reflector = new Reflector();
+      const roles: string[] = reflector.get(ROLES_KEY, controller.closeFortnight);
+
+      expect(roles).toContain('TALENTO_HUMANO');
+      expect(roles).toContain('SYSTEM_ADMIN');
+      expect(roles).not.toContain('COORDINATOR');
       expect(roles).not.toContain('SUPERVISOR');
     });
   });
