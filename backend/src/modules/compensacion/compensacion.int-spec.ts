@@ -179,8 +179,7 @@ describe('Compensacion integration (real Prisma)', () => {
     // Resolve a seed supervisor from the test DB (any supervisor will do)
     const supervisor = await prisma.supervisor.findFirst({ select: { id: true } });
     if (!supervisor) {
-      console.warn('[INT-04] No supervisor found in test DB — skipping INT-04 round-trip test.');
-      return;
+      throw new Error('[INT-04] No supervisor seeded in test DB — cannot run round-trip test');
     }
 
     // Ensure INT-04 operario exists (idempotent — delete in afterAll)
@@ -264,8 +263,7 @@ describe('Compensacion integration (real Prisma)', () => {
   it('INT-02 — close-fortnight: first close persists, second call (same clientRef) is idempotent (row count = 1)', async () => {
     const supervisor = await prisma.supervisor.findFirst({ select: { id: true, zoneId: true } });
     if (!supervisor) {
-      console.warn('[INT-02] No supervisor found in test DB — skipping INT-02.');
-      return;
+      throw new Error('[INT-02] No supervisor seeded in test DB — cannot run close test');
     }
 
     // Ensure INT-02 operario exists
@@ -336,8 +334,7 @@ describe('Compensacion integration (real Prisma)', () => {
   it('INT-03 — JornadaPolicy vigenteDesde inside a closed period → JornadaPolicyOverlapsLiquidatedPeriodError', async () => {
     const supervisor = await prisma.supervisor.findFirst({ select: { id: true, zoneId: true } });
     if (!supervisor) {
-      console.warn('[INT-03] No supervisor found in test DB — skipping INT-03.');
-      return;
+      throw new Error('[INT-03] No supervisor seeded in test DB — cannot run overlap-guard test');
     }
 
     // Ensure INT-02 operario exists (reuse seed)

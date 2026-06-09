@@ -285,7 +285,7 @@ describe('CompensacionController', () => {
 
       expect(roles).toContain('TALENTO_HUMANO');
       expect(roles).toContain('SYSTEM_ADMIN');
-      expect(roles).not.toContain('COORDINATOR');
+      expect(roles).not.toContain('COORDINADOR');
       expect(roles).not.toContain('SUPERVISOR');
     });
   });
