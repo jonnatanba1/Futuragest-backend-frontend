@@ -70,8 +70,13 @@ const READ_ROLES = [
   'LIDER_OPERATIVO',
 ] as const;
 
-/** Only COORDINADOR and SYSTEM_ADMIN may create/modify JornadaPolicy (spec REQ-RBAC-02). */
-const WRITE_POLICY_ROLES = ['COORDINADOR', 'SYSTEM_ADMIN', 'TALENTO_HUMANO'] as const;
+/**
+ * Only TALENTO_HUMANO and SYSTEM_ADMIN may create JornadaPolicy.
+ * JornadaPolicy is a company-wide HR policy (jornada laboral), not an operational
+ * supervisory action — per decision #174 the authoring authority is TALENTO_HUMANO
+ * and SYSTEM_ADMIN. COORDINADOR is explicitly excluded (spec REQ-RBAC-02 + decision #174).
+ */
+const WRITE_POLICY_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
 
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 

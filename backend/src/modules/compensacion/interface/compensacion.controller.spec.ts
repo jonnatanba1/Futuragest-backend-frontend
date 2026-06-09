@@ -1,14 +1,22 @@
 /**
- * A8.2 RED → A8.3 GREEN: CompensacionController unit spec.
+ * A8.2 RED → A8.3 GREEN (patched): CompensacionController unit spec.
  *
- * Covers EP-01a (200 balance), POST jornada-policy (201), GET jornada-policy (200 timeline),
- * EP-02a (403 for unauthorized role on POST jornada-policy).
+ * Covers:
+ *   EP-01a  — 200 balance
+ *   EP-01c  — zeros response for no attendances
+ *   EP-02b  — 201 valid insert
+ *   GET jornada-policy 200 timeline
+ *   W3-role — POST /jornada-policy WRITE_POLICY_ROLES must be exactly
+ *             [TALENTO_HUMANO, SYSTEM_ADMIN] per decision #174.
+ *             COORDINADOR and SUPERVISOR must NOT be in that set.
  *
- * Uses NestJS Testing module. Mocks use-cases via injection tokens.
+ * Uses NestJS Testing module + Reflector for metadata assertions. Mocks use-cases
+ * via injection tokens.
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Decimal } from '@prisma/client/runtime/client';
 import {
   CompensacionController,
@@ -16,6 +24,8 @@ import {
   SET_JORNADA_POLICY_USE_CASE,
   GET_JORNADA_POLICY_TIMELINE_USE_CASE,
 } from './compensacion.controller';
+import { ROLES_KEY } from '../../iam/interface/roles.decorator';
+import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 
@@ -95,6 +105,16 @@ describe('CompensacionController', () => {
       expect(result.breakdown).toHaveLength(1);
     });
 
+    it('EP-01b — use-case throws OperarioNotInScopeError → NotFoundException (404)', async () => {
+      mockGetBalance.mockRejectedValue(new OperarioNotInScopeError('OUT-OF-SCOPE'));
+
+      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+
+      await expect(
+        controller.getPeriodBalance('OUT-OF-SCOPE', '2026-05-01', '2026-05-15', mockRes),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
     it('EP-01c — no attendances → zeros in response', async () => {
       const balance: PeriodBalance = {
         creditos: new Decimal(0),
@@ -143,6 +163,29 @@ describe('CompensacionController', () => {
       expect(result).toHaveLength(2);
       expect(result[0].horasDiarias).toBe('8');
       expect(result[1].horasDiarias).toBe('7.5');
+    });
+  });
+
+  // ── W3 — WRITE_POLICY_ROLES metadata assertion ────────────────────────────
+  //
+  // Per decision #174: JornadaPolicy authoring roles = TALENTO_HUMANO + SYSTEM_ADMIN.
+  // COORDINADOR must NOT be in the set (it was the stale comment value).
+  // SUPERVISOR must NOT be in the set (least-privileged operational role).
+
+  describe('WRITE_POLICY_ROLES — @Roles metadata on setJornadaPolicy', () => {
+    it('W3 — setJornadaPolicy requires exactly TALENTO_HUMANO and SYSTEM_ADMIN', () => {
+      const reflector = new Reflector();
+      const roles: string[] = reflector.get(ROLES_KEY, controller.setJornadaPolicy);
+
+      // Must contain the two authoritative roles
+      expect(roles).toContain('TALENTO_HUMANO');
+      expect(roles).toContain('SYSTEM_ADMIN');
+
+      // COORDINADOR was the stale comment value — must be removed
+      expect(roles).not.toContain('COORDINADOR');
+
+      // SUPERVISOR must never author policy
+      expect(roles).not.toContain('SUPERVISOR');
     });
   });
 });
