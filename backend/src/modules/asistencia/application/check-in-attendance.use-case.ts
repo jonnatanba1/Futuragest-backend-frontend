@@ -21,6 +21,7 @@ import type { Attendance, VerificationMethod } from '@prisma/client';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
 import type { ScopeContextHolder } from '../../auth/domain/scope-context';
 import type { OperarioStatusPort } from '../../iam/domain/ports/operario-status.port';
+import type { LateArrivalNovedadPort } from '../domain/ports/late-arrival-novedad.port';
 import {
   AttendanceAlreadyExistsError,
   AttendanceDateMismatchError,
@@ -102,6 +103,8 @@ export class CheckInAttendanceUseCase {
     private readonly operarioRepo: ScopedOperarioRepo,
     private readonly scopeHolder: ScopeContextHolder,
     private readonly operarioStatus: OperarioStatusPort,
+    /** Optional: fire-and-forget late-arrival detection (PR 3). Omitting preserves backward compat. */
+    private readonly lateArrivalPort?: LateArrivalNovedadPort,
   ) {}
 
   async execute(input: CheckInInput): Promise<CheckInResult> {
@@ -172,6 +175,14 @@ export class CheckInAttendanceUseCase {
         checkInPhotoKey: null,
         completedAt: null,
       });
+
+      // Fire-and-forget: late arrival detection (PR 3).
+      // Must NOT await — the check-in response must not be delayed.
+      // Must NOT throw — a failure here must never fail the check-in.
+      if (this.lateArrivalPort) {
+        this.dispatchLateArrivalCheck(record.id);
+      }
+
       return { record, created: true };
     } catch (err) {
       if (isPrismaUniqueError(err)) {
@@ -196,6 +207,39 @@ export class CheckInAttendanceUseCase {
         );
       }
       throw err;
+    }
+  }
+
+  /**
+   * Fire-and-forget late-arrival detection dispatch.
+   *
+   * NEVER throws — a failure in late-arrival detection must NEVER fail the check-in.
+   * Both synchronous throws and asynchronous rejections are caught and logged.
+   */
+  private dispatchLateArrivalCheck(attendanceId: string): void {
+    if (!this.lateArrivalPort) return;
+    try {
+      const result = this.lateArrivalPort.checkAndCreateLateArrivalNovedad(attendanceId);
+      void Promise.resolve(result).catch((err: unknown) => {
+        this.logLateArrivalFailure(attendanceId, err);
+      });
+    } catch (err) {
+      this.logLateArrivalFailure(attendanceId, err);
+    }
+  }
+
+  /**
+   * Last-resort guard: even a throwing Logger must not break the check-in response.
+   */
+  private logLateArrivalFailure(attendanceId: string, err: unknown): void {
+    try {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[CheckInAttendanceUseCase] LateArrivalNovedadPort failed for attendance ${attendanceId} (non-blocking)`,
+        err,
+      );
+    } catch {
+      // Swallow — check-in success is more important than logging this failure.
     }
   }
 }

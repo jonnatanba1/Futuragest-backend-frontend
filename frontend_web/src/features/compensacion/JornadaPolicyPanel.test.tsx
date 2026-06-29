@@ -27,19 +27,21 @@ vi.mock('@mantine/notifications', () => ({
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
+const BASE_POLICY = {
+  operarioId: null as string | null,
+  zoneId: null as string | null,
+  horaInicio: '06:00',
+  horaFin: '14:00',
+  diasLaborales: [1, 2, 3, 4, 5],
+  almuerzoInicio: '09:45',
+  almuerzoFin: '10:15',
+  toleranciaMin: 5,
+  horasSemanales: '44.00',
+};
+
 const POLICIES: JornadaPolicyDto[] = [
-  {
-    id: 'pol-1',
-    horasDiarias: '8.00',
-    vigenteDesde: '2026-01-01',
-    createdAt: '2026-01-01T10:00:00.000Z',
-  },
-  {
-    id: 'pol-2',
-    horasDiarias: '7.50',
-    vigenteDesde: '2026-06-01',
-    createdAt: '2026-06-01T08:00:00.000Z',
-  },
+  { id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '2026-01-01T10:00:00.000Z', ...BASE_POLICY },
+  { id: 'pol-2', horasDiarias: '7.50', vigenteDesde: '2026-06-01', createdAt: '2026-06-01T08:00:00.000Z', ...BASE_POLICY },
 ];
 
 const mutateMock = vi.fn();
@@ -117,10 +119,10 @@ describe('JornadaPolicyPanel', () => {
     expect(screen.getByRole('button', { name: /agregar política/i })).toBeInTheDocument();
   });
 
-  // Submit payload shape — {horasDiarias: number, vigenteDesde: string}
+  // Submit payload shape — {horasDiarias: number, vigenteDesde: string, ...defaults}
   it('submits correct payload shape on form submit', async () => {
     defaultSetup('TALENTO_HUMANO');
-    mutateMock.mockResolvedValue({ id: 'new-pol', horasDiarias: '9.00', vigenteDesde: '2026-07-01', createdAt: '' });
+    mutateMock.mockResolvedValue({ id: 'new-pol', ...BASE_POLICY, horasDiarias: '9.00', vigenteDesde: '2026-07-01', createdAt: '' });
     renderPanel();
 
     const user = userEvent.setup();
@@ -130,10 +132,12 @@ describe('JornadaPolicyPanel', () => {
     await user.click(screen.getByRole('button', { name: /agregar política/i }));
 
     await waitFor(() => {
-      expect(mutateMock).toHaveBeenCalledWith({
-        horasDiarias: 9,
-        vigenteDesde: '2026-07-01',
-      });
+      expect(mutateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          horasDiarias: 9,
+          vigenteDesde: '2026-07-01',
+        }),
+      );
     });
   });
 

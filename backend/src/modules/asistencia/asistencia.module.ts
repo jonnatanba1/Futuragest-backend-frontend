@@ -33,6 +33,10 @@ import {
   COMPENSATION_DRIFT_MARKER_PORT,
   type CompensationDriftMarkerPort,
 } from './domain/ports/compensation-drift-marker.port';
+import {
+  ATTENDANCE_CLASSIFICATION_PORT,
+  type AttendanceClassificationPort,
+} from './domain/ports/attendance-classification.port';
 import { CheckInAttendanceUseCase } from './application/check-in-attendance.use-case';
 import { CheckOutAttendanceUseCase } from './application/check-out-attendance.use-case';
 import { ListAttendanceUseCase } from './application/list-attendance.use-case';
@@ -50,10 +54,20 @@ import {
   ATTENDANCE_REPO,
 } from './interface/attendance.controller';
 // Fix 5: import CompensacionModule to get the drift-marker adapter for CheckOutAttendanceUseCase.
+import { forwardRef } from '@nestjs/common';
 import { CompensacionModule } from '../compensacion/compensacion.module';
+import { JornadaModule } from '../jornada/jornada.module';
+import { LATE_ARRIVAL_NOVEDAD_PORT, type LateArrivalNovedadPort } from './domain/ports/late-arrival-novedad.port';
 
 @Module({
-  imports: [PrismaModule, AuthModule, IamModule, StorageModule, CompensacionModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    IamModule,
+    StorageModule,
+    CompensacionModule,
+    forwardRef(() => JornadaModule),
+  ],
   controllers: [AttendanceController],
   providers: [
     // ── ScopedAttendanceRepository — request-scoped (needs SCOPE_CONTEXT_HOLDER) ──
@@ -74,7 +88,8 @@ import { CompensacionModule } from '../compensacion/compensacion.module';
     },
 
     // ── CheckInAttendanceUseCase — REQUEST-SCOPED ──────────────────────────────
-    // PR-3: injects OPERARIO_STATUS (exported by IamModule) for inactive-operario guard.
+    // PR-3: injects OPERARIO_STATUS (exported by IamModule) for inactive-operario guard,
+    //       and LATE_ARRIVAL_NOVEDAD_PORT (exported by JornadaModule) for fire-and-forget late-arrival detection.
     {
       provide: CHECK_IN_USE_CASE,
       scope: Scope.REQUEST,
@@ -83,20 +98,27 @@ import { CompensacionModule } from '../compensacion/compensacion.module';
         operarioRepo: ScopedOperarioRepository,
         scopeHolder: ScopeContextHolder,
         operarioStatus: OperarioStatusPort,
-      ) => new CheckInAttendanceUseCase(repo, operarioRepo, scopeHolder, operarioStatus),
-      inject: [ATTENDANCE_REPOSITORY_PORT, ScopedOperarioRepository, SCOPE_CONTEXT_HOLDER, OPERARIO_STATUS],
+        lateArrivalPort: LateArrivalNovedadPort,
+      ) => new CheckInAttendanceUseCase(repo, operarioRepo, scopeHolder, operarioStatus, lateArrivalPort),
+      inject: [ATTENDANCE_REPOSITORY_PORT, ScopedOperarioRepository, SCOPE_CONTEXT_HOLDER, OPERARIO_STATUS, LATE_ARRIVAL_NOVEDAD_PORT],
     },
 
     // ── CheckOutAttendanceUseCase — REQUEST-SCOPED ────────────────────────────
     // Fix 5: inject optional drift-marker so completed check-outs trigger divergedAt.
+    // Fase 2: inject classification port to trigger classification.
     {
       provide: CHECK_OUT_USE_CASE,
       scope: Scope.REQUEST,
       useFactory: (
         repo: AttendanceRepositoryPort,
         driftMarker: CompensationDriftMarkerPort,
-      ) => new CheckOutAttendanceUseCase(repo, driftMarker),
-      inject: [ATTENDANCE_REPOSITORY_PORT, COMPENSATION_DRIFT_MARKER_PORT],
+        classifier: AttendanceClassificationPort,
+      ) => new CheckOutAttendanceUseCase(repo, driftMarker, classifier),
+      inject: [
+        ATTENDANCE_REPOSITORY_PORT,
+        COMPENSATION_DRIFT_MARKER_PORT,
+        ATTENDANCE_CLASSIFICATION_PORT,
+      ],
     },
 
     // ── ListAttendanceUseCase — REQUEST-SCOPED ────────────────────────────────

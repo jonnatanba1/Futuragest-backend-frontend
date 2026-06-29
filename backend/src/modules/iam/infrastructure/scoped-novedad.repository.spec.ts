@@ -16,7 +16,11 @@ function makeNovedad(overrides: Partial<Novedad> = {}): Novedad {
     attendanceId: 'att-a1',
     supervisorId: 'sup-s1',
     zoneId: 'zone-z1',
+    tipoNovedad: 'HORAS_EXTRA',
     horasExtra: '2.50' as unknown as Novedad['horasExtra'],
+    tipoHoraExtra: null,
+    minutosTarde: null,
+    autoGenerada: false,
     motivo: null,
     status: 'PENDING',
     clientRef: null,
@@ -26,7 +30,7 @@ function makeNovedad(overrides: Partial<Novedad> = {}): Novedad {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  };
+  } as Novedad;
 }
 
 function makeRepo(findFirstResult: Novedad | null) {

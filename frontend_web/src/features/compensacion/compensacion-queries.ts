@@ -4,11 +4,12 @@ import type {
   CompensationPeriodDto,
   ConfirmPayoutRequest,
   CreateJornadaPolicyRequest,
+  EnhancedPeriodBalanceDto,
   JornadaPolicyDto,
   PeriodBalanceDto,
   PeriodPayoutDto,
 } from '@futuragest/contracts';
-import { compensacionApi } from '../../lib/api/client';
+import { compensacionApi, enhancedBalanceApi } from '../../lib/api/client';
 
 const FIVE_MIN = 5 * 60 * 1000;
 
@@ -117,5 +118,28 @@ export function useCreateJornadaPolicyMutation() {
   return useMutation<JornadaPolicyDto, Error, CreateJornadaPolicyRequest>({
     mutationFn: (body) => compensacionApi.createJornadaPolicy(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
+  });
+}
+
+// ─── Enhanced balance (PR 5) ──────────────────────────────────────────────────
+
+const enhancedBalanceKey = (operarioId: string, desde: string, hasta: string) =>
+  ['compensacion', 'enhanced-balance', operarioId, desde, hasta] as const;
+
+/**
+ * Enhanced period balance with category breakdown + surcharge values.
+ * Falls back gracefully if the backend doesn't support the enhanced=true param.
+ */
+export function useEnhancedBalanceQuery(
+  operarioId: string | null,
+  desde: string,
+  hasta: string,
+) {
+  return useQuery<EnhancedPeriodBalanceDto>({
+    queryKey: operarioId ? enhancedBalanceKey(operarioId, desde, hasta) : ['compensacion', 'enhanced-balance', null],
+    queryFn: () => enhancedBalanceApi.getBalance(operarioId!, desde, hasta),
+    enabled: Boolean(operarioId && desde && hasta),
+    staleTime: 0,
+    retry: false,
   });
 }

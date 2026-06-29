@@ -492,7 +492,16 @@ describe('activeJornadaPolicy', () => {
   function makePolicy(overrides: Partial<JornadaPolicyDto> = {}): JornadaPolicyDto {
     return {
       id: 'pol-1',
+      operarioId: null,
+      zoneId: null,
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1, 2, 3, 4, 5],
+      almuerzoInicio: '09:45',
+      almuerzoFin: '10:15',
+      toleranciaMin: 5,
       horasDiarias: '8.00',
+      horasSemanales: '44.00',
       vigenteDesde: '2026-01-01T05:00:00Z',
       createdAt: '2025-12-15T00:00:00Z',
       ...overrides,

@@ -209,14 +209,20 @@ describe('useCreateJornadaPolicyMutation', () => {
     );
 
     const created = await result.current.mutateAsync({
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1, 2, 3, 4, 5],
       horasDiarias: 7,
+      horasSemanales: 44,
       vigenteDesde: '2026-07-01',
     });
 
     expect(created.horasDiarias).toBe('7.00');
-    expect(createJornadaPolicyMock).toHaveBeenCalledWith({
-      horasDiarias: 7,
-      vigenteDesde: '2026-07-01',
-    });
+    expect(createJornadaPolicyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        horasDiarias: 7,
+        vigenteDesde: '2026-07-01',
+      }),
+    );
   });
 });

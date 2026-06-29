@@ -21,6 +21,19 @@ export interface DayBreakdown {
   delta: Decimal;
 }
 
+/**
+ * Aggregated category breakdown from AttendanceBreakdown records (REQ-009).
+ * Only populated when breakdownEnabled=true and at least one attendance has breakdown data.
+ */
+export interface CategoryBreakdown {
+  horasOrdinariasDiurnas: Decimal;
+  horasOrdinariasNocturnas: Decimal;
+  horasExtraDiurnas: Decimal;
+  horasExtraNocturnas: Decimal;
+  /** Σ totalHoras from attendances with esDominical=true or esFestivo=true. */
+  horasDominicalesFestivas: Decimal;
+}
+
 export interface PeriodBalance {
   /** Σ max(delta, 0) across all completed days. Always >= 0. */
   creditos: Decimal;
@@ -32,4 +45,10 @@ export interface PeriodBalance {
   saldo: Decimal;
   /** Per-day breakdown — one entry per completed Attendance in range. */
   perDay: DayBreakdown[];
+
+  // ── T4.2: Enhanced compensation (REQ-009) ─────────────────────────────────
+  /** Aggregated category breakdown. Undefined when breakdownEnabled=false or no data. */
+  breakdown?: CategoryBreakdown;
+  /** Monetary surcharge value from aggregated breakdown. Undefined when not computed. */
+  valorRecargos?: Decimal;
 }

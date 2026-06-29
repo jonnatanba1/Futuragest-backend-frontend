@@ -218,7 +218,14 @@ describe('compensacionApi', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await compensacionApi.createJornadaPolicy({ horasDiarias: 7, vigenteDesde: '2026-07-01' });
+    const result = await compensacionApi.createJornadaPolicy({
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1, 2, 3, 4, 5],
+      horasDiarias: 7,
+      horasSemanales: 44,
+      vigenteDesde: '2026-07-01',
+    });
 
     expect(result.horasDiarias).toBe('7.00');
     const [url, init] = fetchMock.mock.calls[0];

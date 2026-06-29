@@ -35,6 +35,11 @@ enum NovedadStatus {
   REJECTED
 }
 
+enum TipoNovedad {
+  LLEGADA_TARDE
+  HORAS_EXTRA
+}
+
 // ---------------------------------------------------------------------------
 // Org domain
 // ---------------------------------------------------------------------------
@@ -42,14 +47,15 @@ enum NovedadStatus {
 /// Geographic zone (e.g. Zona Urabá, Zona Bajo Cauca).
 /// Montería is the central office and operates with global scope (no zone).
 model Zone {
-  id          String       @id @default(uuid())
-  name        String       @unique
-  municipios  Municipio[]
-  supervisors Supervisor[]
+  id              String          @id @default(uuid())
+  name            String          @unique
+  municipios      Municipio[]
+  supervisors     Supervisor[]
   /// One COORDINADOR per zone (enforced by @unique on User.coordinatedZoneId)
-  coordinador User?        @relation("ZoneCoordinador")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @default(now()) @updatedAt
+  coordinador     User?           @relation("ZoneCoordinador")
+  jornadaPolicies JornadaPolicy[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @default(now()) @updatedAt
 }
 
 /// Municipality belonging to a zone.
@@ -119,6 +125,8 @@ model Operario {
   assignments   Assignment[]
   attendances   Attendance[]
   compensationPeriods CompensationPeriod[]
+  compensatoryRests   CompensatoryRest[]
+  jornadaPolicies     JornadaPolicy[]
   /// Soft-deactivation timestamp. null = active; non-null = deactivated.
   deactivatedAt DateTime?
   createdAt     DateTime     @default(now())
@@ -181,6 +189,8 @@ model Attendance {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
   novedades           Novedad[]
+  breakdown           AttendanceBreakdown?
+  compensatoryRest    CompensatoryRest?
 
   @@unique([operarioId, date])
   @@index([supervisorId])
@@ -194,7 +204,7 @@ model Attendance {
 // Novedad domain (overtime novelty + approval)
 // ---------------------------------------------------------------------------
 
-/// Overtime novelty record — one ACTIVE (PENDING|APPROVED) per attendance enforced
+/// Overtime / late-arrival novelty record — one ACTIVE (PENDING|APPROVED) per attendance enforced
 /// by a partial unique index hand-authored in the migration SQL.
 /// REJECTED rows do not count toward the limit (partial unique excludes them).
 model Novedad {
@@ -206,7 +216,14 @@ model Novedad {
   supervisor       Supervisor    @relation(fields: [supervisorId], references: [id])
   /// Denormalized zone — scope key for COORDINADOR filter
   zoneId           String
+  /// Type of novelty — LLEGADA_TARDE (auto-generated) or HORAS_EXTRA (supervisor-requested)
+  tipoNovedad      TipoNovedad   @default(HORAS_EXTRA)
   horasExtra       Decimal       @db.Decimal(5, 2)
+  tipoHoraExtra    TipoHoraExtra?
+  /// Only set when tipoNovedad = LLEGADA_TARDE
+  minutosTarde     Int?
+  /// true = system-created (late arrival); false = supervisor-requested
+  autoGenerada     Boolean       @default(false)
   motivo           String?
   status           NovedadStatus @default(PENDING)
   clientRef        String?       @unique // optional idempotency token for offline sync
@@ -237,13 +254,47 @@ model Novedad {
 /// Company-wide effective-dated work-day baseline (append-only).
 /// Lowering the journey = INSERT a new row with a future vigenteDesde — NEVER UPDATE.
 /// Resolving jornadaDelDia: latest JornadaPolicy with vigenteDesde <= attendance.date.
+///
+/// Scope hierarchy (3-level):
+///   1. operarioId → per-worker override (highest priority)
+///   2. zoneId      → per-zone default
+///   3. null/null   → global default (lowest priority)
 model JornadaPolicy {
-  id           String   @id @default(uuid())
-  horasDiarias Decimal  @db.Decimal(4, 2)
-  vigenteDesde DateTime
-  createdAt    DateTime @default(now())
+  id              String    @id @default(uuid())
 
+  // ── Scope (jerárquico: operario → zona → global) ──
+  operarioId      String?   // null = no per-operario override
+  operario        Operario? @relation(fields: [operarioId], references: [id])
+  zoneId          String?   // null = no per-zone override (combined with operarioId null = global)
+  zone            Zone?     @relation(fields: [zoneId], references: [id])
+
+  // ── Horario ──
+  horaInicio      String    // "07:00" (HH:mm, hora Colombia UTC-5)
+  horaFin         String    // "17:00"
+  diasLaborales   Int[]     // ISO weekday: [1,2,3,4,5] = Lun-Vie
+
+  // ── Almuerzo ──
+  almuerzoInicio  String?   // null = auto-calculated at shift midpoint
+  almuerzoFin     String?   // null = auto (almuerzoInicio + 30 min)
+
+  // ── Tolerancia ──
+  toleranciaMin   Int       @default(5) // late arrival tolerance in minutes
+
+  // ── Horas ──
+  horasDiarias    Decimal   @db.Decimal(4, 2)
+  horasSemanales  Decimal   @db.Decimal(4, 2)
+
+  // ── Vigencia ──
+  vigenteDesde    DateTime
+  createdAt       DateTime  @default(now())
+
+  // ── Relations ──
+  breakdowns      AttendanceBreakdown[]
+
+  @@unique([operarioId, zoneId, vigenteDesde])
   @@index([vigenteDesde])
+  @@index([zoneId])
+  @@index([operarioId])
 }
 
 // ---------------------------------------------------------------------------
@@ -289,6 +340,17 @@ model CompensationPeriod {
   creditos         Decimal                 @db.Decimal(7, 2) // Σ positive deltas
   debitos          Decimal                 @db.Decimal(7, 2) // Σ |negative deltas|
   carryIn          Decimal                 @db.Decimal(7, 2) // negative saldo from previous CARRY_OVER (≤ 0)
+  
+  // ── Desglose de horas (nullable para períodos pre-migración) ──
+  horasOrdinariasDiurnas    Decimal?       @db.Decimal(7, 2)
+  horasOrdinariasNocturnas  Decimal?       @db.Decimal(7, 2)
+  horasExtraDiurnas         Decimal?       @db.Decimal(7, 2)
+  horasExtraNocturnas       Decimal?       @db.Decimal(7, 2)
+  horasDominicalesFestivas  Decimal?       @db.Decimal(7, 2)
+
+  // ── Valor monetario ──
+  valorRecargos             Decimal?       @db.Decimal(12, 2)
+  tasaDominicalAplicada     Decimal?       @db.Decimal(5, 2) // Snapshot
   saldo            Decimal                 @db.Decimal(7, 2) // carryIn + creditos - debitos
   disposition      CompensationDisposition?                  // null until decided at close
   approvedByUserId String?                                   // who decided (audit trail)
@@ -336,4 +398,120 @@ model DeviceSession {
 
   /// Re-registration of the same device upserts on this key
   @@unique([userId, deviceId])
+}
+
+// ---------------------------------------------------------------------------
+// Labor Law & Compliance Domain (Phase 1)
+// ---------------------------------------------------------------------------
+
+enum TipoHoraExtra {
+  EXTRA_DIURNA
+  EXTRA_NOCTURNA
+  DOMINICAL_FESTIVA_DIURNA
+  DOMINICAL_FESTIVA_NOCTURNA
+}
+
+model Holiday {
+  id          String      @id @default(uuid())
+  date        String      // "YYYY-MM-DD"
+  name        String      // "Día de la Independencia"
+  type        HolidayType
+  year        Int
+  isManual    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  @@unique([date])
+  @@index([year])
+}
+
+enum HolidayType {
+  FIXED
+  EMILIANI
+  EASTER_BASED
+  MANUAL
+}
+
+model SurchargeRate {
+  id              String            @id @default(uuid())
+  category        SurchargeCategory
+  percentage      Decimal           @db.Decimal(5, 2)
+  vigenteDesde    DateTime
+  creadoPor       String?
+  legalRef        String?
+  createdAt       DateTime          @default(now())
+
+  @@unique([category, vigenteDesde])
+  @@index([category])
+  @@index([vigenteDesde])
+}
+
+enum SurchargeCategory {
+  RECARGO_NOCTURNO
+  HORA_EXTRA_DIURNA
+  HORA_EXTRA_NOCTURNA
+  RECARGO_DOMINICAL_FESTIVO
+}
+
+model AttendanceBreakdown {
+  id              String      @id @default(uuid())
+  attendanceId    String      @unique
+  attendance      Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  horasOrdinariasDiurnas    Decimal @db.Decimal(5, 2) @default(0)
+  horasOrdinariasNocturnas  Decimal @db.Decimal(5, 2) @default(0)
+  horasExtraDiurnas         Decimal @db.Decimal(5, 2) @default(0)
+  horasExtraNocturnas       Decimal @db.Decimal(5, 2) @default(0)
+  totalHoras                Decimal @db.Decimal(5, 2) @default(0)
+
+  esDominical     Boolean @default(false)
+  esFestivo       Boolean @default(false)
+  esDiaLaboral    Boolean @default(true)
+
+  jornadaPolicyId String
+  jornadaPolicy   JornadaPolicy @relation(fields: [jornadaPolicyId], references: [id])
+  horaInicioAplicada  String
+  horaFinAplicada     String
+  horasDiariasAplicada Decimal @db.Decimal(4, 2)
+
+  classifiedAt    DateTime @default(now())
+  recalculatedAt  DateTime?
+  version         Int      @default(1)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([attendanceId])
+}
+
+model CompensatoryRest {
+  id                String              @id @default(uuid())
+  operarioId        String
+  operario          Operario            @relation(fields: [operarioId], references: [id])
+  attendanceId      String              @unique
+  attendance        Attendance          @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  month             String              // "YYYY-MM"
+  type              CompensatoryType
+  status            CompensatoryStatus  @default(PENDING)
+  scheduledDate     String?
+  takenDate         String?
+  resolvedAt        DateTime?
+  resolvedByUserId  String?
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([operarioId, month])
+  @@index([status])
+}
+
+enum CompensatoryType {
+  OCCASIONAL
+  HABITUAL
+}
+
+enum CompensatoryStatus {
+  PENDING
+  PAID_ONLY
+  SCHEDULED
+  TAKEN
 }

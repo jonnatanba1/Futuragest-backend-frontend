@@ -13,8 +13,10 @@ const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
 const { useBalanceQueryMock } = vi.hoisted(() => ({ useBalanceQueryMock: vi.fn() }));
+const { useEnhancedBalanceQueryMock } = vi.hoisted(() => ({ useEnhancedBalanceQueryMock: vi.fn() }));
 vi.mock('./compensacion-queries', () => ({
   useBalanceQuery: useBalanceQueryMock,
+  useEnhancedBalanceQuery: useEnhancedBalanceQueryMock,
   useClosePeriodMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePayoutQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
   useConfirmPayoutMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -58,6 +60,7 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
   useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role } });
   useOperariosMock.mockReturnValue({ data: OPERARIOS, isLoading: false });
   useBalanceQueryMock.mockReturnValue({ data: BALANCE, isLoading: false, isError: false, error: null });
+  useEnhancedBalanceQueryMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
 }
 
 function renderPanel() {

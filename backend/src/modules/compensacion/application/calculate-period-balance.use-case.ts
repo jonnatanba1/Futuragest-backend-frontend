@@ -25,8 +25,9 @@
 import { Decimal } from '@prisma/client/runtime/client';
 import type { AttendanceReaderRecord } from '../domain/ports/attendance-reader.port';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
-import type { PeriodBalance, DayBreakdown } from '../domain/period-balance.vo';
+import type { PeriodBalance, DayBreakdown, CategoryBreakdown } from '../domain/period-balance.vo';
 import { NoPolicyForDateError } from '../domain/compensacion.errors';
+import { calculateSurchargeValue, type SurchargeRates } from '../domain/surcharge-value-calculator';
 
 export interface CalculatePeriodBalanceInput {
   /** Only records with completedAt != null will be processed (caller may pass all). */
@@ -35,6 +36,17 @@ export interface CalculatePeriodBalanceInput {
   policyTimeline: JornadaPolicyRecord[];
   /** Carry-over from a previous CARRY_OVER period. Defaults to 0. */
   carryIn?: Decimal;
+
+  // ── T4.2: Enhanced compensation (REQ-009) ────────────────────────────
+  /** When true, aggregate breakdown categories from AttendanceBreakdown data.
+   *  Gate: COMPENSATION_BREAKDOWN_ENABLED env var. Default: false. */
+  breakdownEnabled?: boolean;
+  /** Worker's ordinary hourly wage (monetary). Required when breakdownEnabled=true
+   *  to compute valorRecargos. */
+  valorHoraOrdinaria?: Decimal;
+  /** The four base surcharge percentage rates. Required when breakdownEnabled=true
+   *  to compute valorRecargos. */
+  surchargeRates?: SurchargeRates;
 }
 
 const ZERO = new Decimal(0);
@@ -82,11 +94,26 @@ export class CalculatePeriodBalanceUseCase {
    * Throws NoPolicyForDateError if any completed attendance has no applicable policy.
    */
   execute(input: CalculatePeriodBalanceInput): PeriodBalance {
-    const { attendances, policyTimeline, carryIn = ZERO } = input;
+    const {
+      attendances,
+      policyTimeline,
+      carryIn = ZERO,
+      breakdownEnabled = false,
+      valorHoraOrdinaria,
+      surchargeRates,
+    } = input;
 
     const perDay: DayBreakdown[] = [];
     let creditos = ZERO;
     let debitos = ZERO;
+
+    // T4.2: Aggregated breakdown categories (REQ-009)
+    let hasBreakdown = false;
+    let aggOrdDiurnas = ZERO;
+    let aggOrdNocturnas = ZERO;
+    let aggExtraDiurnas = ZERO;
+    let aggExtraNocturnas = ZERO;
+    let aggDomFestivas = ZERO;
 
     for (const att of attendances) {
       // Exclude incomplete records (completedAt null OR checkOutCapturedAt null)
@@ -97,10 +124,7 @@ export class CalculatePeriodBalanceUseCase {
       // 1. horasReales — raw duration, no lunch deduction (REQ-CALC-04)
       const durationMs = att.checkOutCapturedAt.getTime() - att.checkInCapturedAt.getTime();
 
-      // Fix 6 (Layer 2) — defensive skip: poisoned rows recorded before the
-      // check-out duration guard existed must not poison the balance.
-      // Negative duration = clock-skew; > MAX_VALID_DURATION_MS = forgotten checkout.
-      // DO NOT clamp — skipping is honest; clamping would invent data.
+      // Fix 6 (Layer 2) — defensive skip
       if (durationMs <= 0 || durationMs > MAX_VALID_DURATION_MS) {
         continue;
       }
@@ -124,16 +148,60 @@ export class CalculatePeriodBalanceUseCase {
       }
 
       perDay.push({ date: att.date, horasReales, jornadaHoras, delta });
+
+      // ── T4.2: Aggregate breakdown categories ──────────────────────────
+      if (breakdownEnabled && att.breakdown) {
+        hasBreakdown = true;
+        const b = att.breakdown;
+        aggOrdDiurnas = aggOrdDiurnas.plus(b.horasOrdinariasDiurnas);
+        aggOrdNocturnas = aggOrdNocturnas.plus(b.horasOrdinariasNocturnas);
+        aggExtraDiurnas = aggExtraDiurnas.plus(b.horasExtraDiurnas);
+        aggExtraNocturnas = aggExtraNocturnas.plus(b.horasExtraNocturnas);
+        if (b.esDominical || b.esFestivo) {
+          aggDomFestivas = aggDomFestivas.plus(b.totalHoras);
+        }
+      }
     }
 
     const saldo = carryIn.plus(creditos).minus(debitos).toDecimalPlaces(2, ROUNDING);
 
-    return {
+    const result: PeriodBalance = {
       creditos: creditos.toDecimalPlaces(2, ROUNDING),
       debitos: debitos.toDecimalPlaces(2, ROUNDING),
       carryIn,
       saldo,
       perDay,
     };
+
+    // ── T4.2: Attach breakdown aggregation and valorRecargos when enabled and data exists ──
+    if (hasBreakdown) {
+      const breakdown: CategoryBreakdown = {
+        horasOrdinariasDiurnas: aggOrdDiurnas.toDecimalPlaces(2, ROUNDING),
+        horasOrdinariasNocturnas: aggOrdNocturnas.toDecimalPlaces(2, ROUNDING),
+        horasExtraDiurnas: aggExtraDiurnas.toDecimalPlaces(2, ROUNDING),
+        horasExtraNocturnas: aggExtraNocturnas.toDecimalPlaces(2, ROUNDING),
+        horasDominicalesFestivas: aggDomFestivas.toDecimalPlaces(2, ROUNDING),
+      };
+      result.breakdown = breakdown;
+
+      // Compute valorRecargos if surcharge rates and hourly rate are available
+      if (valorHoraOrdinaria && surchargeRates) {
+        const surchargeDetail = calculateSurchargeValue(
+          {
+            horasOrdinariasNocturnas: aggOrdNocturnas,
+            horasExtraDiurnas: aggExtraDiurnas,
+            horasExtraNocturnas: aggExtraNocturnas,
+            totalHoras: aggOrdDiurnas.plus(aggOrdNocturnas).plus(aggExtraDiurnas).plus(aggExtraNocturnas),
+            esDominical: aggDomFestivas.greaterThan(ZERO),
+            esFestivo: aggDomFestivas.greaterThan(ZERO),
+          },
+          valorHoraOrdinaria,
+          surchargeRates,
+        );
+        result.valorRecargos = surchargeDetail.total;
+      }
+    }
+
+    return result;
   }
 }

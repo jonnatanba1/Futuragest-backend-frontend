@@ -11,6 +11,7 @@ vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 // Panel dependencies — mocked here so CompensacionPage tests stay focused on page-level behavior
 vi.mock('./compensacion-queries', () => ({
   useBalanceQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useEnhancedBalanceQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
   useJornadaPoliciesQuery: () => ({ data: [], isLoading: false, isError: false, error: null }),
   useCreateJornadaPolicyMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));

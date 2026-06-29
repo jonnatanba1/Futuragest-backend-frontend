@@ -34,6 +34,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -45,7 +46,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse, ApiOperation } from '@nestjs/swagger';
 import {
   AttendanceResponseDto,
   PhotoUploadResponseDto,
@@ -265,6 +266,8 @@ function mapDomainError(err: unknown): never {
 
 @Controller('asistencia')
 export class AttendanceController {
+  private readonly logger = new Logger(AttendanceController.name);
+
   constructor(
     @Inject(CHECK_IN_USE_CASE)
     private readonly checkInUseCase: Pick<CheckInAttendanceUseCase, 'execute'>,
@@ -316,12 +319,21 @@ export class AttendanceController {
 
   @Roles(...WRITE_ROLES)
   @Post('by-client-ref/:clientRef/check-out')
+  @ApiOperation({ summary: 'DEPRECATED — check-out is now virtual', deprecated: true })
   @ApiOkResponse({ type: AttendanceResponseDto })
   async checkOutByClientRef(
     @Param('clientRef') clientRef: string,
     @Body() body: CheckOutBody,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (process.env.CHECK_OUT_VIRTUAL_ENABLED === 'true') {
+      res.status(HttpStatus.GONE);
+      return {
+        message: 'Manual check-out is deprecated. Check-out is now virtual.',
+        code: 'CHECK_OUT_VIRTUAL',
+      };
+    }
+    this.logger.warn('DEPRECATED — check-out is now virtual. Use /jornada/auto-complete instead.');
     try {
       // Locate the attendance by check-in clientRef (scope-enforced → 404 if not found/not owned)
       const attendance = await this.attendanceRepo.findByClientRef(clientRef);
@@ -349,12 +361,21 @@ export class AttendanceController {
 
   @Roles(...WRITE_ROLES)
   @Post(':id/check-out')
+  @ApiOperation({ summary: 'DEPRECATED — check-out is now virtual', deprecated: true })
   @ApiOkResponse({ type: AttendanceResponseDto })
   async checkOut(
     @Param('id') id: string,
     @Body() body: CheckOutBody,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (process.env.CHECK_OUT_VIRTUAL_ENABLED === 'true') {
+      res.status(HttpStatus.GONE);
+      return {
+        message: 'Manual check-out is deprecated. Check-out is now virtual.',
+        code: 'CHECK_OUT_VIRTUAL',
+      };
+    }
+    this.logger.warn('DEPRECATED — check-out is now virtual. Use /jornada/auto-complete instead.');
     try {
       const result = await this.checkOutUseCase.execute({
         id,

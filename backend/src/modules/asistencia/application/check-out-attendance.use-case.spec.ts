@@ -331,4 +331,34 @@ describe('CheckOutAttendanceUseCase', () => {
       expect(updateData.checkOutVerification).toBeNull();
     });
   });
+
+  describe('Fase 2 — shift classification', () => {
+    it('should trigger classification on successful checkout', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
+      const repo = makeMockRepo(att);
+      const classifier = {
+        classifyAttendance: jest.fn().mockResolvedValue(undefined),
+      };
+      const useCase = new CheckOutAttendanceUseCase(repo, undefined, classifier);
+
+      await useCase.execute(VALID_INPUT);
+
+      expect(classifier.classifyAttendance).toHaveBeenCalledTimes(1);
+      expect(classifier.classifyAttendance).toHaveBeenCalledWith('ATT-1');
+    });
+
+    it('should swallow classifier errors and checkout still succeeds', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
+      const repo = makeMockRepo(att);
+      const classifier = {
+        classifyAttendance: jest.fn().mockRejectedValue(new Error('Classification failed')),
+      };
+      const useCase = new CheckOutAttendanceUseCase(repo, undefined, classifier);
+
+      const result = await useCase.execute(VALID_INPUT);
+
+      expect(classifier.classifyAttendance).toHaveBeenCalledTimes(1);
+      expect(result.record.id).toBe('ATT-1');
+    });
+  });
 });

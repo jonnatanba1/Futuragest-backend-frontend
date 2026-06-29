@@ -348,4 +348,74 @@ describe('AttendanceController — error→HTTP mapping', () => {
       expect.objectContaining({ verification: 'NONE' }),
     );
   });
+
+  // ── Virtual check-out feature flag (T2.5 fix) ─────────────────────────────
+
+  describe('checkOut — virtual check-out feature flag', () => {
+    const originalValue = process.env.CHECK_OUT_VIRTUAL_ENABLED;
+
+    afterEach(() => {
+      if (originalValue === undefined) {
+        delete process.env.CHECK_OUT_VIRTUAL_ENABLED;
+      } else {
+        process.env.CHECK_OUT_VIRTUAL_ENABLED = originalValue;
+      }
+    });
+
+    it('VCO-01 — checkOut with CHECK_OUT_VIRTUAL_ENABLED=true → 410 Gone', async () => {
+      process.env.CHECK_OUT_VIRTUAL_ENABLED = 'true';
+      const result = await controller.checkOut('ATT-1', {} as CheckOutBody, mockRes);
+      expect(mockRes.status).toHaveBeenCalledWith(410);
+      expect(result).toEqual({
+        message: 'Manual check-out is deprecated. Check-out is now virtual.',
+        code: 'CHECK_OUT_VIRTUAL',
+      });
+      expect(mockCheckOut.execute).not.toHaveBeenCalled();
+    });
+
+    it('VCO-02 — checkOutByClientRef with CHECK_OUT_VIRTUAL_ENABLED=true → 410 Gone', async () => {
+      process.env.CHECK_OUT_VIRTUAL_ENABLED = 'true';
+      mockRepo.findByClientRef.mockResolvedValue(makeAttendance());
+      const result = await controller.checkOutByClientRef('REF-A', {} as CheckOutBody, mockRes);
+      expect(mockRes.status).toHaveBeenCalledWith(410);
+      expect(result).toEqual({
+        message: 'Manual check-out is deprecated. Check-out is now virtual.',
+        code: 'CHECK_OUT_VIRTUAL',
+      });
+      expect(mockRepo.findByClientRef).not.toHaveBeenCalled();
+      expect(mockCheckOut.execute).not.toHaveBeenCalled();
+    });
+
+    it('VCO-03 — checkOut with CHECK_OUT_VIRTUAL_ENABLED=false → normal behavior (200)', async () => {
+      process.env.CHECK_OUT_VIRTUAL_ENABLED = 'false';
+      const att = makeAttendance();
+      mockCheckOut.execute.mockResolvedValue({ record: att, idempotent: false });
+      const result = await controller.checkOut('ATT-1', {} as CheckOutBody, mockRes);
+      expect(result).toBe(att);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockCheckOut.execute).toHaveBeenCalled();
+    });
+
+    it('VCO-04 — checkOut with CHECK_OUT_VIRTUAL_ENABLED unset → normal behavior (200)', async () => {
+      delete process.env.CHECK_OUT_VIRTUAL_ENABLED;
+      const att = makeAttendance();
+      mockCheckOut.execute.mockResolvedValue({ record: att, idempotent: false });
+      const result = await controller.checkOut('ATT-1', {} as CheckOutBody, mockRes);
+      expect(result).toBe(att);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockCheckOut.execute).toHaveBeenCalled();
+    });
+
+    it('VCO-05 — checkOutByClientRef with CHECK_OUT_VIRTUAL_ENABLED=false → normal behavior (200)', async () => {
+      process.env.CHECK_OUT_VIRTUAL_ENABLED = 'false';
+      const att = makeAttendance();
+      mockRepo.findByClientRef.mockResolvedValue(att);
+      mockCheckOut.execute.mockResolvedValue({ record: att, idempotent: false });
+      const result = await controller.checkOutByClientRef('REF-A', {} as CheckOutBody, mockRes);
+      expect(result).toBe(att);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRepo.findByClientRef).toHaveBeenCalledWith('REF-A');
+      expect(mockCheckOut.execute).toHaveBeenCalled();
+    });
+  });
 });

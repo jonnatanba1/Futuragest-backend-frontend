@@ -25,6 +25,18 @@ const AdminPage = lazy(() =>
 const CompensacionPage = lazy(() =>
   import('../features/compensacion/CompensacionPage').then((m) => ({ default: m.CompensacionPage })),
 );
+const CompensatoriosPage = lazy(() =>
+  import('../features/compensacion/CompensatoriosPage').then((m) => ({ default: m.CompensatoriosPage })),
+);
+const ConfigJornadaPage = lazy(() =>
+  import('../features/config/ConfigJornadaPage').then((m) => ({ default: m.ConfigJornadaPage })),
+);
+const ConfigHolidaysPage = lazy(() =>
+  import('../features/config/ConfigHolidaysPage').then((m) => ({ default: m.ConfigHolidaysPage })),
+);
+const ConfigSurchargesPage = lazy(() =>
+  import('../features/config/ConfigSurchargesPage').then((m) => ({ default: m.ConfigSurchargesPage })),
+);
 
 export function AppRoutes() {
   return (
@@ -91,6 +103,38 @@ export function AppRoutes() {
           element={
             <RequireAuth roles={OFFICE_ROLES}>
               <CompensacionPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="compensacion/compensatorios"
+          element={
+            <RequireAuth roles={OFFICE_ROLES}>
+              <CompensatoriosPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="config/jornada"
+          element={
+            <RequireAuth roles={OFFICE_ROLES}>
+              <ConfigJornadaPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="config/holidays"
+          element={
+            <RequireAuth roles={OFFICE_ROLES}>
+              <ConfigHolidaysPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="config/surcharges"
+          element={
+            <RequireAuth roles={OFFICE_ROLES}>
+              <ConfigSurchargesPage />
             </RequireAuth>
           }
         />

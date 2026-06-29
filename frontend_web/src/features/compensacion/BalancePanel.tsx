@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Group,
@@ -8,6 +9,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Table,
   Text,
   Title,
 } from '@mantine/core';
@@ -19,7 +21,7 @@ import { hasAnyRole, COMPENSACION_WRITE_ROLES } from '../../lib/auth/roles';
 import { TableSkeleton } from '../../components/TableSkeleton';
 import { useOperarios } from '../operarios/operario-queries';
 import { CloseFortnightModal } from './CloseFortnightModal';
-import { useBalanceQuery } from './compensacion-queries';
+import { useBalanceQuery, useEnhancedBalanceQuery } from './compensacion-queries';
 import { DayBreakdown } from './DayBreakdown';
 import { PayoutPanel } from './PayoutPanel';
 import { quincenaToRange } from './quincena';
@@ -99,6 +101,7 @@ export function BalancePanel() {
   const range = quincenaToRange(Number(year), Number(month), quincena);
 
   const balance = useBalanceQuery(operarioId, range.desde, range.hasta);
+  const enhancedBalance = useEnhancedBalanceQuery(operarioId, range.desde, range.hasta);
 
   // ─── Render helpers ───────────────────────────────────────────────────────
 
@@ -178,6 +181,54 @@ export function BalancePanel() {
             </SimpleGrid>
           </Stack>
         </Card>
+
+        {/* Enhanced category breakdown (PR 5) — shown when enhanced data is available */}
+        {enhancedBalance.data?.categoryBreakdown && (
+          <Card withBorder>
+            <Stack gap="sm">
+              <Title order={5}>Desglose por categoría</Title>
+              {enhancedBalance.data.tasaDominicalAplicada && (
+                <Badge color="orange" variant="light">
+                  Tasa dominical: {enhancedBalance.data.tasaDominicalAplicada}%
+                </Badge>
+              )}
+              <Table striped withTableBorder>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Categoría</Table.Th>
+                    <Table.Th>Horas</Table.Th>
+                    <Table.Th>Valor recargo</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {[
+                    { label: 'Ordinarias diurnas', key: 'horasOrdinariasDiurnas' as const },
+                    { label: 'Ordinarias nocturnas', key: 'horasOrdinariasNocturnas' as const },
+                    { label: 'Extra diurnas', key: 'horasExtraDiurnas' as const },
+                    { label: 'Extra nocturnas', key: 'horasExtraNocturnas' as const },
+                    { label: 'Dominicales / festivas', key: 'horasDominicalesFestivas' as const },
+                  ].map(({ label, key }) => (
+                    <Table.Tr key={key}>
+                      <Table.Td>{label}</Table.Td>
+                      <Table.Td>{enhancedBalance.data!.categoryBreakdown![key]}</Table.Td>
+                      <Table.Td>
+                        {enhancedBalance.data?.valorRecargos?.items
+                          .filter((item) => item.label === label)
+                          .map((item) => `$${item.valor}`)
+                          .join(', ') || '—'}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+              {enhancedBalance.data?.valorRecargos && (
+                <Text size="sm" fw={600} ta="right">
+                  Total recargos: ${enhancedBalance.data.valorRecargos.total}
+                </Text>
+              )}
+            </Stack>
+          </Card>
+        )}
 
         {breakdown.length > 0 && <DayBreakdown breakdown={breakdown} />}
 

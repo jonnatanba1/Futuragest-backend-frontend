@@ -24,7 +24,16 @@ export class JornadaPolicyRepository implements JornadaPolicyRepositoryPort {
 
   /** INSERT-only — never update. */
   create(data: CreateJornadaPolicyData): Promise<JornadaPolicyRecord> {
-    return this.prisma.jornadaPolicy.create({ data }) as Promise<JornadaPolicyRecord>;
+    return this.prisma.jornadaPolicy.create({
+      data: {
+        horasDiarias: data.horasDiarias,
+        vigenteDesde: data.vigenteDesde,
+        horaInicio: '07:00',
+        horaFin: '17:00',
+        horasSemanales: data.horasDiarias.mul(5),
+        diasLaborales: [1, 2, 3, 4, 5],
+      },
+    }) as Promise<JornadaPolicyRecord>;
   }
 
   /** All policies ordered ascending by vigenteDesde. */

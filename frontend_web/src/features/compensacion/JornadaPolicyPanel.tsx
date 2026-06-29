@@ -54,6 +54,10 @@ function CreatePolicyForm() {
       await createMutation.mutateAsync({
         horasDiarias: Number(values.horasDiarias),
         vigenteDesde: values.vigenteDesde,
+        horaInicio: '06:00',
+        horaFin: '14:00',
+        diasLaborales: [1, 2, 3, 4, 5],
+        horasSemanales: 44,
       });
 
       notifications.show({

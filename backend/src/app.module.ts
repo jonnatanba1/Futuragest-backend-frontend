@@ -13,6 +13,7 @@ import { AsistenciaModule } from './modules/asistencia/asistencia.module';
 import { NovedadesModule } from './modules/novedades/novedades.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CompensacionModule } from './modules/compensacion/compensacion.module';
+import { JornadaModule } from './modules/jornada/jornada.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CompensacionModule } from './modules/compensacion/compensacion.module';
     NovedadesModule,
     NotificationsModule,
     CompensacionModule,
+    JornadaModule,
   ],
   controllers: [AppController],
   providers: [

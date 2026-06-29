@@ -1,0 +1,30 @@
+schema: spec-driven
+
+context: |
+  Tech stack: NestJS (hexagonal), Prisma (PostgreSQL), Flutter (mobile), React/Vite (web frontend)
+  Architecture: Hexagonal — domain/application/infrastructure/interface layers per module
+  Testing: Jest (backend unit+integration), Vitest (frontend)
+  Style: Pure domain functions, port-driven DI, snapshot-immutable breakdowns
+
+rules:
+  proposal:
+    - Include rollback plan for all changes
+    - Capabilities section required for spec contract
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale (ADR)
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing NestJS hexagonal patterns
+    tdd: true
+    test_command: "pnpm turbo run test --filter=api"
+  verify:
+    test_command: "pnpm turbo run test --filter=api"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

@@ -9,7 +9,7 @@
  * scoped-novedad.repository.ts file to satisfy the meta-guard scan.
  */
 
-import type { Novedad, NovedadStatus, VerificationMethod } from '@prisma/client';
+import type { Novedad, NovedadStatus, TipoNovedad, VerificationMethod } from '@prisma/client';
 
 export const NOVEDAD_REPOSITORY_PORT = Symbol('NovedadRepositoryPort');
 
@@ -22,6 +22,12 @@ export interface CreateNovedadData {
   motivo?: string | null;
   /** Optional idempotency token for offline sync. */
   clientRef?: string | null;
+  /** Type of novelty — LLEGADA_TARDE (auto-generated) or HORAS_EXTRA (default, supervisor-requested). */
+  tipoNovedad?: TipoNovedad;
+  /** true = system-created (late arrival); false = supervisor-requested. */
+  autoGenerada?: boolean;
+  /** Only set when tipoNovedad = LLEGADA_TARDE. Minutes late from horaInicio. */
+  minutosTarde?: number | null;
 }
 
 export interface UpdateNovedadStatusData {

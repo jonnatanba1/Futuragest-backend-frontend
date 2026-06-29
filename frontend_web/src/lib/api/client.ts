@@ -2,9 +2,13 @@ import type {
   AttendanceDto,
   ClosePeriodRequest,
   CompensationPeriodDto,
+  CompensatoryRestDto,
   ConfirmPayoutRequest,
   CreateJornadaPolicyRequest,
   CreateOperarioRequest,
+  CreateSurchargeRateRequest,
+  EnhancedPeriodBalanceDto,
+  HolidayDto,
   ImportResultDto,
   JornadaPolicyDto,
   MeResponse,
@@ -14,7 +18,10 @@ import type {
   PeriodBalanceDto,
   PeriodPayoutDto,
   PhotoUrlResponseDto,
+  ScheduleCompensatoryRequest,
   SupervisorDto,
+  SurchargeRateDto,
+  UpdateJornadaPolicyRequest,
   ZoneResponseDto,
 } from '@futuragest/contracts';
 
@@ -354,4 +361,71 @@ export const novedadesApi = {
 
   rejectNovedad: (id: string): Promise<NovedadDto> =>
     request<NovedadDto>('PATCH', `/novedades/${id}/reject`),
+};
+
+// --- JornadaPolicy (full CRUD — PR 5) ---------------------------------------
+
+export const jornadaPolicyApi = {
+  list: (): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
+
+  get: (id: string): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('GET', `/jornada-policy/${id}`),
+
+  create: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('POST', '/jornada-policy', { body }),
+
+  update: (id: string, body: UpdateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('PATCH', `/jornada-policy/${id}`, { body }),
+
+  archive: (id: string): Promise<void> =>
+    request<void>('DELETE', `/jornada-policy/${id}`),
+};
+
+// --- Holidays (PR 5) --------------------------------------------------------
+
+export const holidayApi = {
+  listByYear: (year: number): Promise<HolidayDto[]> =>
+    request<HolidayDto[]>('GET', `/holidays?year=${year}`),
+
+  generateYear: (year: number): Promise<HolidayDto[]> =>
+    request<HolidayDto[]>('POST', `/holidays/generate`, { body: { year } }),
+
+  create: (body: { date: string; name: string }): Promise<HolidayDto> =>
+    request<HolidayDto>('POST', '/holidays', { body }),
+};
+
+// --- SurchargeRates (PR 5) --------------------------------------------------
+
+export const surchargeRateApi = {
+  list: (): Promise<SurchargeRateDto[]> =>
+    request<SurchargeRateDto[]>('GET', '/surcharge-rates'),
+
+  create: (body: CreateSurchargeRateRequest): Promise<SurchargeRateDto> =>
+    request<SurchargeRateDto>('POST', '/surcharge-rates', { body }),
+};
+
+// --- CompensatoryRest (PR 5) ------------------------------------------------
+
+export const compensatoryRestApi = {
+  list: (opts: { operarioId?: string; month?: string } = {}): Promise<CompensatoryRestDto[]> => {
+    const params = new URLSearchParams();
+    if (opts.operarioId) params.set('operarioId', opts.operarioId);
+    if (opts.month) params.set('month', opts.month);
+    const qs = params.toString();
+    return request<CompensatoryRestDto[]>('GET', `/compensatorio${qs ? `?${qs}` : ''}`);
+  },
+
+  schedule: (id: string, body: ScheduleCompensatoryRequest): Promise<CompensatoryRestDto> =>
+    request<CompensatoryRestDto>('PATCH', `/compensatorio/${id}/schedule`, { body }),
+};
+
+// --- Enhanced Balance (PR 5) ------------------------------------------------
+
+export const enhancedBalanceApi = {
+  getBalance: (operarioId: string, desde: string, hasta: string): Promise<EnhancedPeriodBalanceDto> =>
+    request<EnhancedPeriodBalanceDto>(
+      'GET',
+      `/compensacion/${operarioId}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&enhanced=true`,
+    ),
 };
