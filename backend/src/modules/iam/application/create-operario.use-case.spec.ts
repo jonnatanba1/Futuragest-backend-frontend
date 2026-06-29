@@ -41,6 +41,7 @@ describe('CreateOperarioUseCase', () => {
         fullName: 'Test Worker',
         documento: '12345678',
         supervisorId: 'sup-1',
+        cargo: 'Barrido',
       });
 
       expect(port.resolveSupervisorByEmail).not.toHaveBeenCalled(); // supervisorId lookup, not email
@@ -49,6 +50,7 @@ describe('CreateOperarioUseCase', () => {
         fullName: 'Test Worker',
         documento: '12345678',
         supervisorId: 'sup-1',
+        cargo: 'Barrido',
       });
       expect(result).toHaveProperty('id', 'op-1');
     });
@@ -65,7 +67,7 @@ describe('CreateOperarioUseCase', () => {
       const useCase = new CreateOperarioUseCase(port);
 
       await expect(
-        useCase.execute({ fullName: 'Test', documento: 'dup-doc', supervisorId: 'sup-1' }),
+        useCase.execute({ fullName: 'Test', documento: 'dup-doc', supervisorId: 'sup-1', cargo: '' }),
       ).rejects.toBeInstanceOf(DuplicateDocumentoError);
     });
 
@@ -76,7 +78,7 @@ describe('CreateOperarioUseCase', () => {
       const useCase = new CreateOperarioUseCase(port);
 
       await expect(
-        useCase.execute({ fullName: 'Test', documento: '111', supervisorId: 'sup-1' }),
+        useCase.execute({ fullName: 'Test', documento: '111', supervisorId: 'sup-1', cargo: '' }),
       ).rejects.toBeInstanceOf(DuplicateDocumentoError);
 
       expect(port.create).toHaveBeenCalledTimes(1);
@@ -98,7 +100,7 @@ describe('CreateOperarioUseCase', () => {
       const useCase = new CreateOperarioUseCase(port);
 
       await expect(
-        useCase.execute({ fullName: 'Test', documento: '22222222', supervisorId: 'does-not-exist' }),
+        useCase.execute({ fullName: 'Test', documento: '22222222', supervisorId: 'does-not-exist', cargo: '' }),
       ).rejects.toBeInstanceOf(OperarioSupervisorNotFoundError);
 
       expect(port.create).toHaveBeenCalledTimes(1);

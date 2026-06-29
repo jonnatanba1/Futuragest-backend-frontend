@@ -1,8 +1,8 @@
 /**
  * T-15 RED → T-16 GREEN: CheckOutAttendanceUseCase unit spec.
  * Covers:
- *   AT-18 (happy path with checkOutSignatureKey present)
- *   AT-19 (no checkOutSignatureKey → 422, even if signatureKey is set)
+ *   AT-18 (happy path with checkOutPhotoKey present)
+ *   AT-19 (no checkOutPhotoKey → 422, even if checkInPhotoKey is set)
  *   AT-20 (already completed → 409 ImmutableAttendanceError)
  *   AT-21 (not in scope → 404)
  *   AT-23 (invalid GPS → 400)
@@ -10,21 +10,25 @@
  *   SI-15 (same checkOutClientRef on completed → idempotent 200, no update)
  *   SI-16 (different checkOutClientRef on completed → ImmutableAttendanceError)
  *   SI-17 (absent checkOutClientRef on completed → ImmutableAttendanceError)
- *   SI-18 (signature required check: checkOutSignatureKey null → 422 even with checkOutClientRef present)
+ *   SI-18 (photo required check: checkOutPhotoKey null → 422 even with checkOutClientRef present)
  *   SI-30 (no checkOutClientRef on active → backward-compat checkout)
  *   SI-31 (by-clientRef lookup returns null → AttendanceNotFoundError)
- *   AT-39 (signatureKey set but checkOutSignatureKey null → 422, checkout signature is what matters)
+ *   AT-39 (checkInPhotoKey set but checkOutPhotoKey null → 422, checkout photo is what matters)
  */
 
 import { CheckOutAttendanceUseCase } from './check-out-attendance.use-case';
 import {
   AttendanceNotFoundError,
   ImmutableAttendanceError,
-  SignatureRequiredError,
+  PhotoRequiredError,
   InvalidGpsError,
 } from '../domain/attendance.errors';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
 import type { Attendance } from '@prisma/client';
+
+// Fixed check-in time used across all tests so VALID_INPUT.checkOutCapturedAt (2026-05-31T17:00Z)
+// is always after checkIn and within MAX_SHIFT_HOURS.
+const FIXED_CHECK_IN = new Date('2026-05-31T08:00:00Z');
 
 function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
   return {
@@ -33,8 +37,8 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     operarioId: 'O1',
     zoneId: 'Z1',
     date: '2026-05-31',
-    checkInCapturedAt: new Date(),
-    checkInReceivedAt: new Date(),
+    checkInCapturedAt: FIXED_CHECK_IN,
+    checkInReceivedAt: FIXED_CHECK_IN,
     checkInLat: 7.5,
     checkInLng: -76.5,
     checkInAccuracy: 10,
@@ -43,9 +47,11 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: 'signatures/S1/ATT-1.png',
-    // checkOutSignatureKey is required for check-out (SALIDA signature)
-    checkOutSignatureKey: 'signatures/S1/ATT-1-checkout.png',
+    checkInVerification: null,
+    checkOutVerification: null,
+    checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
+    // checkOutPhotoKey is required for check-out (SALIDA photo)
+    checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png',
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -76,9 +82,9 @@ const VALID_INPUT = {
 };
 
 describe('CheckOutAttendanceUseCase', () => {
-  describe('AT-18 — happy path: checks out with signature present', () => {
+  describe('AT-18 — happy path: checks out with photo present', () => {
     it('sets completedAt and both checkOut timestamps', async () => {
-      const att = makeAttendance({ signatureKey: 'signatures/S1/ATT-1.png', completedAt: null });
+      const att = makeAttendance({ checkInPhotoKey: 'photos/S1/ATT-1-checkin.png', completedAt: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
@@ -97,13 +103,13 @@ describe('CheckOutAttendanceUseCase', () => {
     });
   });
 
-  describe('AT-19 — no checkout signature uploaded → SignatureRequiredError (422)', () => {
-    it('throws SignatureRequiredError when checkOutSignatureKey is null', async () => {
-      const att = makeAttendance({ checkOutSignatureKey: null, completedAt: null });
+  describe('AT-19 — no checkout photo uploaded → PhotoRequiredError (422)', () => {
+    it('throws PhotoRequiredError when checkOutPhotoKey is null', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: null, completedAt: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
-      await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(SignatureRequiredError);
+      await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(PhotoRequiredError);
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
@@ -112,7 +118,7 @@ describe('CheckOutAttendanceUseCase', () => {
     it('throws ImmutableAttendanceError when completedAt is set and no ref provided', async () => {
       const att = makeAttendance({
         completedAt: new Date(),
-        signatureKey: 'signatures/S1/ATT-1.png',
+        checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
         checkOutClientRef: 'CREF-Z',
       });
       const repo = makeMockRepo(att);
@@ -135,7 +141,7 @@ describe('CheckOutAttendanceUseCase', () => {
 
   describe('AT-23 — invalid GPS on check-out → InvalidGpsError (400)', () => {
     it('throws InvalidGpsError for lat out of range', async () => {
-      const att = makeAttendance({ checkOutSignatureKey: 'checkout-key', completedAt: null });
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
@@ -148,7 +154,7 @@ describe('CheckOutAttendanceUseCase', () => {
 
   describe('AT-36 — success path sets completedAt and server timestamps (unit)', () => {
     it('repo.update is called with completedAt and checkOutReceivedAt as Dates', async () => {
-      const att = makeAttendance({ checkOutSignatureKey: 'checkout-key', completedAt: null });
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
       const updatedAtt = { ...att, completedAt: new Date(), checkOutReceivedAt: new Date() };
       const repo = {
         ...makeMockRepo(att),
@@ -172,7 +178,7 @@ describe('CheckOutAttendanceUseCase', () => {
       const att = makeAttendance({
         completedAt,
         checkOutClientRef: 'CREF-Z',
-        signatureKey: 'sig-key',
+        checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
       });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
@@ -190,7 +196,7 @@ describe('CheckOutAttendanceUseCase', () => {
       const att = makeAttendance({
         completedAt: new Date(),
         checkOutClientRef: 'CREF-Z',
-        signatureKey: 'sig-key',
+        checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
       });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
@@ -210,7 +216,7 @@ describe('CheckOutAttendanceUseCase', () => {
       const att = makeAttendance({
         completedAt: new Date(),
         checkOutClientRef: 'CREF-Z',
-        signatureKey: 'sig-key',
+        checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
       });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
@@ -221,22 +227,22 @@ describe('CheckOutAttendanceUseCase', () => {
     });
   });
 
-  describe('SI-18 — signature required check: checkOutSignatureKey null → 422 even with checkOutClientRef present', () => {
-    it('throws SignatureRequiredError when active record has no checkOutSignatureKey', async () => {
-      const att = makeAttendance({ completedAt: null, checkOutSignatureKey: null });
+  describe('SI-18 — photo required check: checkOutPhotoKey null → 422 even with checkOutClientRef present', () => {
+    it('throws PhotoRequiredError when active record has no checkOutPhotoKey', async () => {
+      const att = makeAttendance({ completedAt: null, checkOutPhotoKey: null });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
       await expect(
         useCase.execute({ ...VALID_INPUT, checkOutClientRef: 'CREF-NEW' }),
-      ).rejects.toThrow(SignatureRequiredError);
+      ).rejects.toThrow(PhotoRequiredError);
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
 
   describe('SI-30 — no checkOutClientRef on active record → backward-compat checkout', () => {
     it('calls update with completedAt set; checkOutClientRef null in payload', async () => {
-      const att = makeAttendance({ completedAt: null, checkOutSignatureKey: 'checkout-sig-key' });
+      const att = makeAttendance({ completedAt: null, checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png' });
       const updatedAtt = { ...att, completedAt: new Date() };
       const repo = {
         ...makeMockRepo(att),
@@ -267,19 +273,62 @@ describe('CheckOutAttendanceUseCase', () => {
     });
   });
 
-  describe('AT-39 — signatureKey set but checkOutSignatureKey null → SignatureRequiredError (422)', () => {
-    it('rejects check-out when only checkin signature is present', async () => {
-      // signatureKey (ingreso) is set; checkOutSignatureKey (salida) is not
+  describe('AT-39 — checkInPhotoKey set but checkOutPhotoKey null → PhotoRequiredError (422)', () => {
+    it('rejects check-out when only checkin photo is present', async () => {
+      // checkInPhotoKey (ingreso) is set; checkOutPhotoKey (salida) is not
       const att = makeAttendance({
-        signatureKey: 'signatures/S1/ATT-1.png',
-        checkOutSignatureKey: null,
+        checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
+        checkOutPhotoKey: null,
         completedAt: null,
       });
       const repo = makeMockRepo(att);
       const useCase = new CheckOutAttendanceUseCase(repo);
 
-      await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(SignatureRequiredError);
+      await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(PhotoRequiredError);
       expect(repo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── VM-03..VM-05 — VerificationMethod (checkOutVerification) ───────────────
+
+  describe('VM-03 — checkOut with verification → persists checkOutVerification', () => {
+    it('passes checkOutVerification: BIOMETRIC to repo.update when provided', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
+      const updatedAtt = { ...att, completedAt: new Date() };
+      const repo = { ...makeMockRepo(att), update: jest.fn().mockResolvedValue(updatedAtt) };
+      const useCase = new CheckOutAttendanceUseCase(repo);
+
+      await useCase.execute({ ...VALID_INPUT, verification: 'BIOMETRIC' });
+
+      const [, updateData] = (repo.update as jest.Mock).mock.calls[0];
+      expect(updateData.checkOutVerification).toBe('BIOMETRIC');
+    });
+
+    it('passes checkOutVerification: NONE to repo.update when provided', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
+      const updatedAtt = { ...att, completedAt: new Date() };
+      const repo = { ...makeMockRepo(att), update: jest.fn().mockResolvedValue(updatedAtt) };
+      const useCase = new CheckOutAttendanceUseCase(repo);
+
+      await useCase.execute({ ...VALID_INPUT, verification: 'NONE' });
+
+      const [, updateData] = (repo.update as jest.Mock).mock.calls[0];
+      expect(updateData.checkOutVerification).toBe('NONE');
+    });
+  });
+
+  describe('VM-04 — checkOut without verification → persists null', () => {
+    it('passes checkOutVerification: null to repo.update when verification is absent', async () => {
+      const att = makeAttendance({ checkOutPhotoKey: 'photos/S1/ATT-1-checkout.png', completedAt: null });
+      const updatedAtt = { ...att, completedAt: new Date() };
+      const repo = { ...makeMockRepo(att), update: jest.fn().mockResolvedValue(updatedAtt) };
+      const useCase = new CheckOutAttendanceUseCase(repo);
+
+      // VALID_INPUT has no verification field
+      await useCase.execute(VALID_INPUT);
+
+      const [, updateData] = (repo.update as jest.Mock).mock.calls[0];
+      expect(updateData.checkOutVerification).toBeNull();
     });
   });
 });

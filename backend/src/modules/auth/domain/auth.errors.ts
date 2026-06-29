@@ -54,6 +54,13 @@ export class MaxDevicesExceededError extends Error {
   }
 }
 
+export class MissingDeviceContextError extends Error {
+  constructor() {
+    super('Se requiere una sesión vinculada a un dispositivo para gestionar tokens de notificación');
+    this.name = 'MissingDeviceContextError';
+  }
+}
+
 export class UserNotFoundError extends Error {
   constructor() {
     super('Usuario no encontrado');

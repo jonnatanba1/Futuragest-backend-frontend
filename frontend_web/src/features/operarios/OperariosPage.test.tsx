@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +18,7 @@ const OPS = [
     fullName: 'Wilson Palacios',
     documento: '1030000007',
     supervisorId: 's-1',
+    cargo: 'Barrido',
     deactivatedAt: null,
     createdAt: '',
     updatedAt: '',
@@ -27,6 +28,7 @@ const OPS = [
     fullName: 'Yuliana Cuesta',
     documento: '1030000008',
     supervisorId: 's-1',
+    cargo: '',
     deactivatedAt: '2026-02-01T00:00:00Z',
     createdAt: '',
     updatedAt: '',
@@ -35,9 +37,9 @@ const OPS = [
 
 vi.mock('./operario-queries', () => ({
   useOperarios: () => ({ data: OPS, isLoading: false, isError: false }),
-  useSupervisors: () => ({ data: [{ id: 's-1', userId: 'u', municipioId: 'm', zoneId: 'z', area: 'BARRIDO', email: 's1@futuragest.co', createdAt: '' }] }),
-  useZones: () => ({ data: [] }),
-  useMunicipios: () => ({ data: [] }),
+  useSupervisors: () => ({ data: [{ id: 's-1', userId: 'u', municipioId: 'm-1', zoneId: 'z-1', area: 'BARRIDO', email: 's1@futuragest.co', createdAt: '' }] }),
+  useZones: () => ({ data: [{ id: 'z-1', name: 'Zona Urabá', createdAt: '', updatedAt: '' }] }),
+  useMunicipios: () => ({ data: [{ id: 'm-1', name: 'Turbo', zoneId: 'z-1', createdAt: '', updatedAt: '' }] }),
   useCreateOperario: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeactivateOperario: () => ({ mutateAsync: deactivateMock, isPending: false, variables: undefined }),
   useReactivateOperario: () => ({ mutateAsync: vi.fn(), isPending: false, variables: undefined }),
@@ -76,12 +78,16 @@ describe('OperariosPage', () => {
     expect(screen.queryByText('Yuliana Cuesta')).not.toBeInTheDocument();
   });
 
-  it('shows write controls for write roles', () => {
+  it('shows write controls for write roles', async () => {
     setRole('TALENTO_HUMANO');
+    const user = userEvent.setup();
     renderPage();
     expect(screen.getByRole('button', { name: /nuevo operario/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^importar$/i })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /desactivar/i }).length).toBeGreaterThan(0);
+    // Action buttons live inside the drawer — open it by clicking the row
+    await user.click(screen.getByText('Wilson Palacios'));
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getByRole('button', { name: /desactivar/i })).toBeInTheDocument();
   });
 
   it('hides write controls for read-only roles', () => {
@@ -92,14 +98,15 @@ describe('OperariosPage', () => {
     expect(screen.queryByRole('button', { name: /desactivar/i })).not.toBeInTheDocument();
   });
 
-  it('deactivates an active operario through the confirm modal', async () => {
+  it('opens the detail drawer and shows deactivation button for an active operario', async () => {
     setRole('TALENTO_HUMANO');
-    deactivateMock.mockResolvedValue({});
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: /desactivar/i }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: /desactivar/i }));
-    await waitFor(() => expect(deactivateMock).toHaveBeenCalledWith('o-1'));
+    // Click the row to open the drawer
+    await user.click(screen.getByText('Wilson Palacios'));
+    // The detail drawer should appear with the Desactivar button
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getByRole('button', { name: /desactivar/i })).toBeInTheDocument();
+    // The full deactivation confirm flow is covered by OperarioDetailDrawer.test.tsx
   });
 });

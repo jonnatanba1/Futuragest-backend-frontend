@@ -1,12 +1,19 @@
 import type {
   AttendanceDto,
+  ClosePeriodRequest,
+  CompensationPeriodDto,
+  ConfirmPayoutRequest,
+  CreateJornadaPolicyRequest,
   CreateOperarioRequest,
   ImportResultDto,
+  JornadaPolicyDto,
   MeResponse,
   MunicipioResponseDto,
   NovedadDto,
   OperarioDto,
-  SignatureUrlResponseDto,
+  PeriodBalanceDto,
+  PeriodPayoutDto,
+  PhotoUrlResponseDto,
   SupervisorDto,
   ZoneResponseDto,
 } from '@futuragest/contracts';
@@ -282,12 +289,12 @@ export const asistenciaApi = {
       `/asistencia${opts.since ? `?since=${encodeURIComponent(opts.since)}` : ''}`,
     ),
 
-  /** Presigned URL for an attendance signature image (check-in or check-out). */
-  getSignatureUrl: (
+  /** Presigned URL for an attendance photo (check-in or check-out). */
+  getPhotoUrl: (
     id: string,
     phase: 'checkin' | 'checkout' = 'checkin',
-  ): Promise<SignatureUrlResponseDto> =>
-    request<SignatureUrlResponseDto>('GET', `/asistencia/${id}/signature?phase=${phase}`),
+  ): Promise<PhotoUrlResponseDto> =>
+    request<PhotoUrlResponseDto>('GET', `/asistencia/${id}/photo?phase=${phase}`),
 };
 
 export interface HealthResponse {
@@ -298,6 +305,40 @@ export interface HealthResponse {
 
 export const healthApi = {
   check: (): Promise<HealthResponse> => request<HealthResponse>('GET', '/health', { auth: false }),
+};
+
+// --- Compensación de Horas --------------------------------------------------
+
+export const compensacionApi = {
+  /** GET /compensacion/:operarioId?desde=...&hasta=... */
+  getBalance: (operarioId: string, desde: string, hasta: string): Promise<PeriodBalanceDto> =>
+    request<PeriodBalanceDto>(
+      'GET',
+      `/compensacion/${operarioId}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`,
+    ),
+
+  /** POST /compensacion/:operarioId/close */
+  closePeriod: (operarioId: string, body: ClosePeriodRequest): Promise<CompensationPeriodDto> =>
+    request<CompensationPeriodDto>('POST', `/compensacion/${operarioId}/close`, { body }),
+
+  /** GET /compensacion/:operarioId/payout?periodKey=... */
+  getPayout: (operarioId: string, periodKey: string): Promise<PeriodPayoutDto> =>
+    request<PeriodPayoutDto>(
+      'GET',
+      `/compensacion/${operarioId}/payout?periodKey=${encodeURIComponent(periodKey)}`,
+    ),
+
+  /** POST /compensacion/:operarioId/payout/confirm */
+  confirmPayout: (operarioId: string, body: ConfirmPayoutRequest): Promise<PeriodPayoutDto> =>
+    request<PeriodPayoutDto>('POST', `/compensacion/${operarioId}/payout/confirm`, { body }),
+
+  /** GET /jornada-policy */
+  getJornadaPolicies: (): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
+
+  /** POST /jornada-policy */
+  createJornadaPolicy: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('POST', '/jornada-policy', { body }),
 };
 
 export const novedadesApi = {

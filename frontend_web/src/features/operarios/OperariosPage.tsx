@@ -3,18 +3,15 @@ import {
   Badge,
   Button,
   Group,
-  Modal,
   Pagination,
   Select,
   Stack,
   Switch,
   Table,
-  Text,
   TextInput,
   Title,
 } from '@mantine/core';
 import { useDisclosure, useDocumentTitle } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
 import type { OperarioDto } from '@futuragest/contracts';
 import React, { useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
@@ -25,15 +22,13 @@ import { TableSkeleton } from '../../components/TableSkeleton';
 import { CreateOperarioModal } from './CreateOperarioModal';
 import { ImportOperariosModal } from './ImportOperariosModal';
 import {
-  useDeactivateOperario,
   useMunicipios,
   useOperarios,
-  useReactivateOperario,
-  useReassignOperario,
   useSupervisors,
   useZones,
 } from './operario-queries';
 import { buildSupervisorLabelMap } from './supervisor-label';
+import { OperarioDetailDrawer } from './OperarioDetailDrawer';
 
 const PAGE_SIZE = 10;
 
@@ -50,24 +45,35 @@ export function OperariosPage() {
 
   const [search, setSearch] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [filterCargo, setFilterCargo] = useState<string | null>(null);
+  const [filterSupervisorId, setFilterSupervisorId] = useState<string | null>(null);
+  const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [modalOpened, modal] = useDisclosure(false);
   const [importOpened, importModal] = useDisclosure(false);
-  const [toDeactivate, setToDeactivate] = useState<OperarioDto | null>(null);
-  const [toReassign, setToReassign] = useState<OperarioDto | null>(null);
-  const [reassignSup, setReassignSup] = useState<string | null>(null);
+  const [selectedOp, setSelectedOp] = useState<OperarioDto | null>(null);
 
   const operarios = useOperarios(includeInactive);
   const supervisors = useSupervisors();
   const zones = useZones();
   const municipios = useMunicipios();
-  const deactivate = useDeactivateOperario();
-  const reactivate = useReactivateOperario();
-  const reassign = useReassignOperario();
 
   const labelMap = useMemo(
     () => buildSupervisorLabelMap(supervisors.data ?? [], zones.data ?? [], municipios.data ?? []),
     [supervisors.data, zones.data, municipios.data],
+  );
+
+  const zoneMap = useMemo(
+    () => new Map((zones.data ?? []).map((z) => [z.id, z.name])),
+    [zones.data],
+  );
+  const municipioMap = useMemo(
+    () => new Map((municipios.data ?? []).map((m) => [m.id, m.name])),
+    [municipios.data],
+  );
+  const supervisorMap = useMemo(
+    () => new Map((supervisors.data ?? []).map((s) => [s.id, s])),
+    [supervisors.data],
   );
 
   const supervisorOptions = useMemo(
@@ -75,39 +81,49 @@ export function OperariosPage() {
     [supervisors.data, labelMap],
   );
 
+  const cargoOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (operarios.data ?? [])
+            .map((o) => o.cargo?.trim())
+            .filter((c): c is string => !!c),
+        ),
+      )
+        .sort()
+        .map((c) => ({ value: c, label: c })),
+    [operarios.data],
+  );
+
+  const municipioOptions = useMemo(
+    () => (municipios.data ?? []).map((m) => ({ value: m.id, label: m.name })),
+    [municipios.data],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const rows = operarios.data ?? [];
-    if (!q) return rows;
-    return rows.filter(
-      (o) => o.fullName.toLowerCase().includes(q) || o.documento.toLowerCase().includes(q),
-    );
-  }, [operarios.data, search]);
+    return (operarios.data ?? []).filter((o) => {
+      if (q && !o.fullName.toLowerCase().includes(q) && !o.documento.toLowerCase().includes(q))
+        return false;
+      if (filterCargo && (o.cargo?.trim() || '') !== filterCargo) return false;
+      if (filterSupervisorId && o.supervisorId !== filterSupervisorId) return false;
+      if (filterMunicipioId) {
+        const sup = supervisorMap.get(o.supervisorId);
+        if (!sup || sup.municipioId !== filterMunicipioId) return false;
+      }
+      return true;
+    });
+  }, [operarios.data, search, filterCargo, filterSupervisorId, filterMunicipioId, supervisorMap]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const onSearchChange = (value: string) => {
-    setSearch(value);
-    setPage(1);
-  };
-  const onIncludeInactiveChange = (value: boolean) => {
-    setIncludeInactive(value);
-    setPage(1);
-  };
-
-  const runAction = async (action: Promise<unknown>, ok: string) => {
-    try {
-      await action;
-      notifications.show({ color: 'teal', message: ok });
-    } catch (err) {
-      notifications.show({
-        color: 'red',
-        message: err instanceof ApiError ? err.message : 'La acción falló',
-      });
-    }
-  };
+  const onSearchChange = (value: string) => { setSearch(value); setPage(1); };
+  const onIncludeInactiveChange = (value: boolean) => { setIncludeInactive(value); setPage(1); };
+  const onCargoChange = (value: string | null) => { setFilterCargo(value); setPage(1); };
+  const onSupervisorChange = (value: string | null) => { setFilterSupervisorId(value); setPage(1); };
+  const onMunicipioChange = (value: string | null) => { setFilterMunicipioId(value); setPage(1); };
 
   if (operarios.isError) {
     return (
@@ -131,20 +147,52 @@ export function OperariosPage() {
         )}
       </Group>
 
-      <Group>
-        <TextInput
-          placeholder="Buscar por nombre o documento"
-          aria-label="Buscar operarios"
-          value={search}
-          onChange={(e) => onSearchChange(e.currentTarget.value)}
-          flex={1}
-        />
-        <Switch
-          label="Mostrar inactivos"
-          checked={includeInactive}
-          onChange={(e) => onIncludeInactiveChange(e.currentTarget.checked)}
-        />
-      </Group>
+      <Stack gap="xs">
+        <Group wrap="wrap">
+          <TextInput
+            placeholder="Buscar por nombre o documento"
+            aria-label="Buscar operarios"
+            value={search}
+            onChange={(e) => onSearchChange(e.currentTarget.value)}
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <Switch
+            label="Mostrar inactivos"
+            checked={includeInactive}
+            onChange={(e) => onIncludeInactiveChange(e.currentTarget.checked)}
+          />
+        </Group>
+        <Group wrap="wrap" gap="sm">
+          <Select
+            placeholder="Cargo"
+            aria-label="Filtrar por cargo"
+            data={cargoOptions}
+            value={filterCargo}
+            onChange={onCargoChange}
+            clearable
+            w={180}
+          />
+          <Select
+            placeholder="Supervisor"
+            aria-label="Filtrar por supervisor"
+            data={supervisorOptions}
+            value={filterSupervisorId}
+            onChange={onSupervisorChange}
+            clearable
+            searchable
+            w={220}
+          />
+          <Select
+            placeholder="Municipio"
+            aria-label="Filtrar por municipio"
+            data={municipioOptions}
+            value={filterMunicipioId}
+            onChange={onMunicipioChange}
+            clearable
+            w={180}
+          />
+        </Group>
+      </Stack>
 
       {operarios.isLoading ? (
         <TableSkeleton />
@@ -153,7 +201,7 @@ export function OperariosPage() {
           icon="👷"
           title="Sin operarios"
           message={
-            search || includeInactive
+            search || includeInactive || filterCargo || filterSupervisorId || filterMunicipioId
               ? 'Ningún operario coincide con los filtros actuales.'
               : 'Agregue el primer operario para comenzar.'
           }
@@ -166,62 +214,36 @@ export function OperariosPage() {
               <Table.Tr>
                 <Table.Th>Nombre</Table.Th>
                 <Table.Th>Documento</Table.Th>
-                <Table.Th>Supervisor</Table.Th>
+                <Table.Th>Cargo</Table.Th>
+                <Table.Th>Zona</Table.Th>
+                <Table.Th>Municipio</Table.Th>
                 <Table.Th>Estado</Table.Th>
-                {canWrite && <Table.Th>Acciones</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {pageRows.map((op) => (
-                <Table.Tr key={op.id}>
+              {pageRows.map((op) => {
+                const sup = supervisorMap.get(op.supervisorId);
+                const zoneName = sup ? (zoneMap.get(sup.zoneId) ?? sup.zoneId) : '—';
+                const municipioName = sup ? (municipioMap.get(sup.municipioId) ?? sup.municipioId) : '—';
+                return (
+                <Table.Tr
+                  key={op.id}
+                  onClick={() => setSelectedOp(op)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <Table.Td>{op.fullName}</Table.Td>
                   <Table.Td>{op.documento}</Table.Td>
-                  <Table.Td>{labelMap.get(op.supervisorId) ?? op.supervisorId}</Table.Td>
+                  <Table.Td>{op.cargo || '—'}</Table.Td>
+                  <Table.Td>{zoneName}</Table.Td>
+                  <Table.Td>{municipioName}</Table.Td>
                   <Table.Td>
                     <Badge color={isActive(op) ? 'teal' : 'gray'} variant="light">
                       {isActive(op) ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </Table.Td>
-                  {canWrite && (
-                    <Table.Td>
-                      <Group gap="xs">
-                      <Button
-                        size="xs"
-                        variant="subtle"
-                        onClick={() => {
-                          setToReassign(op);
-                          setReassignSup(op.supervisorId);
-                        }}
-                      >
-                        Reasignar
-                      </Button>
-                      {isActive(op) ? (
-                        <Button
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          loading={deactivate.isPending && deactivate.variables === op.id}
-                          onClick={() => setToDeactivate(op)}
-                        >
-                          Desactivar
-                        </Button>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="subtle"
-                          loading={reactivate.isPending && reactivate.variables === op.id}
-                          onClick={() =>
-                            runAction(reactivate.mutateAsync(op.id), 'Operario reactivado')
-                          }
-                        >
-                          Reactivar
-                        </Button>
-                      )}
-                      </Group>
-                    </Table.Td>
-                  )}
                 </Table.Tr>
-              ))}
+                );
+              })}
             </Table.Tbody>
           </Table>
 
@@ -240,78 +262,15 @@ export function OperariosPage() {
       />
       <ImportOperariosModal opened={importOpened} onClose={importModal.close} />
 
-      <Modal
-        opened={toDeactivate !== null}
-        onClose={() => setToDeactivate(null)}
-        title="Desactivar operario"
-        centered
-      >
-        {toDeactivate && (
-          <Stack>
-            <Text size="sm">
-              ¿Desactivar a <strong>{toDeactivate.fullName}</strong>? Saldrá de la lista activa
-              y ya no podrá registrar asistencia. Puede reactivarlo más adelante.
-            </Text>
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setToDeactivate(null)}>
-                Cancelar
-              </Button>
-              <Button
-                color="red"
-                loading={deactivate.isPending}
-                onClick={() =>
-                  void runAction(
-                    deactivate.mutateAsync(toDeactivate.id),
-                    'Operario desactivado',
-                  ).finally(() => setToDeactivate(null))
-                }
-              >
-                Desactivar
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
-
-      <Modal
-        opened={toReassign !== null}
-        onClose={() => setToReassign(null)}
-        title="Reasignar operario"
-        centered
-      >
-        {toReassign && (
-          <Stack>
-            <Text size="sm">
-              Reasigne a <strong>{toReassign.fullName}</strong> a un supervisor diferente.
-            </Text>
-            <Select
-              label="Supervisor"
-              placeholder="Seleccione un supervisor"
-              data={supervisorOptions}
-              searchable
-              value={reassignSup}
-              onChange={setReassignSup}
-            />
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setToReassign(null)}>
-                Cancelar
-              </Button>
-              <Button
-                loading={reassign.isPending}
-                disabled={!reassignSup || reassignSup === toReassign.supervisorId}
-                onClick={() =>
-                  void runAction(
-                    reassign.mutateAsync({ id: toReassign.id, supervisorId: reassignSup as string }),
-                    'Operario reasignado',
-                  ).finally(() => setToReassign(null))
-                }
-              >
-                Reasignar
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
+      <OperarioDetailDrawer
+        operario={selectedOp}
+        onClose={() => setSelectedOp(null)}
+        supervisorOptions={supervisorOptions}
+        supervisorMap={supervisorMap}
+        zoneMap={zoneMap}
+        municipioMap={municipioMap}
+        canWrite={canWrite}
+      />
     </Stack>
   );
 }

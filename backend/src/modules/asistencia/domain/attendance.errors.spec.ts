@@ -7,14 +7,14 @@ import {
   AttendanceAlreadyExistsError,
   AttendanceNotFoundError,
   ImmutableAttendanceError,
-  SignatureRequiredError,
+  PhotoRequiredError,
   InvalidGpsError,
   OperarioNotInScopeError,
 } from './attendance.errors';
 
 describe('Attendance domain errors', () => {
   it('AttendanceAlreadyExistsError has name and is an Error', () => {
-    const stub = { id: 'ATT-1' } as any;
+    const stub = { id: 'ATT-1' } as unknown as import('@prisma/client').Attendance;
     const err = new AttendanceAlreadyExistsError('O1', '2026-05-31', stub);
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe('AttendanceAlreadyExistsError');
@@ -31,7 +31,7 @@ describe('Attendance domain errors', () => {
   });
 
   it('ImmutableAttendanceError has name and is an Error', () => {
-    const stub = { id: 'ATT-1' } as any;
+    const stub = { id: 'ATT-1' } as unknown as import('@prisma/client').Attendance;
     const err = new ImmutableAttendanceError('A1', stub);
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe('ImmutableAttendanceError');
@@ -39,10 +39,10 @@ describe('Attendance domain errors', () => {
     expect(err.conflicting).toBe(stub);
   });
 
-  it('SignatureRequiredError has name and is an Error', () => {
-    const err = new SignatureRequiredError('A1');
+  it('PhotoRequiredError has name and is an Error', () => {
+    const err = new PhotoRequiredError('A1');
     expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe('SignatureRequiredError');
+    expect(err.name).toBe('PhotoRequiredError');
     expect(err.httpStatus).toBe(422);
   });
 

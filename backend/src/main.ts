@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,10 +7,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Global DTO validation — must match the pipe installed in every test
+  // bootstrap (auth.int-spec.ts etc.); without it class-validator decorators
+  // are inert in production.
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+
   // CORS — required for the web admin panel (the browser enforces it; the
   // Flutter app is native and unaffected). Origins are configurable via
   // CORS_ORIGINS (comma-separated); defaults cover the Vite dev + preview ports.
-  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4173')
+  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4173,http://futuragest-frontendweb-5pwypd-171cc5-5-252-52-113.sslip.io,https://futuragest.jjsoftech.com')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);

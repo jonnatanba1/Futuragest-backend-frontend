@@ -102,4 +102,49 @@ describe('ApproveNovedadUseCase', () => {
       expect(repo.updateStatus).not.toHaveBeenCalled();
     });
   });
+
+  // ── VM-06..VM-07 — VerificationMethod (decisionVerification) ──────────────
+
+  describe('VM-06 — approve with verification → persists decisionVerification', () => {
+    it('passes decisionVerification: BIOMETRIC to updateStatus when provided', async () => {
+      const repo = makeMockRepo();
+      const scopeHolder = makeScopeHolder('lider-user-id');
+
+      const useCase = new ApproveNovedadUseCase(repo, scopeHolder);
+      await useCase.execute('nov-1', 'BIOMETRIC');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'nov-1',
+        expect.objectContaining({ decisionVerification: 'BIOMETRIC' }),
+      );
+    });
+
+    it('passes decisionVerification: NONE to updateStatus when provided', async () => {
+      const repo = makeMockRepo();
+      const scopeHolder = makeScopeHolder();
+
+      const useCase = new ApproveNovedadUseCase(repo, scopeHolder);
+      await useCase.execute('nov-1', 'NONE');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'nov-1',
+        expect.objectContaining({ decisionVerification: 'NONE' }),
+      );
+    });
+  });
+
+  describe('VM-07 — approve without verification → persists null', () => {
+    it('passes decisionVerification: null to updateStatus when absent', async () => {
+      const repo = makeMockRepo();
+      const scopeHolder = makeScopeHolder();
+
+      const useCase = new ApproveNovedadUseCase(repo, scopeHolder);
+      await useCase.execute('nov-1');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'nov-1',
+        expect.objectContaining({ decisionVerification: null }),
+      );
+    });
+  });
 });

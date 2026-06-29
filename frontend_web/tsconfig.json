@@ -1,10 +1,10 @@
 {
-  "extends": "@futuragest/tsconfig/react",
+  "extends": "./tsconfig.react.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@futuragest/contracts": ["../packages/contracts/src/index.ts"],
-      "@futuragest/contracts/generated/api": ["../packages/contracts/src/generated/api.ts"]
+      "@futuragest/contracts": ["src/contracts/index.ts"],
+      "@futuragest/contracts/generated/api": ["src/contracts/generated/api.ts"]
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },

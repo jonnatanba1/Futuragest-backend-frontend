@@ -52,12 +52,14 @@ export class ScopedOperarioRepository
     fullName: string;
     documento: string;
     supervisorId: string;
+    cargo: string;
   }): Promise<Operario> {
     return this.prismaService.operario.create({
       data: {
         fullName: data.fullName,
         documento: data.documento,
         supervisorId: data.supervisorId,
+        cargo: data.cargo,
         deactivatedAt: null,
       },
     });
@@ -102,7 +104,7 @@ export class ScopedOperarioRepository
    * Returns the count of successfully inserted rows.
    */
   async bulkCreate(
-    rows: Array<{ fullName: string; documento: string; supervisorId: string }>,
+    rows: Array<{ fullName: string; documento: string; supervisorId: string; cargo: string }>,
   ): Promise<number> {
     if (rows.length === 0) return 0;
     const results = await this.prismaService.$transaction(
@@ -112,6 +114,7 @@ export class ScopedOperarioRepository
             fullName: r.fullName,
             documento: r.documento,
             supervisorId: r.supervisorId,
+            cargo: r.cargo,
             deactivatedAt: null,
           },
         }),

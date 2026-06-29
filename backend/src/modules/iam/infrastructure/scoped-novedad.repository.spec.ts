@@ -22,6 +22,7 @@ function makeNovedad(overrides: Partial<Novedad> = {}): Novedad {
     clientRef: null,
     approvedByUserId: null,
     decidedAt: null,
+    decisionVerification: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

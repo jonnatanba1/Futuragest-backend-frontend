@@ -117,14 +117,14 @@ describe('Auth Integration', () => {
       expect(adminUser).not.toBeNull();
 
       const session = await prisma.deviceSession.findFirst({
-        where: { userId: adminUser!.id, deviceId },
+        where: { userId: adminUser?.id, deviceId },
       });
 
       expect(session).not.toBeNull();
       // The hash must differ from the plaintext token
-      expect(session!.refreshTokenHash).not.toBe(refreshToken);
+      expect(session?.refreshTokenHash).not.toBe(refreshToken);
       // And must not be empty
-      expect(session!.refreshTokenHash.length).toBeGreaterThan(10);
+      expect(session?.refreshTokenHash.length).toBeGreaterThan(10);
     });
   });
 
@@ -185,7 +185,7 @@ describe('Auth Integration', () => {
         .expect(200);
 
       const updated = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
-      expect(updated!.mustChangePassword).toBe(false);
+      expect(updated?.mustChangePassword).toBe(false);
     });
 
     it('allows protected endpoint access after password change', async () => {
@@ -234,9 +234,9 @@ describe('Auth Integration', () => {
       // Verify DB row has revokedAt set
       const adminUser = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
       const session = await prisma.deviceSession.findFirst({
-        where: { userId: adminUser!.id, deviceId },
+        where: { userId: adminUser?.id, deviceId },
       });
-      expect(session!.revokedAt).not.toBeNull();
+      expect(session?.revokedAt).not.toBeNull();
     });
 
     it('rejects POST /auth/refresh from a revoked device', async () => {
@@ -244,7 +244,7 @@ describe('Auth Integration', () => {
 
       await request(app.getHttpServer())
         .post('/auth/refresh')
-        .send({ userId: adminUser!.id, deviceId, refreshToken })
+        .send({ userId: adminUser?.id, deviceId, refreshToken })
         .expect(401);
     });
   });

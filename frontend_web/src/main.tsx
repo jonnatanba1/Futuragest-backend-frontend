@@ -1,5 +1,8 @@
 import '@mantine/core/styles.css';
+import '@mantine/charts/styles.css';
 import '@mantine/notifications/styles.css';
+import '@fontsource-variable/inter';
+import './app/global.css';
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';

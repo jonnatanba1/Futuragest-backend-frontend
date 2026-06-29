@@ -22,11 +22,13 @@ const ATT = [
     checkOutLat: 1,
     checkOutLng: 2,
     checkOutAccuracy: 5,
-    signatureKey: 'k1',
-    checkOutSignatureKey: 'k2',
+    checkInPhotoKey: 'k1',
+    checkOutPhotoKey: 'k2',
     clientRef: 'c1',
     checkOutClientRef: 'c2',
     completedAt: '2026-06-03T23:00:01Z',
+    checkInVerification: 'BIOMETRIC' as const,
+    checkOutVerification: 'DEVICE_CREDENTIAL' as const,
     createdAt: '',
     updatedAt: '',
   },
@@ -46,11 +48,13 @@ const ATT = [
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: null,
-    checkOutSignatureKey: null,
+    checkInPhotoKey: null,
+    checkOutPhotoKey: null,
     clientRef: 'c3',
     checkOutClientRef: null,
     completedAt: null,
+    checkInVerification: null,
+    checkOutVerification: null,
     createdAt: '',
     updatedAt: '',
   },
@@ -58,7 +62,7 @@ const ATT = [
 
 vi.mock('./attendance-queries', () => ({
   useAttendances: () => ({ data: ATT, isLoading: false, isError: false }),
-  useSignatureUrl: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePhotoUrl: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 vi.mock('../operarios/operario-queries', () => ({
@@ -112,6 +116,31 @@ describe('AsistenciaPage', () => {
     await waitFor(() =>
       expect(screen.getByText('Detalle de asistencia')).toBeInTheDocument(),
     );
-    expect(screen.getByText('Firma de ingreso')).toBeInTheDocument();
+    expect(screen.getByText('Foto de ingreso')).toBeInTheDocument();
+  });
+
+  it('shows BIOMETRIC verification badge for row with checkInVerification=BIOMETRIC', () => {
+    renderPage();
+    expect(screen.getByText('Huella')).toBeInTheDocument();
+  });
+
+  it('shows a dash for row with checkInVerification=null', () => {
+    renderPage();
+    // The BIOMETRIC row shows 'Huella'; the null row shows '—'
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('drawer shows checkInVerification and checkOutVerification for the selected row', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByText('Wilson Palacios'));
+    await waitFor(() =>
+      expect(screen.getByText('Detalle de asistencia')).toBeInTheDocument(),
+    );
+    // a-1 has BIOMETRIC check-in — table + drawer both show 'Huella' (two elements)
+    expect(screen.getAllByText('Huella').length).toBeGreaterThanOrEqual(2);
+    // a-1 has DEVICE_CREDENTIAL check-out — only visible in the drawer
+    expect(screen.getByText('PIN dispositivo')).toBeInTheDocument();
   });
 });

@@ -16,6 +16,8 @@ import {
   OperarioNotInScopeError,
 } from '../domain/attendance.errors';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
+import type { OperarioStatusPort } from '../../iam/domain/ports/operario-status.port';
+import type { ScopeContextHolder } from '../../auth/domain/scope-context';
 import type { Attendance } from '@prisma/client';
 
 // ── Mock factory helpers ─────────────────────────────────────────────────────
@@ -37,8 +39,10 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: null,
-    checkOutSignatureKey: null,
+    checkInVerification: null,
+    checkOutVerification: null,
+    checkInPhotoKey: null,
+    checkOutPhotoKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: null,
     completedAt: null,
@@ -61,13 +65,13 @@ function makeMockRepo(overrides: Partial<AttendanceRepositoryPort> = {}): Attend
   };
 }
 
-function makeMockOperarioRepo() {
+function makeMockOperarioRepo(): { findById: jest.Mock } {
   return {
     findById: jest.fn().mockResolvedValue({ id: 'O1', supervisorId: 'S1' }),
   };
 }
 
-function makeMockStatusPort(isActive: boolean | null = true) {
+function makeMockStatusPort(isActive: boolean | null = true): jest.Mocked<OperarioStatusPort> {
   return { isActive: jest.fn().mockResolvedValue(isActive) };
 }
 
@@ -77,7 +81,7 @@ function makeMockHolder(
     zoneId: 'Z1',
     role: 'SUPERVISOR',
   },
-) {
+): Pick<ScopeContextHolder, 'current'> {
   return { current: jest.fn().mockReturnValue(ctx) };
 }
 
@@ -102,7 +106,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true); // active
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
       const result = await useCase.execute(VALID_INPUT);
 
       expect(result.record).toBe(attendance);
@@ -128,7 +132,7 @@ describe('CheckInAttendanceUseCase', () => {
       const operarioRepo = makeMockOperarioRepo();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
       const result = await useCase.execute(VALID_INPUT);
 
       expect(result.record).toBe(existing);
@@ -152,7 +156,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
       const result = await useCase.execute(VALID_INPUT);
 
       expect(result.record).toBe(existing);
@@ -174,7 +178,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       await expect(useCase.execute({ ...VALID_INPUT, clientRef: 'REF-B' })).rejects.toThrow(
         AttendanceAlreadyExistsError,
@@ -190,7 +194,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       await expect(
         useCase.execute({ ...VALID_INPUT, checkInLat: 999 }),
@@ -206,7 +210,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       await expect(
         useCase.execute({ ...VALID_INPUT, checkInLng: 200 }),
@@ -225,7 +229,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true);
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(OperarioNotInScopeError);
       expect(repo.create).not.toHaveBeenCalled();
@@ -241,7 +245,7 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(false); // inactive
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       await expect(useCase.execute(VALID_INPUT)).rejects.toThrow(InactiveOperarioError);
       expect(repo.create).not.toHaveBeenCalled();
@@ -256,13 +260,62 @@ describe('CheckInAttendanceUseCase', () => {
       const holder = makeMockHolder();
       const statusPort = makeMockStatusPort(true); // active
 
-      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo as any, holder as any, statusPort as any);
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
 
       const result = await useCase.execute(VALID_INPUT);
 
       expect(result.record).toBe(attendance);
       expect(result.created).toBe(true);
       expect(repo.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── VM-01..VM-03 — VerificationMethod (checkInVerification) ────────────────
+
+  describe('VM-01 — checkIn with verification → persists checkInVerification', () => {
+    it('passes checkInVerification: BIOMETRIC to repo.create when provided', async () => {
+      const attendance = makeAttendance();
+      const repo = makeMockRepo({ create: jest.fn().mockResolvedValue(attendance) });
+      const operarioRepo = makeMockOperarioRepo();
+      const holder = makeMockHolder();
+      const statusPort = makeMockStatusPort(true);
+
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
+      await useCase.execute({ ...VALID_INPUT, verification: 'BIOMETRIC' });
+
+      const createCall = (repo.create as jest.Mock).mock.calls[0][0];
+      expect(createCall.checkInVerification).toBe('BIOMETRIC');
+    });
+
+    it('passes checkInVerification: DEVICE_CREDENTIAL when provided', async () => {
+      const attendance = makeAttendance();
+      const repo = makeMockRepo({ create: jest.fn().mockResolvedValue(attendance) });
+      const operarioRepo = makeMockOperarioRepo();
+      const holder = makeMockHolder();
+      const statusPort = makeMockStatusPort(true);
+
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
+      await useCase.execute({ ...VALID_INPUT, verification: 'DEVICE_CREDENTIAL' });
+
+      const createCall = (repo.create as jest.Mock).mock.calls[0][0];
+      expect(createCall.checkInVerification).toBe('DEVICE_CREDENTIAL');
+    });
+  });
+
+  describe('VM-02 — checkIn without verification → persists null', () => {
+    it('passes checkInVerification: null to repo.create when verification is absent', async () => {
+      const attendance = makeAttendance();
+      const repo = makeMockRepo({ create: jest.fn().mockResolvedValue(attendance) });
+      const operarioRepo = makeMockOperarioRepo();
+      const holder = makeMockHolder();
+      const statusPort = makeMockStatusPort(true);
+
+      const useCase = new CheckInAttendanceUseCase(repo, operarioRepo, holder as ScopeContextHolder, statusPort);
+      // VALID_INPUT has no verification field
+      await useCase.execute(VALID_INPUT);
+
+      const createCall = (repo.create as jest.Mock).mock.calls[0][0];
+      expect(createCall.checkInVerification).toBeNull();
     });
   });
 });

@@ -5,16 +5,21 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
-# Copy the entire monorepo so pnpm workspace links resolve correctly
-COPY . .
+# Copy package and lockfile
+COPY package.json pnpm-lock.yaml ./
+COPY prisma/ prisma/
 
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client (Prisma 7 WASM client for linux-musl-openssl-3.0.x)
-RUN pnpm --filter @futuragest/api exec prisma generate
+# Generate Prisma client
+RUN pnpm exec prisma generate
+
+# Copy source code
+COPY . .
 
 # Build the API
-RUN pnpm --filter @futuragest/api run build
+RUN pnpm run build
 
 # Stage 2: runner
 FROM node:20-alpine AS runner
@@ -23,24 +28,19 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
-# Copy workspace manifests and lockfile
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY packages/ packages/
-COPY backend/package.json backend/
-COPY backend/prisma/ backend/prisma/
+# Copy package.json and prisma schema
+COPY package.json pnpm-lock.yaml ./
+COPY prisma/ prisma/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy compiled output from builder
-COPY --from=builder /app/backend/dist backend/dist
+# Generate Prisma client for production
+RUN pnpm dlx prisma generate
 
-# Copy Prisma generated client from builder
-COPY --from=builder /app/backend/node_modules/.prisma backend/node_modules/.prisma
-COPY --from=builder /app/backend/node_modules/@prisma backend/node_modules/@prisma
+# Copy compiled output from builder
+COPY --from=builder /app/dist dist
 
 EXPOSE 3000
-
-WORKDIR /app/backend
 
 CMD ["node", "dist/main"]

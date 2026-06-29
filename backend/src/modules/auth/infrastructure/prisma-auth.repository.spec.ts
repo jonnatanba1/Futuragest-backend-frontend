@@ -8,6 +8,8 @@
  *               so a re-login does not wipe an already-registered push token (survival).
  * Spec: PN-22 — clearPushToken issues updateMany on (userId, deviceId) setting both fields to null.
  * Spec: PN-23 — updatePushToken still stores token + platform (regression guard).
+ * Spec: PN-33 — revokeDeviceSession also nulls pushToken/pushPlatform, so revoked
+ *               sessions never keep a stale FCM token.
  */
 
 import { PrismaAuthRepository } from './prisma-auth.repository';
@@ -70,8 +72,9 @@ describe('PrismaAuthRepository — push token persistence', () => {
     await repo.clearPushToken('user-9', 'device-9');
 
     expect(deviceSession.updateMany).toHaveBeenCalledTimes(1);
+    // revokedAt: null guards against deviceId-less writes ever touching revoked sessions.
     expect(deviceSession.updateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-9', deviceId: 'device-9' },
+      where: { userId: 'user-9', deviceId: 'device-9', revokedAt: null },
       data: { pushToken: null, pushPlatform: null },
     });
   });
@@ -82,8 +85,11 @@ describe('PrismaAuthRepository — push token persistence', () => {
 
     await repo.updatePushToken('user-2', 'device-2', 'fcm-tok', 'ios');
 
+    // revokedAt: null — revoked sessions must NEVER receive token writes. Prisma silently
+    // drops undefined filter keys in updateMany, so without this guard a missing deviceId
+    // would update ALL of the user's sessions, including revoked ones.
     expect(deviceSession.updateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-2', deviceId: 'device-2' },
+      where: { userId: 'user-2', deviceId: 'device-2', revokedAt: null },
       data: { pushToken: 'fcm-tok', pushPlatform: 'ios' },
     });
   });
@@ -95,8 +101,25 @@ describe('PrismaAuthRepository — push token persistence', () => {
     await repo.updatePushToken('user-3', 'device-3', 'fcm-tok-2');
 
     expect(deviceSession.updateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-3', deviceId: 'device-3' },
+      where: { userId: 'user-3', deviceId: 'device-3', revokedAt: null },
       data: { pushToken: 'fcm-tok-2', pushPlatform: null },
+    });
+  });
+
+  it('PN-33 — revokeDeviceSession sets revokedAt AND nulls pushToken/pushPlatform in the same update', async () => {
+    const { prisma, deviceSession } = makePrisma();
+    const repo = new PrismaAuthRepository(prisma);
+
+    await repo.revokeDeviceSession('user-4', 'device-4');
+
+    expect(deviceSession.updateMany).toHaveBeenCalledTimes(1);
+    expect(deviceSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-4', deviceId: 'device-4' },
+      data: {
+        revokedAt: expect.any(Date),
+        pushToken: null,
+        pushPlatform: null,
+      },
     });
   });
 });

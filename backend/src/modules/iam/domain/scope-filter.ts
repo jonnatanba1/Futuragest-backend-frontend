@@ -123,6 +123,17 @@ export const SCOPE_MAPS: Record<string, ScopeMap> = {
     zonePath: (zoneId) => ({ zoneId }),
     supervisorPath: (supervisorId) => ({ supervisorId }),
   },
+
+  /**
+   * CompensationPeriod (immutable fortnight-close snapshot) has denormalized
+   * zoneId + supervisorId columns — same pattern as Attendance and Novedad.
+   * COORDINATOR sees all periods in their zone; SUPERVISOR sees only their own.
+   * Missing entry → MissingScopeMapError (fail-closed).
+   */
+  CompensationPeriod: {
+    zonePath: (zoneId) => ({ zoneId }),
+    supervisorPath: (supervisorId) => ({ supervisorId }),
+  },
 };
 
 // ---------------------------------------------------------------------------

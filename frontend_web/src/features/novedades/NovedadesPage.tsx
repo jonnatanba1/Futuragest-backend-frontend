@@ -25,6 +25,7 @@ import { useMunicipios, useOperarios, useSupervisors, useZones } from '../operar
 import { buildSupervisorLabelMap } from '../operarios/supervisor-label';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
+import { VerificationBadge } from '../../components/VerificationBadge';
 import { useApproveNovedad, useNovedades, useRejectNovedad } from './novedad-queries';
 
 const PAGE_SIZE = 15;
@@ -54,6 +55,8 @@ export function NovedadesPage() {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [filterSupervisorId, setFilterSupervisorId] = useState<string | null>(null);
+  const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pending, setPending] = useState<PendingAction | null>(null);
 
@@ -81,6 +84,18 @@ export function NovedadesPage() {
     () => new Map((attendances.data ?? []).map((a) => [a.id, a.operarioId])),
     [attendances.data],
   );
+  const supervisorMap = useMemo(
+    () => new Map((supervisors.data ?? []).map((s) => [s.id, s])),
+    [supervisors.data],
+  );
+  const supervisorOptions = useMemo(
+    () => (supervisors.data ?? []).map((s) => ({ value: s.id, label: supervisorLabel.get(s.id) ?? s.id })),
+    [supervisors.data, supervisorLabel],
+  );
+  const municipioOptions = useMemo(
+    () => (municipios.data ?? []).map((m) => ({ value: m.id, label: m.name })),
+    [municipios.data],
+  );
 
   const supOf = (id: string) => supervisorLabel.get(id) ?? id;
   const operarioOf = (attendanceId: string) => {
@@ -93,6 +108,11 @@ export function NovedadesPage() {
     return (novedades.data ?? [])
       .filter((n) => (status === 'all' ? true : n.status === status))
       .filter((n) => {
+        if (filterSupervisorId && n.supervisorId !== filterSupervisorId) return false;
+        if (filterMunicipioId) {
+          const sup = supervisorMap.get(n.supervisorId);
+          if (!sup || sup.municipioId !== filterMunicipioId) return false;
+        }
         if (!q) return true;
         return (
           supOf(n.supervisorId).toLowerCase().includes(q) ||
@@ -101,7 +121,7 @@ export function NovedadesPage() {
         );
       })
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-  }, [novedades.data, status, search, supervisorLabel, attendanceOperario, operarioName]);
+  }, [novedades.data, status, search, filterSupervisorId, filterMunicipioId, supervisorLabel, supervisorMap, attendanceOperario, operarioName]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -139,34 +159,51 @@ export function NovedadesPage() {
     <Stack>
       <Title order={2}>Novedades</Title>
 
-      <Group>
-        <TextInput
-          placeholder="Buscar por operario, supervisor o motivo"
-          aria-label="Buscar novedades"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.currentTarget.value);
-            setPage(1);
-          }}
-          flex={1}
-        />
-        <Select
-          aria-label="Filtrar por estado"
-          data={[
-            { value: 'all', label: 'Todas' },
-            { value: 'PENDING', label: 'Pendientes' },
-            { value: 'APPROVED', label: 'Aprobadas' },
-            { value: 'REJECTED', label: 'Rechazadas' },
-          ]}
-          value={status}
-          onChange={(v) => {
-            setStatus((v as StatusFilter) ?? 'all');
-            setPage(1);
-          }}
-          allowDeselect={false}
-          w={150}
-        />
-      </Group>
+      <Stack gap="xs">
+        <Group wrap="wrap">
+          <TextInput
+            placeholder="Buscar por operario, supervisor o motivo"
+            aria-label="Buscar novedades"
+            value={search}
+            onChange={(e) => { setSearch(e.currentTarget.value); setPage(1); }}
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <Select
+            aria-label="Filtrar por estado"
+            data={[
+              { value: 'all', label: 'Todas' },
+              { value: 'PENDING', label: 'Pendientes' },
+              { value: 'APPROVED', label: 'Aprobadas' },
+              { value: 'REJECTED', label: 'Rechazadas' },
+            ]}
+            value={status}
+            onChange={(v) => { setStatus((v as StatusFilter) ?? 'all'); setPage(1); }}
+            allowDeselect={false}
+            w={150}
+          />
+        </Group>
+        <Group wrap="wrap" gap="sm">
+          <Select
+            placeholder="Supervisor"
+            aria-label="Filtrar por supervisor"
+            data={supervisorOptions}
+            value={filterSupervisorId}
+            onChange={(v) => { setFilterSupervisorId(v); setPage(1); }}
+            clearable
+            searchable
+            w={220}
+          />
+          <Select
+            placeholder="Municipio"
+            aria-label="Filtrar por municipio"
+            data={municipioOptions}
+            value={filterMunicipioId}
+            onChange={(v) => { setFilterMunicipioId(v); setPage(1); }}
+            clearable
+            w={180}
+          />
+        </Group>
+      </Stack>
 
       {novedades.isLoading ? (
         <TableSkeleton />
@@ -187,6 +224,7 @@ export function NovedadesPage() {
                 <Table.Th>Horas extra</Table.Th>
                 <Table.Th>Motivo</Table.Th>
                 <Table.Th>Estado</Table.Th>
+                <Table.Th>Verificación</Table.Th>
                 {canApprove && <Table.Th>Acciones</Table.Th>}
               </Table.Tr>
             </Table.Thead>
@@ -202,6 +240,15 @@ export function NovedadesPage() {
                     <Badge color={STATUS_COLOR[n.status]} variant="light">
                       {STATUS_LABEL[n.status]}
                     </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {n.status !== 'PENDING' ? (
+                      <VerificationBadge method={n.decisionVerification} />
+                    ) : (
+                      <Text size="sm" c="dimmed" component="span">
+                        —
+                      </Text>
+                    )}
                   </Table.Td>
                   {canApprove && (
                     <Table.Td>

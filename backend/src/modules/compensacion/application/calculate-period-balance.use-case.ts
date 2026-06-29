@@ -41,6 +41,15 @@ const ZERO = new Decimal(0);
 const MS_PER_HOUR = 3_600_000;
 const ROUNDING = Decimal.ROUND_HALF_UP;
 
+/**
+ * Fix 6 (Layer 2) — defensive skip bound.
+ * Rows recorded before the check-out duration guard existed may have negative
+ * or implausibly long durations. Skipping them (rather than clamping) is honest:
+ * the data is garbage and must not poison the fortnight balance.
+ * This constant must match MAX_SHIFT_HOURS in check-out-attendance.use-case.ts.
+ */
+const MAX_VALID_DURATION_MS = 20 * MS_PER_HOUR;
+
 /** Resolve the applicable JornadaPolicy for a given date string (YYYY-MM-DD). */
 function resolvePolicyForDate(
   dateStr: string,
@@ -87,6 +96,15 @@ export class CalculatePeriodBalanceUseCase {
 
       // 1. horasReales — raw duration, no lunch deduction (REQ-CALC-04)
       const durationMs = att.checkOutCapturedAt.getTime() - att.checkInCapturedAt.getTime();
+
+      // Fix 6 (Layer 2) — defensive skip: poisoned rows recorded before the
+      // check-out duration guard existed must not poison the balance.
+      // Negative duration = clock-skew; > MAX_VALID_DURATION_MS = forgotten checkout.
+      // DO NOT clamp — skipping is honest; clamping would invent data.
+      if (durationMs <= 0 || durationMs > MAX_VALID_DURATION_MS) {
+        continue;
+      }
+
       const horasRealesRaw = new Decimal(durationMs).div(MS_PER_HOUR);
       const horasReales = horasRealesRaw.toDecimalPlaces(2, ROUNDING);
 

@@ -40,7 +40,7 @@ import {
 import type { Response } from 'express';
 import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { NovedadResponseDto } from './response-dtos';
-import { IsISO8601, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { Roles } from '../../iam/interface/roles.decorator';
@@ -112,6 +112,21 @@ export class CreateNovedadBody {
   @IsOptional()
   @IsString()
   clientRef?: string;
+}
+
+export class ApproveRejectBody {
+  /**
+   * Optional audit label — how the líder operativo verified identity before deciding.
+   * Stored as-is from the client. AUDIT TRAIL ONLY: no authorization logic may
+   * depend on this field. Absent = web admin (no biometrics).
+   */
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    description: 'Verification method used by the actor. Audit label only.',
+  })
+  @IsOptional()
+  @IsIn(['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'])
+  verification?: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE';
 }
 
 // ─── Error → HTTP helper ───────────────────────────────────────────────────────
@@ -214,9 +229,9 @@ export class NovedadController {
   @Patch('novedades/:id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: NovedadResponseDto })
-  async approveNovedad(@Param('id') id: string) {
+  async approveNovedad(@Param('id') id: string, @Body() body: ApproveRejectBody) {
     try {
-      return await this.approveUseCase.execute(id);
+      return await this.approveUseCase.execute(id, body.verification);
     } catch (err) {
       mapDomainError(err);
     }
@@ -228,9 +243,9 @@ export class NovedadController {
   @Patch('novedades/:id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: NovedadResponseDto })
-  async rejectNovedad(@Param('id') id: string) {
+  async rejectNovedad(@Param('id') id: string, @Body() body: ApproveRejectBody) {
     try {
-      return await this.rejectUseCase.execute(id);
+      return await this.rejectUseCase.execute(id, body.verification);
     } catch (err) {
       mapDomainError(err);
     }

@@ -34,6 +34,7 @@ export class DeactivateOperarioUseCase {
       fullName: updated.fullName,
       documento: updated.documento,
       supervisorId: updated.supervisorId,
+      cargo: updated.cargo,
       active: updated.deactivatedAt === null,
       deactivatedAt: updated.deactivatedAt ? updated.deactivatedAt.toISOString() : null,
       createdAt: updated.createdAt.toISOString(),

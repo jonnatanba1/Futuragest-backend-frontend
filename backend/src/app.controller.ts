@@ -3,7 +3,6 @@ import {
   Get,
   HttpException,
   HttpStatus,
-  Inject,
 } from '@nestjs/common';
 import { PrismaService } from './database/prisma.service';
 import { MinioStorageAdapter } from './modules/storage/infrastructure/minio-storage.adapter';

@@ -1,7 +1,7 @@
 /**
  * Asistencia module — OpenAPI response DTO classes.
  *
- * Mirrors AttendanceDto and SignatureUploadResponseDto from contracts.
+ * Mirrors AttendanceDto and PhotoUploadResponseDto from contracts.
  * These classes are ONLY used for Swagger schema generation.
  * Runtime behavior is unchanged — controllers return plain objects/interfaces.
  */
@@ -58,10 +58,24 @@ export class AttendanceResponseDto {
   checkOutAccuracy!: number | null;
 
   @ApiProperty({ nullable: true })
-  signatureKey!: string | null;
+  checkInPhotoKey!: string | null;
 
   @ApiProperty({ nullable: true })
-  checkOutSignatureKey!: string | null;
+  checkOutPhotoKey!: string | null;
+
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    nullable: true,
+    description: 'Audit label: verification method used at check-in. Null = legacy / old app version.',
+  })
+  checkInVerification!: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE' | null;
+
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    nullable: true,
+    description: 'Audit label: verification method used at check-out. Null = legacy / old app version.',
+  })
+  checkOutVerification!: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE' | null;
 
   @ApiProperty({ description: 'Idempotency token' })
   clientRef!: string;
@@ -79,19 +93,19 @@ export class AttendanceResponseDto {
   updatedAt!: string;
 }
 
-// ─── POST /asistencia/:id/signature ───────────────────────────────────────────
+// ─── POST /asistencia/:id/photo ────────────────────────────────────────────────
 
-export class SignatureUploadResponseDto {
+export class PhotoUploadResponseDto {
   @ApiProperty({ format: 'uuid' })
   attendanceId!: string;
 
   @ApiProperty()
-  signatureKey!: string;
+  photoKey!: string;
 }
 
-// ─── GET /asistencia/:id/signature ────────────────────────────────────────────
+// ─── GET /asistencia/:id/photo ─────────────────────────────────────────────────
 
-export class SignatureUrlDto {
+export class PhotoUrlDto {
   @ApiProperty({ description: 'Presigned GET URL' })
   url!: string;
 }

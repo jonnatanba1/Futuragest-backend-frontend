@@ -49,7 +49,7 @@ export class SetJornadaPolicyUseCase {
     // 2. Check overlap with already-liquidated CompensationPeriods
     //    PR-A: NullCompensationPeriodLookup always returns null.
     //    PR-B: real adapter queries the DB.
-    const overlapping = await this.periodLookup.findOverlappingLiquidated(vigenteDesdeDate);
+    const overlapping = await this.periodLookup.findOverlappingClosed(vigenteDesdeDate);
     if (overlapping !== null) {
       throw new JornadaPolicyOverlapsLiquidatedPeriodError(vigenteDesde);
     }

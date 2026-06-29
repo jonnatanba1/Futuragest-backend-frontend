@@ -11,15 +11,15 @@ export function useAttendances() {
 }
 
 /**
- * Presigned signature URL for an attendance. The backend URL is short-lived
+ * Presigned photo URL for an attendance. The backend URL is short-lived
  * (~300s). We use staleTime 0 so re-opening the drawer (which re-enables the
  * query) always refetches a fresh URL rather than serving an expired one.
- * Only fetches when an id is provided (drawer open AND a signature exists).
+ * Only fetches when an id is provided (drawer open AND a photo exists).
  */
-export function useSignatureUrl(id: string | null, phase: 'checkin' | 'checkout' = 'checkin') {
+export function usePhotoUrl(id: string | null, phase: 'checkin' | 'checkout' = 'checkin') {
   return useQuery({
-    queryKey: ['attendance-signature', id, phase],
-    queryFn: () => asistenciaApi.getSignatureUrl(id as string, phase),
+    queryKey: ['attendance-photo', id, phase],
+    queryFn: () => asistenciaApi.getPhotoUrl(id as string, phase),
     enabled: id !== null,
     staleTime: 0,
     retry: false,

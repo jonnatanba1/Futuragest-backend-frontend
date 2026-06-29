@@ -1,5 +1,5 @@
 /**
- * A9.1 — Compensacion integration tests (real Prisma, pnpm test:int).
+ * Compensacion integration tests (real Prisma, pnpm test:int).
  *
  * Requires a running PostgreSQL instance (see backend/.env.test).
  * Run with: cd backend && pnpm test:int
@@ -14,23 +14,29 @@
  *   INT-01b: Duplicate vigenteDesde → DuplicateEffectiveDateError.
  *   INT-04:  Insert policy + 2 real Attendance rows → GET balance via
  *            ScopedAttendanceRepository.findCompletedInRange + GetPeriodBalanceUseCase.
- *            This is a true end-to-end round-trip through the real scoped adapter
- *            (fixes W2: previously only called the pure calc use-case directly).
- *
- * INT-02 and INT-03 are PR-B (require CompensationPeriod table).
+ *            This is a true end-to-end round-trip through the real scoped adapter.
+ *   INT-02:  Close fortnight → snapshot persisted + immutability + idempotency (PR-B).
+ *   INT-03:  Overlap guard — closed period blocks new JornadaPolicy with vigenteDesde
+ *            inside the liquidated period (PR-B).
  */
 
 import type { PrismaClient } from '@prisma/client';
 import { createPrismaClient } from '../../database/prisma-client';
+import type { PrismaService } from '../../database/prisma.service';
 import { SetJornadaPolicyUseCase } from './application/set-jornada-policy.use-case';
 import { CalculatePeriodBalanceUseCase } from './application/calculate-period-balance.use-case';
 import { GetPeriodBalanceUseCase } from './application/get-period-balance.use-case';
-import { JornadaPolicyDuplicateEffectiveDateError } from './domain/compensacion.errors';
-import { NullCompensationPeriodLookup } from './domain/ports/compensation-period-lookup.port';
+import { CloseCompensationPeriodUseCase } from './application/close-compensation-period.use-case';
+import {
+  JornadaPolicyDuplicateEffectiveDateError,
+  JornadaPolicyOverlapsLiquidatedPeriodError,
+} from './domain/compensacion.errors';
 import { JornadaPolicyRepository } from '../iam/infrastructure/jornada-policy.repository';
 import { ScopedAttendanceRepository } from '../iam/infrastructure/scoped-attendance.repository';
 import { ScopedOperarioRepository } from '../iam/infrastructure/scoped-operario.repository';
+import { ScopedCompensationPeriodRepository } from '../iam/infrastructure/scoped-compensation-period.repository';
 import { ScopeContextHolder } from '../auth/domain/scope-context';
+import { SupervisorZoneReaderAdapter } from '../iam/infrastructure/supervisor-zone-reader';
 
 // ─── NOTE ────────────────────────────────────────────────────────────────────
 // These tests require a real Postgres connection (DATABASE_URL in .env.test).
@@ -64,43 +70,76 @@ describe('Compensacion integration (real Prisma)', () => {
   // INT-04: real scoped adapter instances
   let attendanceRepo: ScopedAttendanceRepository;
   let operarioRepo: ScopedOperarioRepository;
+  let periodRepo: ScopedCompensationPeriodRepository;
   let getPeriodBalance: GetPeriodBalanceUseCase;
+  let closePeriod: CloseCompensationPeriodUseCase;
+  // Real seeded SYSTEM_ADMIN user id — used as approvedByUserId (FK to User)
+  let adminUserId: string;
 
-  // Seed IDs used by INT-04 (supervisor must exist in test DB for FK)
-  const INT04_SUPERVISOR_ID = 'int04-supervisor';
   const INT04_OPERARIO_ID = 'int04-operario';
+  // INT-02/INT-03: separate seed operario to avoid conflicts
+  const INT02_OPERARIO_ID = 'int02-operario';
 
   beforeAll(async () => {
     prisma = createPrismaClient();
     await prisma.$connect();
-    policyRepo = new JornadaPolicyRepository(prisma as any);
-    const periodLookup = new NullCompensationPeriodLookup();
-    setJornadaPolicy = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
+    policyRepo = new JornadaPolicyRepository(prisma as unknown as PrismaService);
     calcUseCase = new CalculatePeriodBalanceUseCase();
 
     // Set up real scoped repos with an unrestricted scope (SYSTEM_ADMIN)
     const scopeHolder = new UnrestrictedScopeHolder();
-    attendanceRepo = new ScopedAttendanceRepository(prisma as any, scopeHolder);
-    operarioRepo = new ScopedOperarioRepository(prisma as any, scopeHolder);
+    attendanceRepo = new ScopedAttendanceRepository(prisma as unknown as PrismaService, scopeHolder);
+    operarioRepo = new ScopedOperarioRepository(prisma as unknown as PrismaService, scopeHolder);
+    periodRepo = new ScopedCompensationPeriodRepository(prisma as unknown as PrismaService, scopeHolder);
+
+    // PR-B: real period lookup (replaces NullCompensationPeriodLookup stub)
+    setJornadaPolicy = new SetJornadaPolicyUseCase(policyRepo, periodRepo);
+
     getPeriodBalance = new GetPeriodBalanceUseCase(
       attendanceRepo,
       policyRepo,
       calcUseCase,
       operarioRepo,
+      periodRepo,
     );
+
+    const supervisorZoneReader = new SupervisorZoneReaderAdapter(prisma as unknown as PrismaService);
+
+    closePeriod = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      attendanceRepo,
+      policyRepo,
+      calcUseCase,
+      operarioRepo,
+      supervisorZoneReader,
+    );
+
+    // Resolve the seeded SYSTEM_ADMIN to satisfy the approvedByUserId FK
+    const admin = await prisma.user.findFirst({
+      where: { role: 'SYSTEM_ADMIN' },
+      select: { id: true },
+    });
+    if (!admin) {
+      throw new Error('[compensacion.int-spec] No SYSTEM_ADMIN seeded in test DB');
+    }
+    adminUserId = admin.id;
   });
 
   afterAll(async () => {
     // Clean up in FK-safe order
     await prisma.attendance.deleteMany({ where: { operarioId: INT04_OPERARIO_ID } }).catch(() => {});
-    await prisma.operario.deleteMany({ where: { id: INT04_OPERARIO_ID } }).catch(() => {});
+    await prisma.attendance.deleteMany({ where: { operarioId: INT02_OPERARIO_ID } }).catch(() => {});
+    await prisma.compensationPeriod.deleteMany({ where: { operarioId: INT02_OPERARIO_ID } }).catch(() => {});
+    await prisma.operario.deleteMany({ where: { id: { in: [INT04_OPERARIO_ID, INT02_OPERARIO_ID] } } }).catch(() => {});
     await prisma.jornadaPolicy.deleteMany({});
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
-    // Clean JornadaPolicy and INT-04 attendance before each test
+    // Clean JornadaPolicy, attendance and compensation periods before each test
     await prisma.attendance.deleteMany({ where: { operarioId: INT04_OPERARIO_ID } }).catch(() => {});
+    await prisma.attendance.deleteMany({ where: { operarioId: INT02_OPERARIO_ID } }).catch(() => {});
+    await prisma.compensationPeriod.deleteMany({ where: { operarioId: INT02_OPERARIO_ID } }).catch(() => {});
     await prisma.jornadaPolicy.deleteMany({});
   });
 
@@ -143,8 +182,7 @@ describe('Compensacion integration (real Prisma)', () => {
     // Resolve a seed supervisor from the test DB (any supervisor will do)
     const supervisor = await prisma.supervisor.findFirst({ select: { id: true } });
     if (!supervisor) {
-      console.warn('[INT-04] No supervisor found in test DB — skipping INT-04 round-trip test.');
-      return;
+      throw new Error('[INT-04] No supervisor seeded in test DB — cannot run round-trip test');
     }
 
     // Ensure INT-04 operario exists (idempotent — delete in afterAll)
@@ -180,7 +218,7 @@ describe('Compensacion integration (real Prisma)', () => {
         checkOutCapturedAt: new Date('2026-05-01T14:00:00Z'), // 7h
         completedAt: new Date('2026-05-01T14:00:00Z'),
         clientRef: clientRef1,
-        signatureKey: null,
+        checkInPhotoKey: null,
         checkInAccuracy: null,
       },
     });
@@ -198,7 +236,7 @@ describe('Compensacion integration (real Prisma)', () => {
         checkOutCapturedAt: new Date('2026-05-02T16:00:00Z'), // 9h
         completedAt: new Date('2026-05-02T16:00:00Z'),
         clientRef: clientRef2,
-        signatureKey: null,
+        checkInPhotoKey: null,
         checkInAccuracy: null,
       },
     });
@@ -215,5 +253,127 @@ describe('Compensacion integration (real Prisma)', () => {
     expect(balance.creditos.toNumber()).toBe(1);
     expect(balance.debitos.toNumber()).toBe(1);
     expect(balance.perDay).toHaveLength(2);
+  });
+
+  // ── INT-02: Close-fortnight idempotency + immutability (PR-B) ───────────────
+  //
+  // Tests:
+  //   - First close creates a CompensationPeriod row.
+  //   - Second close with same clientRef → no-op (idempotent: true), row count = 1.
+  //   - CompensationPeriod.clientRef is unique in DB.
+  //   REQ-INT-02, REQ-CP-01, REQ-CP-02.
+
+  it('INT-02 — close-fortnight: first close persists, second call (same clientRef) is idempotent (row count = 1)', async () => {
+    const supervisor = await prisma.supervisor.findFirst({ select: { id: true, zoneId: true } });
+    if (!supervisor) {
+      throw new Error('[INT-02] No supervisor seeded in test DB — cannot run close test');
+    }
+
+    // Ensure INT-02 operario exists
+    await prisma.operario.upsert({
+      where: { id: INT02_OPERARIO_ID },
+      create: {
+        id: INT02_OPERARIO_ID,
+        fullName: 'INT02 Test Operario',
+        documento: 'INT02DOC999',
+        supervisorId: supervisor.id,
+        deactivatedAt: null,
+      },
+      update: {},
+    });
+
+    // Insert JornadaPolicy (8h from 2026-01-01)
+    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+
+    const clientRef = `int02-close-${Date.now()}`;
+
+    // First close
+    const firstResult = await closePeriod.execute({
+      operarioId: INT02_OPERARIO_ID,
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      // No attendances → saldo = 0, so disposition not required
+      disposition: null,
+      approvedByUserId: adminUserId,
+      clientRef,
+    });
+
+    expect(firstResult.idempotent).toBe(false);
+    expect(firstResult.period.operarioId).toBe(INT02_OPERARIO_ID);
+    expect(firstResult.period.periodKey).toBe('2026-05-Q1');
+
+    // Row count = 1
+    const rows = await prisma.compensationPeriod.findMany({ where: { operarioId: INT02_OPERARIO_ID } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].clientRef).toBe(clientRef);
+
+    // Second close with SAME clientRef → idempotent replay
+    const secondResult = await closePeriod.execute({
+      operarioId: INT02_OPERARIO_ID,
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      disposition: null,
+      approvedByUserId: adminUserId,
+      clientRef,
+    });
+
+    expect(secondResult.idempotent).toBe(true);
+    expect(secondResult.period.id).toBe(firstResult.period.id);
+
+    // Still exactly 1 row — no second INSERT
+    const rowsAfter = await prisma.compensationPeriod.findMany({ where: { operarioId: INT02_OPERARIO_ID } });
+    expect(rowsAfter).toHaveLength(1);
+  });
+
+  // ── INT-03: JornadaPolicy vigenteDesde overlap guard (PR-B) ────────────────
+  //
+  // Tests:
+  //   - Insert a CompensationPeriod for operario X, period "2026-05-01"–"2026-05-15".
+  //   - Then call SetJornadaPolicyUseCase with vigenteDesde = "2026-05-10".
+  //   - Assert JornadaPolicyOverlapsLiquidatedPeriodError is thrown.
+  //   - DB must have no new JornadaPolicy row.
+  //   REQ-INT-03, REQ-SJP-02.
+
+  it('INT-03 — JornadaPolicy vigenteDesde inside a closed period → JornadaPolicyOverlapsLiquidatedPeriodError', async () => {
+    const supervisor = await prisma.supervisor.findFirst({ select: { id: true, zoneId: true } });
+    if (!supervisor) {
+      throw new Error('[INT-03] No supervisor seeded in test DB — cannot run overlap-guard test');
+    }
+
+    // Ensure INT-02 operario exists (reuse seed)
+    await prisma.operario.upsert({
+      where: { id: INT02_OPERARIO_ID },
+      create: {
+        id: INT02_OPERARIO_ID,
+        fullName: 'INT02 Test Operario',
+        documento: 'INT02DOC999',
+        supervisorId: supervisor.id,
+        deactivatedAt: null,
+      },
+      update: {},
+    });
+
+    // Insert a baseline policy so close doesn't fail for missing policy
+    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+
+    // Close the period 2026-05-01 to 2026-05-15 (creates a CompensationPeriod row)
+    await closePeriod.execute({
+      operarioId: INT02_OPERARIO_ID,
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      disposition: null,
+      approvedByUserId: adminUserId,
+      clientRef: `int03-close-${Date.now()}`,
+    });
+
+    // Now try to insert a JornadaPolicy with vigenteDesde = "2026-05-10" (inside closed period)
+    await expect(
+      setJornadaPolicy.execute({ horasDiarias: 7.5, vigenteDesde: '2026-05-10' }),
+    ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
+
+    // DB must have exactly the one original policy (no new row added)
+    const policies = await prisma.jornadaPolicy.findMany({});
+    expect(policies).toHaveLength(1);
+    expect(policies[0].horasDiarias.toString()).toBe('8');
   });
 });

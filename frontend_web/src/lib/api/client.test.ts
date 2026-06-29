@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, authApi, setUnauthorizedHandler } from './client';
+import { ApiError, authApi, compensacionApi, setUnauthorizedHandler } from './client';
+import type { ConfirmPayoutRequest } from '@futuragest/contracts';
 import { tokenStore } from '../auth/token-store';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -105,6 +106,124 @@ describe('refresh single-flight on 401', () => {
     expect(onUnauth).toHaveBeenCalledOnce();
     expect(tokenStore.getSession()).toBeNull();
     expect(tokenStore.getAccessToken()).toBeNull();
+  });
+});
+
+describe('compensacionApi', () => {
+  beforeEach(() => {
+    tokenStore.setAccessToken('test-token');
+  });
+
+  it('getBalance GETs /compensacion/:operarioId with desde & hasta query params', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ operarioId: 'op-1', desde: '2026-05-01', hasta: '2026-05-15', creditosHoras: '3.50', debitosHoras: '1.00', carryIn: '0.00', saldoHoras: '2.50', breakdown: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await compensacionApi.getBalance('op-1', '2026-05-01', '2026-05-15');
+
+    expect(result.saldoHoras).toBe('2.50');
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/compensacion\/op-1\?desde=2026-05-01&hasta=2026-05-15/);
+  });
+
+  it('closePeriod POSTs to /compensacion/:operarioId/close', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ id: 'period-1', periodKey: '2026-05-Q1' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await compensacionApi.closePeriod('op-1', { desde: '2026-05-01', hasta: '2026-05-15' });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/compensacion/op-1/close');
+    expect(init?.method).toBe('POST');
+  });
+
+  it('getPayout GETs /compensacion/:operarioId/payout with periodKey', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ operarioId: 'op-1', periodKey: '2026-05-Q1', saldoHoras: '2.50', horasBase: '2.50', factorRecargo: '1.25', horasPagables: '3.13' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await compensacionApi.getPayout('op-1', '2026-05-Q1');
+
+    expect(result.factorRecargo).toBe('1.25');
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/compensacion/op-1/payout');
+    expect(String(url)).toContain('periodKey=2026-05-Q1');
+  });
+
+  it('getJornadaPolicies GETs /jornada-policy', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify([{ id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await compensacionApi.getJornadaPolicies();
+
+    expect(result[0].horasDiarias).toBe('8.00');
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/jornada-policy$/);
+  });
+
+  it('confirmPayout POSTs to /compensacion/:operarioId/payout/confirm with body', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          operarioId: 'op-1',
+          periodKey: '2026-05-Q1',
+          saldoHoras: '2.50',
+          horasBase: '2.50',
+          factorRecargo: '1.25',
+          horasPagables: '3.13',
+          paidAt: '2026-06-10T12:00:00.000Z',
+          payoutRef: 'ref-uuid-001',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const body: ConfirmPayoutRequest = { periodKey: '2026-05-Q1' };
+    const result = await compensacionApi.confirmPayout('op-1', body);
+
+    expect(result.paidAt).toBe('2026-06-10T12:00:00.000Z');
+    expect(result.payoutRef).toBe('ref-uuid-001');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/compensacion/op-1/payout/confirm');
+    expect(init?.method).toBe('POST');
+    const sent = JSON.parse(init?.body as string);
+    expect(sent.periodKey).toBe('2026-05-Q1');
+  });
+
+  it('createJornadaPolicy POSTs to /jornada-policy', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ id: 'pol-2', horasDiarias: '7.00', vigenteDesde: '2026-07-01', createdAt: '' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await compensacionApi.createJornadaPolicy({ horasDiarias: 7, vigenteDesde: '2026-07-01' });
+
+    expect(result.horasDiarias).toBe('7.00');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/jornada-policy$/);
+    expect(init?.method).toBe('POST');
   });
 });
 

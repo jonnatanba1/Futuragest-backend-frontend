@@ -5,8 +5,10 @@
 
 import { Decimal } from '@prisma/client/runtime/client';
 import { JornadaPolicyRepository } from './jornada-policy.repository';
+import type { JornadaPolicyRecord } from '../../compensacion/domain/ports/jornada-policy-repository.port';
+import type { PrismaService } from '../../../database/prisma.service';
 
-function makeDelegate(findManyResult: any[] = [], findFirstResult: any = null) {
+function makeDelegate(findManyResult: JornadaPolicyRecord[] = [], findFirstResult: JornadaPolicyRecord | null = null) {
   return {
     create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'pol-1', ...data, createdAt: new Date() })),
     findMany: jest.fn().mockResolvedValue(findManyResult),
@@ -15,7 +17,7 @@ function makeDelegate(findManyResult: any[] = [], findFirstResult: any = null) {
 }
 
 function makePrisma(delegate: ReturnType<typeof makeDelegate>) {
-  return { jornadaPolicy: delegate } as any;
+  return { jornadaPolicy: delegate } as unknown as PrismaService;
 }
 
 describe('JornadaPolicyRepository', () => {

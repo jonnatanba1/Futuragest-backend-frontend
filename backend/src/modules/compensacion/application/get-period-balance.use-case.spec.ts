@@ -7,6 +7,8 @@
  *   - This mirrors how CheckInAttendanceUseCase validates operario scope.
  *   - The old vacuous test (mocking AttendanceReaderPort to return null, an impossible
  *     production path) is replaced by this real-path test.
+ *
+ * B7.1 PR-B addition: EP-04e — carryIn from previous CARRY_OVER period fed into balance.
  */
 
 import { Decimal } from '@prisma/client/runtime/client';
@@ -17,6 +19,10 @@ import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.erro
 import type { AttendanceReaderPort, AttendanceReaderRecord } from '../domain/ports/attendance-reader.port';
 import type { JornadaPolicyRepositoryPort, JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type { OperarioReaderPort } from '../domain/ports/operario-reader.port';
+import type {
+  CompensationPeriodRepositoryPort,
+  CompensationPeriodRecord,
+} from '../domain/ports/compensation-period-repository.port';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +65,19 @@ function makePolicyRepo(timeline: JornadaPolicyRecord[]): jest.Mocked<JornadaPol
 function makeOperarioReader(exists: boolean): jest.Mocked<OperarioReaderPort> {
   return {
     findById: jest.fn().mockResolvedValue(exists ? { id: 'O1' } : null),
+  };
+}
+
+function makePeriodRepo(prevPeriod: CompensationPeriodRecord | null): jest.Mocked<CompensationPeriodRepositoryPort> {
+  return {
+    findByOperarioAndPeriod: jest.fn().mockResolvedValue(null),
+    findPreviousClosed: jest.fn().mockResolvedValue(prevPeriod),
+    findByClientRef: jest.fn().mockResolvedValue(null),
+    findOverlappingClosed: jest.fn().mockResolvedValue(null),
+    create: jest.fn(),
+    markPaid: jest.fn().mockResolvedValue(1),
+    markDiverged: jest.fn().mockResolvedValue(undefined),
+    findClosedContainingDate: jest.fn().mockResolvedValue(null),
   };
 }
 
@@ -154,5 +173,204 @@ describe('GetPeriodBalanceUseCase', () => {
     await expect(
       useCase.execute({ operarioId: 'O1', desde: '2025-12-31', hasta: '2025-12-31' }),
     ).rejects.toThrow(NoPolicyForDateError);
+  });
+
+  // ── B7.1 EP-04e — carryIn from previous CARRY_OVER period ─────────────────
+  // PR-B: GetPeriodBalanceUseCase injects CompensationPeriodRepositoryPort and
+  // reads carryIn from the previous CARRY_OVER period when it exists + saldo < 0.
+
+  it('EP-04e — previous CARRY_OVER period with negative saldo feeds carryIn into current balance', async () => {
+    // Current period: zero attendances → live saldo before carryIn = 0
+    const reader = makeReaderPort([]);
+    const policies = [makePolicy('2026-01-01', 8)];
+    const policyRepo = makePolicyRepo(policies);
+    const operarioReader = makeOperarioReader(true);
+
+    // Previous Q1 period: saldo = -0.25, disposition = CARRY_OVER
+    const prevPeriod: CompensationPeriodRecord = {
+      id: 'cp-prev',
+      operarioId: 'O1',
+      zoneId: 'zone-1',
+      supervisorId: 'sup-1',
+      periodKey: '2026-05-Q1',
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      creditos: new Decimal('0.00'),
+      debitos: new Decimal('0.25'),
+      carryIn: new Decimal('0.00'),
+      saldo: new Decimal('-0.25'),
+      disposition: 'CARRY_OVER',
+      approvedByUserId: 'admin-1',
+      decidedAt: new Date(),
+      closedAt: new Date(),
+      clientRef: 'ref-prev',
+      paidAt: null,
+      payoutRef: null,
+      divergedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Fix 3: implementation now uses findByOperarioAndPeriod with the EXACT prevKey
+    const periodRepo = makePeriodRepo(null);
+    // Q2 prevKey = Q1; findByOperarioAndPeriod('O1', '2026-05-Q1') → prevPeriod
+    periodRepo.findByOperarioAndPeriod.mockImplementation((_oid: string, key: string) =>
+      Promise.resolve(key === '2026-05-Q1' ? prevPeriod : null),
+    );
+
+    // Use the overloaded constructor that accepts CompensationPeriodRepositoryPort
+    const useCase = new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase, operarioReader, periodRepo);
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-16', // Q2 — previous was Q1
+      hasta: '2026-05-31',
+    });
+
+    // carryIn = -0.25 from prev; current live credits = 0, debits = 0
+    // saldo = -0.25 + 0 - 0 = -0.25
+    expect(result.carryIn.toNumber()).toBeCloseTo(-0.25, 2);
+    expect(result.saldo.toNumber()).toBeCloseTo(-0.25, 2);
+    // Fix 3: exact prevKey lookup via findByOperarioAndPeriod
+    expect(periodRepo.findByOperarioAndPeriod).toHaveBeenCalledWith('O1', '2026-05-Q1');
+  });
+
+  // ── Fix 3: exact prevKey carryIn (live balance) ───────────────────────────────
+
+  it('Fix3-live-a — Q1 closed CARRY_OVER saldo=-2, exact prev Q1 → carryIn = -2 for Q2', async () => {
+    const reader = makeReaderPort([]);
+    const policies = [makePolicy('2026-01-01', 8)];
+    const policyRepo = makePolicyRepo(policies);
+    const operarioReader = makeOperarioReader(true);
+
+    const prevQ1: CompensationPeriodRecord = {
+      id: 'cp-q1',
+      operarioId: 'O1',
+      zoneId: 'zone-1',
+      supervisorId: 'sup-1',
+      periodKey: '2026-05-Q1',
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      creditos: new Decimal('0.00'),
+      debitos: new Decimal('2.00'),
+      carryIn: new Decimal('0.00'),
+      saldo: new Decimal('-2.00'),
+      disposition: 'CARRY_OVER',
+      approvedByUserId: 'admin-1',
+      decidedAt: new Date(),
+      closedAt: new Date(),
+      clientRef: 'ref-q1',
+      paidAt: null,
+      payoutRef: null,
+      divergedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // periodRepo mock: findByOperarioAndPeriod returns Q1 when asked for '2026-05-Q1'
+    const periodRepo: jest.Mocked<CompensationPeriodRepositoryPort> = {
+      findByOperarioAndPeriod: jest.fn().mockImplementation((_oid: string, key: string) =>
+        Promise.resolve(key === '2026-05-Q1' ? prevQ1 : null),
+      ),
+      findPreviousClosed: jest.fn().mockResolvedValue(prevQ1),
+      findByClientRef: jest.fn().mockResolvedValue(null),
+      findOverlappingClosed: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+      markPaid: jest.fn().mockResolvedValue(1),
+      markDiverged: jest.fn().mockResolvedValue(undefined),
+      findClosedContainingDate: jest.fn().mockResolvedValue(null),
+    };
+
+    const useCase = new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase, operarioReader, periodRepo);
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-16', // Q2 — exact prev is Q1
+      hasta: '2026-05-31',
+    });
+
+    expect(result.carryIn.toNumber()).toBe(-2);
+    expect(result.saldo.toNumber()).toBe(-2);
+  });
+
+  it('Fix3-live-b — gap: Q1 closed CARRY_OVER, Q2 missing, live balance for Q3 → carryIn = 0 (no throw)', async () => {
+    const reader = makeReaderPort([]);
+    const policies = [makePolicy('2026-01-01', 8)];
+    const policyRepo = makePolicyRepo(policies);
+    const operarioReader = makeOperarioReader(true);
+
+    // prevKey for Q3 (2026-06-Q1) = 2026-05-Q2 — does NOT exist
+    const periodRepo: jest.Mocked<CompensationPeriodRepositoryPort> = {
+      findByOperarioAndPeriod: jest.fn().mockResolvedValue(null), // Q2 not found
+      findPreviousClosed: jest.fn().mockResolvedValue(null),
+      findByClientRef: jest.fn().mockResolvedValue(null),
+      findOverlappingClosed: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+      markPaid: jest.fn().mockResolvedValue(1),
+      markDiverged: jest.fn().mockResolvedValue(undefined),
+      findClosedContainingDate: jest.fn().mockResolvedValue(null),
+    };
+
+    const useCase = new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase, operarioReader, periodRepo);
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-06-01',
+      hasta: '2026-06-15',
+    });
+
+    // Live balance: no throw, carryIn = 0
+    expect(result.carryIn.toNumber()).toBe(0);
+    expect(result.saldo.toNumber()).toBe(0);
+  });
+
+  it('EP-04e-no-carryover — previous PAYROLL_DEDUCTION period → carryIn = 0', async () => {
+    const reader = makeReaderPort([]);
+    const policies = [makePolicy('2026-01-01', 8)];
+    const policyRepo = makePolicyRepo(policies);
+    const operarioReader = makeOperarioReader(true);
+
+    // Previous period settled via PAYROLL_DEDUCTION → does NOT carry forward
+    const prevPeriod: CompensationPeriodRecord = {
+      id: 'cp-prev-settled',
+      operarioId: 'O1',
+      zoneId: 'zone-1',
+      supervisorId: 'sup-1',
+      periodKey: '2026-05-Q1',
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      creditos: new Decimal('0.00'),
+      debitos: new Decimal('0.50'),
+      carryIn: new Decimal('0.00'),
+      saldo: new Decimal('-0.50'),
+      disposition: 'PAYROLL_DEDUCTION', // debt settled — no carryIn
+      approvedByUserId: 'admin-1',
+      decidedAt: new Date(),
+      closedAt: new Date(),
+      clientRef: 'ref-settled',
+      paidAt: null,
+      payoutRef: null,
+      divergedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Fix 3: use findByOperarioAndPeriod mock to return the PAYROLL_DEDUCTION period
+    const periodRepo = makePeriodRepo(null);
+    periodRepo.findByOperarioAndPeriod.mockImplementation((_oid: string, key: string) =>
+      Promise.resolve(key === '2026-05-Q1' ? prevPeriod : null),
+    );
+
+    const useCase = new GetPeriodBalanceUseCase(reader, policyRepo, calcUseCase, operarioReader, periodRepo);
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+    });
+
+    // PAYROLL_DEDUCTION: carryIn must be 0 (debt was settled, not carried)
+    expect(result.carryIn.toNumber()).toBe(0);
+    expect(result.saldo.toNumber()).toBe(0);
   });
 });

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Detalle de Asistencia</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "background": "#f9f9fc",
+                    "outline": "#6e7a74",
+                    "on-tertiary-fixed": "#001e2d",
+                    "on-background": "#1a1c1e",
+                    "error": "#ba1a1a",
+                    "on-primary-container": "#a4ffdd",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#00513d",
+                    "surface-container-highest": "#e2e2e5",
+                    "on-tertiary-fixed-variant": "#004c6b",
+                    "surface-container": "#eeeef0",
+                    "tertiary-fixed": "#c6e7ff",
+                    "inverse-on-surface": "#f0f0f3",
+                    "primary-fixed-dim": "#79d8b7",
+                    "tertiary-fixed-dim": "#81cfff",
+                    "on-error-container": "#93000a",
+                    "primary-fixed": "#95f5d2",
+                    "on-secondary-container": "#613100",
+                    "secondary-fixed-dim": "#ffb77f",
+                    "surface-container-low": "#f3f3f6",
+                    "on-secondary": "#ffffff",
+                    "surface-dim": "#dadadc",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#e8e8ea",
+                    "on-primary-fixed": "#002117",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-container": "#00739f",
+                    "primary": "#005f48",
+                    "inverse-surface": "#2f3133",
+                    "secondary-fixed": "#ffdcc4",
+                    "on-surface": "#1a1c1e",
+                    "on-surface-variant": "#3e4944",
+                    "primary-container": "#007a5e",
+                    "outline-variant": "#bdc9c2",
+                    "tertiary": "#00597d",
+                    "surface-variant": "#e2e2e5",
+                    "on-secondary-fixed-variant": "#6f3900",
+                    "on-tertiary-container": "#ddf0ff",
+                    "on-secondary-fixed": "#2f1500",
+                    "surface-bright": "#f9f9fc",
+                    "surface": "#f9f9fc",
+                    "secondary-container": "#ff8a00",
+                    "secondary": "#914c00",
+                    "inverse-primary": "#79d8b7",
+                    "on-error": "#ffffff",
+                    "surface-tint": "#006c53"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap": "16px",
+                    "inline-gap": "12px",
+                    "section-margin": "32px",
+                    "unit": "4px",
+                    "container-padding": "20px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "title-lg": ["Manrope"],
+                    "display-lg": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "label-lg": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-lg-mobile": ["22px", {"lineHeight": "28px", "fontWeight": "700"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "700"}],
+                    "label-lg": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24">
+<!-- Top App Bar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-xl font-headline-lg-mobile text-headline-lg-mobile fixed top-0 w-full z-50 border-b border-outline-variant/30 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] flex justify-between items-center px-container-padding h-16">
+<button class="text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<span class="font-display-lg text-display-lg text-primary tracking-tight truncate flex-1 text-center">Detalle</span>
+<button class="text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-20 px-container-padding flex flex-col gap-stack-gap max-w-2xl mx-auto">
+<!-- Profile High-Depth Card -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-outline-variant/20 p-4 flex items-start gap-4">
+<div class="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-surface bg-surface-variant">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="A professional portrait of an individual wearing formal attire, suitable for an ID badge. The lighting is bright and even, capturing a clear, modern aesthetic against a soft, blurred office background. The overall tone conveys reliability and competence in a corporate or institutional setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuClIZ5fREoHqc9Em3-BVyF8Z3hM1WSk-AtynwF3CGivYUHT_ZpLkOmKuMuPupWqZwoyflfZekcgVdWDrfaq4Gw72U75m-DSKDWjbm8cdYk50AEBjR0W0rtVI3kSSOuLBbX6YkVVhwehBtHK5VgsLnYsWtl26U1jV5GRgGeqJIPawaIuGI8rPxuQr5rkL9_f9srtI9wWhZGgMRLH4abFloBZ7PHqEXkGAfU_sa6b0ToLXxBmR0QCQjyBZj45XvtqNozoPTqDlg9MDIWl"/>
+</div>
+<div class="flex flex-col flex-1">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-1">MARCELA CORTES</h2>
+<div class="flex items-center gap-2 mb-2">
+<span class="bg-primary/10 text-primary font-label-lg text-label-lg px-2 py-0.5 rounded-DEFAULT">ID: 104598734</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Especialista en Operaciones - Turno Diurno. Responsable de supervisión de área técnica.</p>
+</div>
+</section>
+<!-- Attendance Status -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-outline-variant/20 p-4">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-title-lg text-title-lg text-on-surface">Estado Actual</h3>
+<span class="bg-secondary-container/20 text-secondary-container font-label-lg text-label-lg px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+                     Pendiente Ingreso
+                 </span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-outline">HORA PROGRAMADA</span>
+<span class="font-body-lg text-body-lg text-on-surface">08:00 AM</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-outline">FECHA</span>
+<span class="font-body-lg text-body-lg text-on-surface">24 Oct 2023</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-outline">ÁREA</span>
+<span class="font-body-lg text-body-lg text-on-surface">Sede Central - Piso 3</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-outline">SUPERVISOR</span>
+<span class="font-body-lg text-body-lg text-on-surface">Carlos Mendoza</span>
+</div>
+</div>
+</section>
+<!-- Action Buttons (Floating Style in Canvas) -->
+<section class="flex flex-col gap-4 mt-4">
+<button class="bg-primary hover:bg-primary-container text-on-primary font-headline-md text-headline-md py-4 rounded-xl shadow-[0px_8px_16px_rgba(0,95,72,0.2)] flex items-center justify-center gap-2 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="login">login</span>
+                Reportar Ingreso
+            </button>
+<button class="bg-surface-container-highest hover:bg-surface-variant border border-outline-variant/30 text-on-surface font-headline-md text-headline-md py-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95">
+<span class="material-symbols-outlined text-secondary" data-icon="report_problem">report_problem</span>
+                Reportar Novedad
+            </button>
+</section>
+<!-- Map/Location Context Placeholder -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-outline-variant/20 p-2 h-48 relative overflow-hidden mt-2">
+<img alt="Map Location" class="w-full h-full object-cover rounded-lg opacity-80" data-alt="A clean, minimalist digital map interface showing a stylized city grid. The map uses a light mode aesthetic with soft grey roads and subtle pale green parks, typical of modern navigation apps. A discrete location marker is visible near the center. The style is highly legible and functional." data-location="Bogota" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhK9RBnN9gR8I03pcoPR_kNhK1_gdLwaDeRhcqlIPCRDw8943ak8p3PIlFUp8K1mVolxiXG3ednwCia95RPQkFkyNxIbp-w4BfmhvOfaWM4RXG_jKxXrX8bubnkfUBe3A9wd3wu0P2j473-SGGVLdZ9vf7Ia_0pFI7lI4Z1H9NJCA0PzTxC5TdeAMoRhmtWeSgQWIzHQltrd3EQfZOVkk7bN8DDDY6Pczuw1F0iK9Yr9gtLxWJCmkKeNyehVOHcdm8HU_MWfq3OkYk"/>
+<div class="absolute bottom-4 left-4 right-4 bg-surface/90 backdrop-blur-md border border-outline-variant/20 p-2 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="location_on">location_on</span>
+<span class="font-body-md text-body-md text-on-surface truncate">Ubicación Requerida: Sede Central</span>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar (Hidden on md, visible on mobile) -->
+<nav class="md:hidden bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-2xl font-label-lg text-label-lg fixed bottom-6 left-4 right-4 rounded-full z-50 border border-outline-variant/20 shadow-[0px_8px_32px_rgba(0,0,0,0.08)] flex justify-around items-center h-20 px-2">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:bg-surface-container-highest/30 rounded-full active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home_work">home_work</span>
+<span class="font-label-lg text-label-lg">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-6 py-2 transition-all duration-300 active:scale-90" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="notifications">notifications</span>
+<span class="font-label-lg text-label-lg">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:bg-surface-container-highest/30 rounded-full active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-label-lg text-label-lg">Settings</span>
+</a>
+</nav>
+</body></html>

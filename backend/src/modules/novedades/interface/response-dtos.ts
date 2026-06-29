@@ -6,7 +6,7 @@
  * Runtime behavior is unchanged — controllers return plain objects/interfaces.
  */
 
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // ─── GET /novedades, GET /novedades/:id ───────────────────────────────────────
 // POST /asistencia/:attendanceId/novedades ─────────────────────────────────────
@@ -52,6 +52,15 @@ export class NovedadResponseDto {
     nullable: true,
   })
   decidedAt!: string | null;
+
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    nullable: true,
+    description:
+      'Audit label: verification method used by the líder operativo when deciding. ' +
+      'Null = web admin decision (no biometrics) or legacy row.',
+  })
+  decisionVerification!: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE' | null;
 
   @ApiProperty({ description: 'ISO 8601 timestamp' })
   createdAt!: string;

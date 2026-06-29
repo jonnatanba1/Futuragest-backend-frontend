@@ -23,6 +23,7 @@ const NOV = [
     clientRef: null,
     approvedByUserId: null,
     decidedAt: null,
+    decisionVerification: null,
     createdAt: '2026-06-03T10:00:00Z',
     updatedAt: '',
   },
@@ -37,6 +38,7 @@ const NOV = [
     clientRef: null,
     approvedByUserId: 'u',
     decidedAt: '2026-06-02T12:00:00Z',
+    decisionVerification: 'BIOMETRIC' as const,
     createdAt: '2026-06-02T10:00:00Z',
     updatedAt: '',
   },
@@ -124,5 +126,19 @@ describe('NovedadesPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Rechazar' }));
 
     await waitFor(() => expect(rejectMock).toHaveBeenCalledWith('n-1'));
+  });
+
+  it('shows BIOMETRIC verification badge for the APPROVED row', () => {
+    setRole('TALENTO_HUMANO');
+    renderPage();
+    expect(screen.getByText('Huella')).toBeInTheDocument();
+  });
+
+  it('shows a dash in the Verificación column for the PENDING row', () => {
+    setRole('TALENTO_HUMANO');
+    renderPage();
+    // PENDING row has no decision verification — should render '—'
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 });

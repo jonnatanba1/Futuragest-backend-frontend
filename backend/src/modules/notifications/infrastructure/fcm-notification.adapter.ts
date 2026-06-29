@@ -31,11 +31,16 @@ import { RecipientResolver } from './recipient-resolver';
  * When a send fails with one of these, the owning DeviceSession's pushToken is purged
  * so future sends don't keep targeting a token FCM will never deliver to.
  */
+// NOTE: 'messaging/invalid-argument' is deliberately NOT in this set. FCM returns that
+// code both for bad tokens AND for malformed message PAYLOADS — treating it as a dead
+// token would let a single payload bug purge every recipient's pushToken fleet-wide.
 const DEAD_TOKEN_ERROR_CODES = new Set<string>([
   'messaging/registration-token-not-registered',
-  'messaging/invalid-argument',
   'messaging/invalid-registration-token',
 ]);
+
+/** FCM hard limit: sendEachForMulticast rejects messages with more than 500 tokens. */
+const FCM_MULTICAST_LIMIT = 500;
 
 @Injectable()
 export class FcmNotificationAdapter implements NotificationPort {
@@ -93,8 +98,8 @@ export class FcmNotificationAdapter implements NotificationPort {
         });
       }
 
-      // Build multicast message
-      const message = {
+      // Build the multicast message body (tokens are attached per batch below)
+      const baseMessage = {
         notification: {
           title: 'Nueva novedad de horas extra',
           body: `Se registraron ${payload.horasExtra} horas extra pendientes de aprobación.`,
@@ -104,19 +109,70 @@ export class FcmNotificationAdapter implements NotificationPort {
           novedadId: payload.novedadId,
           type: 'NOVEDAD_CREATED',
         },
-        tokens,
       };
 
-      const response = await admin.messaging().sendEachForMulticast(message);
+      // FCM rejects multicasts with >500 tokens, so chunk into batches of ≤500.
+      // aggregatedResponses[i] maps 1:1 to recipients[i] across ALL batches — a batch
+      // that fails wholesale contributes `undefined` placeholders to keep alignment.
+      const aggregatedResponses: Array<
+        { success: boolean; error?: { code?: string } } | undefined
+      > = [];
+      let successCount = 0;
+      let failureCount = 0;
+      // Tokens whose whole batch threw (no per-token verdict). Counted in the failure
+      // metric of the summary log, but kept OUT of failureCount so the purge gate
+      // semantics are unchanged (thrown batches are never purge candidates).
+      let batchFailureCount = 0;
+      let batchCount = 0;
+
+      for (let start = 0; start < tokens.length; start += FCM_MULTICAST_LIMIT) {
+        const batchTokens = tokens.slice(start, start + FCM_MULTICAST_LIMIT);
+        batchCount++;
+        try {
+          const response = await admin
+            .messaging()
+            .sendEachForMulticast({ ...baseMessage, tokens: batchTokens });
+          successCount += response.successCount;
+          failureCount += response.failureCount;
+          // Defensive guard: never trust the SDK to return exactly one response per
+          // token. A short (or long) array would shift indices for every later entry
+          // and could purge the WRONG recipient's token — discard the batch's
+          // per-token results instead and keep alignment with undefined padding.
+          const responses: unknown[] = Array.isArray(response.responses) ? response.responses : [];
+          if (responses.length !== batchTokens.length) {
+            this.logger.error(
+              `[FcmAdapter] Batch ${batchCount} returned ${responses.length} response(s) for ` +
+                `${batchTokens.length} token(s) — discarding per-token results to preserve ` +
+                'recipient index alignment (no purge for this batch)',
+            );
+            aggregatedResponses.push(...new Array<undefined>(batchTokens.length).fill(undefined));
+          } else {
+            aggregatedResponses.push(
+              ...(responses as Array<{ success: boolean; error?: { code?: string } }>),
+            );
+          }
+        } catch (batchErr) {
+          // A batch-level failure must not abort the remaining batches.
+          this.logger.error(
+            `[FcmAdapter] Batch ${batchCount} send failed (${batchTokens.length} token(s), ` +
+              `offset ${start}) — continuing with remaining batches`,
+            batchErr,
+          );
+          batchFailureCount += batchTokens.length;
+          // No per-token results for this batch — pad to keep recipient index alignment.
+          aggregatedResponses.push(...new Array<undefined>(batchTokens.length).fill(undefined));
+        }
+      }
+
       this.logger.log(
-        `[FcmAdapter] Sent to ${tokens.length} device(s). ` +
-          `Success: ${response.successCount}, Failure: ${response.failureCount}`,
+        `[FcmAdapter] Sent to ${tokens.length} device(s) in ${batchCount} batch(es). ` +
+          `Success: ${successCount}, Failure: ${failureCount + batchFailureCount}`,
       );
 
-      // Purge dead tokens: responses[i] maps 1:1 to recipients[i].
+      // Purge dead tokens: aggregatedResponses[i] maps 1:1 to recipients[i].
       // Fully failure-isolated — a purge error never escapes the fire-and-forget path.
-      if (response.failureCount > 0) {
-        await this.purgeDeadTokens(response.responses, recipients);
+      if (failureCount > 0) {
+        await this.purgeDeadTokens(aggregatedResponses, recipients);
       }
     } catch (err) {
       // Never rethrow — fire-and-forget invariant
@@ -128,17 +184,19 @@ export class FcmNotificationAdapter implements NotificationPort {
    * Walk the multicast responses and clear the push token for any recipient whose send
    * failed with a permanently-dead-token error code.
    *
-   * responses[i] corresponds to recipients[i] (FCM preserves multicast ordering).
+   * responses[i] corresponds to recipients[i] (FCM preserves multicast ordering; batch
+   * aggregation preserves it across chunks). `undefined` entries (whole-batch send
+   * failures) carry no per-token verdict and are skipped.
    * Each clearPushToken call is independently try/caught so a single repo failure does
    * not abort the rest of the purge, and the method NEVER throws (fire-and-forget invariant).
    */
   private async purgeDeadTokens(
-    responses: Array<{ success: boolean; error?: { code?: string } }>,
+    responses: Array<{ success: boolean; error?: { code?: string } } | undefined>,
     recipients: Array<{ userId: string; deviceId: string; pushToken: string }>,
   ): Promise<void> {
     for (let i = 0; i < responses.length; i++) {
       const resp = responses[i];
-      if (resp.success) continue;
+      if (!resp || resp.success) continue;
 
       const code = resp.error?.code ?? 'unknown';
       const recipient = recipients[i];

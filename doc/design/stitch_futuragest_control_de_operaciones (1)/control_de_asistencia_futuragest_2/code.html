@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FuturaGest - Control de Asistencia</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Work+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<!-- Tailwind Configuration from Design System -->
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-tertiary": "#ffffff",
+                "surface-container-high": "#dde9ff",
+                "secondary-fixed": "#ffdbca",
+                "error-container": "#ffdad6",
+                "tertiary-fixed-dim": "#44d8f1",
+                "inverse-surface": "#1c314d",
+                "inverse-on-surface": "#ebf1ff",
+                "secondary": "#9d4400",
+                "surface-variant": "#d4e3ff",
+                "on-background": "#041c37",
+                "on-secondary-fixed-variant": "#773200",
+                "tertiary-container": "#008091",
+                "on-surface": "#041c37",
+                "tertiary": "#006673",
+                "surface-container-lowest": "#ffffff",
+                "surface": "#f9f9ff",
+                "on-primary-container": "#f7fff2",
+                "on-surface-variant": "#3e4a3d",
+                "on-tertiary-fixed-variant": "#004e59",
+                "on-primary-fixed-variant": "#00531d",
+                "on-error-container": "#93000a",
+                "secondary-fixed-dim": "#ffb68f",
+                "surface-bright": "#f9f9ff",
+                "surface-container-highest": "#d4e3ff",
+                "primary-fixed": "#8cfa98",
+                "primary-container": "#048734",
+                "primary": "#006b27",
+                "outline": "#6e7a6c",
+                "inverse-primary": "#70dd7f",
+                "surface-container": "#e7eeff",
+                "surface-container-low": "#f0f3ff",
+                "on-tertiary-container": "#f8fdff",
+                "on-primary": "#ffffff",
+                "on-primary-fixed": "#002107",
+                "secondary-container": "#fd7200",
+                "surface-dim": "#c6dbff",
+                "primary-fixed-dim": "#70dd7f",
+                "tertiary-fixed": "#a1efff",
+                "error": "#ba1a1a",
+                "on-secondary-container": "#582300",
+                "background": "#f9f9ff",
+                "on-secondary": "#ffffff",
+                "surface-tint": "#006e29",
+                "on-error": "#ffffff",
+                "outline-variant": "#becaba",
+                "on-tertiary-fixed": "#001f25",
+                "on-secondary-fixed": "#331100"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "container-max": "1280px",
+                "gutter": "24px",
+                "unit": "4px",
+                "margin-mobile": "16px",
+                "margin-desktop": "64px"
+        },
+        "fontFamily": {
+                "headline-xl": [
+                        "Hanken Grotesk"
+                ],
+                "headline-lg-mobile": [
+                        "Hanken Grotesk"
+                ],
+                "headline-lg": [
+                        "Hanken Grotesk"
+                ],
+                "body-sm": [
+                        "Work Sans"
+                ],
+                "label-caps": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "Work Sans"
+                ]
+        },
+        "fontSize": {
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md m-0 p-0 overflow-x-hidden">
+<!-- Global App Container -->
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-primary flex flex-col py-6 px-4 z-50">
+<!-- Header -->
+<div class="flex items-center gap-3 mb-8 px-4">
+<div class="w-10 h-10 flex items-center justify-center overflow-hidden"><img alt="FuturaGest Isotipo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDtX-Qmn9ZADqkgFaHP_hMsO2elifLY_-S6IETYnX0im0mnvEfltidfcBRgfv_zI6ugwU7GS62A_cM0iK0yNrfbLsGVb66_g9MgbaH5z6FHsv5uBoylNV8H44k_G7kdu-3szjWSrv6qoDia4cChGCvt1VYev_jEtQXhVI1We26o7HEFTHmjgCGRGOih2u-0QhC3jnZm-ZxL6hhVzZMWMUYCnMUjiNqDMo9CqGqYwTvmdB7FmSZcV8LcfnlutEBybLSWkWrB-g2koiz"/></div>
+<div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-primary">FuturaGest</h1>
+<p class="font-label-caps text-label-caps text-primary-fixed uppercase">Gestión Operativa</p>
+</div>
+</div>
+<!-- Primary Navigation Tabs -->
+<ul class="flex flex-col gap-2 flex-1">
+<!-- Inactive Tab -->
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md font-semibold">Dashboard</span>
+</a>
+</li>
+<!-- Active Tab -->
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 bg-surface text-primary rounded-lg scale-95 transition-transform font-semibold shadow-sm" href="#">
+<span class="material-symbols-outlined" data-icon="assignment_ind" style="font-variation-settings: 'FILL' 1;">assignment_ind</span>
+<span class="font-body-md text-body-md">Asistencia</span>
+</a>
+</li>
+<!-- Inactive Tab -->
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-body-md text-body-md font-semibold">Empleados</span>
+</a>
+</li>
+<!-- Inactive Tab -->
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
+<span class="font-body-md text-body-md font-semibold">Configuración</span>
+</a>
+</li>
+</ul>
+<!-- Footer Navigation -->
+<ul class="flex flex-col gap-2 mt-auto border-t border-primary-container pt-4">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-body-md text-body-md font-semibold">Soporte</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md font-semibold">Cerrar Sesión</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-[260px] flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="fixed top-0 bg-surface-container-lowest border-b border-surface-container-high flex justify-between items-center h-16 px-margin-desktop ml-[260px] w-[calc(100%-260px)] z-40">
+<div class="flex items-center gap-4">
+<img alt="FuturaGest Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAN5Og4lHr_xevWEz9s-v_hr0nsxKymyDTSQXvDk06F2NY95fEBZcOKdPEPti-Z1Q_DPbwJkNFKth7dG37338hcv7qltY7cP9S_pXyf-osV0zY26HA9icT79loaOJ-tRd5-bKC7OdxhA9xI_KDr5lDvXGNd2a9vp0soqQVGd2Bhivrs3YscXSdY_HcSfMfoxiwygf_ssedMBKA1QVpagN1f7AfEKwb6YLsYueAJ-w7MzIEWU-7VXMY6OETWeFZSLU_MUcrZ1ZsfKlfV"/>
+<div class="hidden md:flex items-center px-3 py-1.5 bg-surface-container-low rounded-md ml-8 border border-outline-variant focus-within:border-primary transition-colors w-64">
+<span class="material-symbols-outlined text-outline text-sm mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm font-body-sm w-full placeholder-outline outline-none text-on-surface" placeholder="Buscar empleado..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-colors duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-colors duration-200 flex items-center justify-center ml-2">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="mt-16 p-margin-desktop bg-surface flex-1 flex flex-col gap-gutter max-w-container-max mx-auto w-full">
+<!-- Page Header & KPIs -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Control de Asistencia</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Monitoreo diario de personal en rutas y centros logísticos.</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-lg p-4 min-w-[140px] shadow-sm">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Presentes</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-primary">248</p>
+</div>
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-lg p-4 min-w-[140px] shadow-sm">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Retrasos</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-secondary">12</p>
+</div>
+</div>
+</div>
+<!-- Filters Section -->
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-xl p-6 shadow-sm">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase">Fecha</label>
+<input class="border border-outline-variant rounded-md px-3 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full bg-surface-bright" type="date" value="2023-10-24"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase">Municipio</label>
+<select class="border border-outline-variant rounded-md px-3 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full bg-surface-bright">
+<option>Todos los municipios</option>
+<option>Bogotá</option>
+<option>Medellín</option>
+<option>Cali</option>
+</select>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase">Supervisor</label>
+<select class="border border-outline-variant rounded-md px-3 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full bg-surface-bright">
+<option>Todos</option>
+<option>Carlos Ramírez</option>
+<option>Ana Martínez</option>
+</select>
+</div>
+<div class="flex justify-end">
+<button class="bg-primary text-on-primary font-body-md text-body-md font-semibold px-6 py-2 rounded-md hover:bg-surface-tint transition-colors h-[38px] flex items-center justify-center gap-2 w-full md:w-auto">
+<span class="material-symbols-outlined text-[18px]" data-icon="filter_list">filter_list</span>
+                                Filtrar
+                            </button>
+</div>
+</div>
+</div>
+<!-- Data Table Section -->
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-xl overflow-hidden shadow-sm flex-1">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-surface-container-high">
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 whitespace-nowrap uppercase">Nombre del empleado</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 whitespace-nowrap uppercase">Municipio</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 whitespace-nowrap uppercase">Hora de ingreso</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 whitespace-nowrap uppercase">Hora de salida</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 whitespace-nowrap uppercase">Estado</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant py-4 px-6 text-right whitespace-nowrap uppercase">Acciones</th>
+</tr>
+</thead>
+<tbody>
+<!-- Row 1 -->
+<tr class="border-b border-surface-container-high hover:bg-surface-bright transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-bold text-xs">
+                                                JG
+                                            </div>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Juan González</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Bogotá - Zona Norte</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">06:00 AM</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">--:--</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-caps text-label-caps bg-primary-container text-on-primary-container uppercase">
+                                            A tiempo
+                                        </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-primary font-body-md text-body-md hover:underline bg-transparent border border-outline-variant px-3 py-1.5 rounded hover:bg-surface-container-low transition-colors inline-flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+                                            Ver Detalles
+                                        </button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-surface-container-high hover:bg-surface-bright transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-bold text-xs">
+                                                LM
+                                            </div>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Laura Méndez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Medellín - Centro</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">06:45 AM</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">--:--</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-caps text-label-caps bg-secondary-container text-on-secondary-container uppercase">
+                                            Retraso
+                                        </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-primary font-body-md text-body-md hover:underline bg-transparent border border-outline-variant px-3 py-1.5 rounded hover:bg-surface-container-low transition-colors inline-flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+                                            Ver Detalles
+                                        </button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-surface-container-high hover:bg-surface-bright transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-bold text-xs">
+                                                CR
+                                            </div>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Carlos Ramírez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Cali - Sur</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">05:55 AM</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">--:--</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-caps text-label-caps bg-primary-container text-on-primary-container uppercase">
+                                            A tiempo
+                                        </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-primary font-body-md text-body-md hover:underline bg-transparent border border-outline-variant px-3 py-1.5 rounded hover:bg-surface-container-low transition-colors inline-flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+                                            Gestionar Horas
+                                        </button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-bold text-xs">
+                                                SP
+                                            </div>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Sofia Pérez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Bogotá - Suba</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface text-on-surface-variant italic">No registrado</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface text-on-surface-variant italic">No registrado</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-caps text-label-caps bg-tertiary-container text-on-tertiary-container uppercase">
+                                            Novedad
+                                        </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-primary font-body-md text-body-md hover:underline bg-transparent border border-outline-variant px-3 py-1.5 rounded hover:bg-surface-container-low transition-colors inline-flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+                                            Ver Detalles
+                                        </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination (Simplified) -->
+<div class="bg-surface-container-lowest border-t border-surface-container-high p-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Mostrando 1 a 4 de 248 registros</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 border border-outline-variant rounded text-on-surface-variant hover:bg-surface-container-low font-body-sm disabled:opacity-50" disabled="">Anterior</button>
+<button class="px-3 py-1 border border-outline-variant rounded text-on-surface-variant hover:bg-surface-container-low font-body-sm">Siguiente</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

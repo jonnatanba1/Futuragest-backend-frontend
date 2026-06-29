@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+
+<html lang="es" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gestión de Municipios y Supervisores - FuturaGest</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Work+Sans:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-tertiary": "#ffffff",
+                "surface-container-high": "#dde9ff",
+                "secondary-fixed": "#ffdbca",
+                "error-container": "#ffdad6",
+                "tertiary-fixed-dim": "#44d8f1",
+                "inverse-surface": "#1c314d",
+                "inverse-on-surface": "#ebf1ff",
+                "secondary": "#9d4400",
+                "surface-variant": "#d4e3ff",
+                "on-background": "#041c37",
+                "on-secondary-fixed-variant": "#773200",
+                "tertiary-container": "#008091",
+                "on-surface": "#041c37",
+                "tertiary": "#006673",
+                "surface-container-lowest": "#ffffff",
+                "surface": "#f9f9ff",
+                "on-primary-container": "#f7fff2",
+                "on-surface-variant": "#3e4a3d",
+                "on-tertiary-fixed-variant": "#004e59",
+                "on-primary-fixed-variant": "#00531d",
+                "on-error-container": "#93000a",
+                "secondary-fixed-dim": "#ffb68f",
+                "surface-bright": "#f9f9ff",
+                "surface-container-highest": "#d4e3ff",
+                "primary-fixed": "#8cfa98",
+                "primary-container": "#048734",
+                "primary": "#006b27",
+                "outline": "#6e7a6c",
+                "inverse-primary": "#70dd7f",
+                "surface-container": "#e7eeff",
+                "surface-container-low": "#f0f3ff",
+                "on-tertiary-container": "#f8fdff",
+                "on-primary": "#ffffff",
+                "on-primary-fixed": "#002107",
+                "secondary-container": "#fd7200",
+                "surface-dim": "#c6dbff",
+                "primary-fixed-dim": "#70dd7f",
+                "tertiary-fixed": "#a1efff",
+                "error": "#ba1a1a",
+                "on-secondary-container": "#582300",
+                "background": "#f9f9ff",
+                "on-secondary": "#ffffff",
+                "surface-tint": "#006e29",
+                "on-error": "#ffffff",
+                "outline-variant": "#becaba",
+                "on-tertiary-fixed": "#001f25",
+                "on-secondary-fixed": "#331100"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "container-max": "1280px",
+                "gutter": "24px",
+                "unit": "4px",
+                "margin-mobile": "16px",
+                "margin-desktop": "64px"
+        },
+        "fontFamily": {
+                "headline-xl": [
+                        "Hanken Grotesk"
+                ],
+                "headline-lg-mobile": [
+                        "Hanken Grotesk"
+                ],
+                "headline-lg": [
+                        "Hanken Grotesk"
+                ],
+                "body-sm": [
+                        "Work Sans"
+                ],
+                "label-caps": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "Work Sans"
+                ]
+        },
+        "fontSize": {
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-primary dark:bg-inverse-surface flex flex-col py-6 px-4 z-50">
+<div class="mb-8 px-4 flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center"><img alt="FuturaGest Isotipo" class="w-8 h-8 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDtX-Qmn9ZADqkgFaHP_hMsO2elifLY_-S6IETYnX0im0mnvEfltidfcBRgfv_zI6ugwU7GS62A_cM0iK0yNrfbLsGVb66_g9MgbaH5z6FHsv5uBoylNV8H44k_G7kdu-3szjWSrv6qoDia4cChGCvt1VYev_jEtQXhVI1We26o7HEFTHmjgCGRGOih2u-0QhC3jnZm-ZxL6hhVzZMWMUYCnMUjiNqDMo9CqGqYwTvmdB7FmSZcV8LcfnlutEBybLSWkWrB-g2koiz"/></div>
+<div class="flex flex-col justify-center"><img alt="FuturaGest Logo" class="h-10 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKC3goLWFB4bFiZ_Glh86d3MyVxcgW_k-5LfyA8PrTXes8O2fZmB67-5nVGKVO42R1K2tncYJ3DYvOvm0g1hSwb6g4DPrgp73LVJEJpzw5IPMYNZyf1ucNeSN7CQ6a4UpxQZwvinPbLi_Ac1wQRJtMvgR4d3UAZWoVVUafHpG8gNjgJqzJuY1FabhyugvcJ5jajRJVOc8oLzu4gz7JIkCeikskyxj5s3wLWfBUyUU-SXVcwKFA0IS2Gw7TrVTPOmQ3HzfYQd6NaA4w"/></div>
+</div>
+<div class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 text-inverse-on-surface hover:text-on-primary hover:bg-primary-container dark:hover:bg-surface-variant transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-inverse-on-surface hover:text-on-primary hover:bg-primary-container dark:hover:bg-surface-variant transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment_ind">assignment_ind</span>
+<span class="font-label-caps text-label-caps">Asistencia</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-inverse-surface text-inverse-on-surface rounded-lg scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-caps text-label-caps font-bold">Empleados</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-inverse-on-surface hover:text-on-primary hover:bg-primary-container dark:hover:bg-surface-variant transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
+<span class="font-label-caps text-label-caps">Configuración</span>
+</a>
+</div>
+<div class="mt-auto flex flex-col gap-2 pt-4 border-t border-primary-container">
+<a class="flex items-center gap-3 px-4 py-3 text-inverse-on-surface hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-caps text-label-caps">Soporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-inverse-on-surface hover:text-on-primary hover:bg-primary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-caps text-label-caps">Cerrar Sesión</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[260px] w-[calc(100%-260px)] flex flex-col h-screen">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center h-16 px-margin-desktop bg-surface-container-lowest dark:bg-surface border-b border-outline-variant dark:border-outline shrink-0">
+<div class="flex items-center"><img alt="Logo" class="h-8 mr-6 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKC3goLWFB4bFiZ_Glh86d3MyVxcgW_k-5LfyA8PrTXes8O2fZmB67-5nVGKVO42R1K2tncYJ3DYvOvm0g1hSwb6g4DPrgp73LVJEJpzw5IPMYNZyf1ucNeSN7CQ6a4UpxQZwvinPbLi_Ac1wQRJtMvgR4d3UAZWoVVUafHpG8gNjgJqzJuY1FabhyugvcJ5jajRJVOc8oLzu4gz7JIkCeikskyxj5s3wLWfBUyUU-SXVcwKFA0IS2Gw7TrVTPOmQ3HzfYQd6NaA4w"/>
+<!-- Search bar would go here on_left -->
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-full font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-64" placeholder="Buscar..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<div class="flex-1 overflow-y-auto p-margin-desktop bg-surface">
+<div class="mb-8 flex justify-between items-end">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-2">Gestión de Personal</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Asignación de supervisores por territorio municipal.</p>
+</div>
+<button class="bg-primary text-on-primary font-label-caps text-label-caps px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-surface-tint transition-colors">
+<span class="material-symbols-outlined">add</span>
+                    Nueva Asignación
+                </button>
+</div>
+<!-- Split View Layout -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-gutter">
+<!-- Left Column: Municipios -->
+<div class="xl:col-span-5 flex flex-col gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 h-full shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Municipios</h3>
+<span class="bg-surface-container-low text-on-surface font-label-caps text-label-caps px-3 py-1 rounded-full border border-outline-variant">12 Activos</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Municipio Item -->
+<div class="p-4 border border-outline-variant rounded-lg hover:border-primary transition-colors cursor-pointer group flex justify-between items-center bg-surface-container-lowest">
+<div>
+<h4 class="font-label-caps text-label-caps text-on-surface group-hover:text-primary transition-colors">Madrid Centro</h4>
+<p class="font-body-sm text-body-sm text-outline mt-1">Zona A</p>
+</div>
+<div class="text-right">
+<div class="font-headline-lg text-headline-lg text-primary">145</div>
+<p class="font-label-caps text-label-caps text-outline">Empleados</p>
+</div>
+</div>
+<!-- Municipio Item -->
+<div class="p-4 border border-outline-variant rounded-lg hover:border-primary transition-colors cursor-pointer group flex justify-between items-center bg-surface-container-lowest">
+<div>
+<h4 class="font-label-caps text-label-caps text-on-surface group-hover:text-primary transition-colors">Barcelona Norte</h4>
+<p class="font-body-sm text-body-sm text-outline">Zona B</p>
+</div>
+<div class="text-right">
+<div class="font-headline-lg text-headline-lg text-primary">89</div>
+<p class="font-label-caps text-label-caps text-outline">Empleados</p>
+</div>
+</div>
+<!-- Municipio Item -->
+<div class="p-4 border border-outline-variant rounded-lg hover:border-primary transition-colors cursor-pointer group flex justify-between items-center bg-surface-container-lowest">
+<div>
+<h4 class="font-label-caps text-label-caps text-on-surface group-hover:text-primary transition-colors">Valencia Este</h4>
+<p class="font-body-sm text-body-sm text-outline">Zona C</p>
+</div>
+<div class="text-right">
+<div class="font-headline-lg text-headline-lg text-primary">210</div>
+<p class="font-label-caps text-label-caps text-outline">Empleados</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Supervisores -->
+<div class="xl:col-span-7 flex flex-col gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 h-full shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Supervisores Asignados</h3>
+<button class="text-primary font-label-caps text-label-caps hover:underline flex items-center gap-1">
+                                Ver todos <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Supervisor Card -->
+<div class="border border-outline-variant rounded-lg p-5 bg-surface-container-lowest">
+<div class="flex items-start gap-4 mb-4">
+<div class="w-12 h-12 rounded-full bg-inverse-surface text-inverse-on-surface flex items-center justify-center font-headline-lg text-headline-lg">
+                                        RC
+                                    </div>
+<div class="flex-1">
+<h4 class="font-label-caps text-label-caps text-on-surface">Roberto Carlos</h4>
+<p class="font-body-sm text-body-sm text-outline">Supervisor Senior</p>
+</div>
+<button class="text-outline hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+<div class="bg-surface p-3 rounded-lg border border-surface-variant">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Asignación Actual</span>
+<span class="bg-inverse-surface text-inverse-on-surface px-2 py-0.5 rounded text-label-caps">Madrid Centro</span>
+</div>
+<div class="flex justify-between items-end">
+<div class="font-body-sm text-body-sm text-on-surface">145 / 150 Capacidad</div>
+<div class="w-24 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[95%]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Supervisor Card -->
+<div class="border border-outline-variant rounded-lg p-5 bg-surface-container-lowest">
+<div class="flex items-start gap-4 mb-4">
+<div class="w-12 h-12 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-headline-lg text-headline-lg">
+                                        MG
+                                    </div>
+<div class="flex-1">
+<h4 class="font-label-caps text-label-caps text-on-surface">María Gómez</h4>
+<p class="font-body-sm text-body-sm text-outline">Supervisora Zonal</p>
+</div>
+<button class="text-outline hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+<div class="bg-surface p-3 rounded-lg border border-surface-variant">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Asignación Actual</span>
+<span class="bg-tertiary text-on-tertiary px-2 py-0.5 rounded text-label-caps">Barcelona Norte</span>
+</div>
+<div class="flex justify-between items-end">
+<div class="font-body-sm text-body-sm text-on-surface">89 / 150 Capacidad</div>
+<div class="w-24 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[60%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

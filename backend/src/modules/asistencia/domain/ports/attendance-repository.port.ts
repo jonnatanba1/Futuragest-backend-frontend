@@ -8,7 +8,7 @@
  * Writes live inside the same sanctioned file to satisfy the meta-guard.
  */
 
-import type { Attendance } from '@prisma/client';
+import type { Attendance, VerificationMethod } from '@prisma/client';
 
 export const ATTENDANCE_REPOSITORY_PORT = Symbol('AttendanceRepositoryPort');
 
@@ -22,8 +22,10 @@ export interface CreateAttendanceData {
   checkInLat: number;
   checkInLng: number;
   checkInAccuracy?: number | null;
+  /** Audit label only — no authorization logic may depend on this field. */
+  checkInVerification?: VerificationMethod | null;
   clientRef: string;
-  signatureKey?: string | null;
+  checkInPhotoKey?: string | null;
   completedAt?: Date | null;
 }
 
@@ -33,9 +35,11 @@ export interface UpdateAttendanceData {
   checkOutLat?: number | null;
   checkOutLng?: number | null;
   checkOutAccuracy?: number | null;
+  /** Audit label only — no authorization logic may depend on this field. */
+  checkOutVerification?: VerificationMethod | null;
   completedAt?: Date | null;
-  signatureKey?: string | null;
-  checkOutSignatureKey?: string | null;
+  checkInPhotoKey?: string | null;
+  checkOutPhotoKey?: string | null;
   checkOutClientRef?: string | null;
 }
 
@@ -73,6 +77,6 @@ export interface AttendanceRepositoryPort {
    */
   findByOperarioAndDate(operarioId: string, date: string): Promise<Attendance | null>;
 
-  /** Partial update (check-out fields, signatureKey). */
+  /** Partial update (check-out fields, checkInPhotoKey, checkOutPhotoKey). */
   update(id: string, data: UpdateAttendanceData): Promise<Attendance>;
 }

@@ -46,7 +46,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiProperty, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { CreatedIdDto, ImportResultResponseDto, OperarioResponseDto } from './response-dtos';
-import { IsEmail, IsIn, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { Roles } from './roles.decorator';
 import type { CreateOperarioUseCase } from '../application/create-operario.use-case';
 import type { DeactivateOperarioUseCase } from '../application/deactivate-operario.use-case';
@@ -101,6 +101,11 @@ export class CreateOperarioBody {
   @IsString()
   @IsNotEmpty()
   supervisorId!: string;
+
+  @ApiProperty({ description: 'Free-text job position (e.g. "Barrido", "Recolección")', default: '' })
+  @IsOptional()
+  @IsString()
+  cargo?: string;
 }
 
 export class ReassignOperarioBody {
@@ -173,6 +178,7 @@ export class OperarioController {
         fullName: body.fullName,
         documento: body.documento,
         supervisorId: body.supervisorId,
+        cargo: body.cargo ?? '',
       });
     } catch (err) {
       this.mapDomainError(err);

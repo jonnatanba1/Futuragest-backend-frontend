@@ -18,27 +18,30 @@ describe('AttendanceRepositoryPort — structural contract', () => {
   });
 
   it('the port type has the required method signatures (compile-time check)', () => {
-    // This is a compile-time-only assertion: if AttendanceRepositoryPort does not
-    // have these methods, TypeScript will fail to compile this file.
-    type _Methods = {
+    // Compile-time-only: if AttendanceRepositoryPort is missing a method,
+    // TypeScript fails to compile. The satisfies check forces type resolution.
+    const _methods: {
       create: AttendanceRepositoryPort['create'];
       findById: AttendanceRepositoryPort['findById'];
       findMany: AttendanceRepositoryPort['findMany'];
       findByClientRef: AttendanceRepositoryPort['findByClientRef'];
       update: AttendanceRepositoryPort['update'];
-    };
+    } = null as never;
+    void _methods;
     // Runtime: just confirm the import succeeded
     expect(ATTENDANCE_REPOSITORY_PORT).toBeDefined();
   });
 
   it('CreateAttendanceData type is importable', () => {
-    // Compile-time check: type must be exported
-    type _Check = CreateAttendanceData;
+    // Compile-time check: type must be exported and resolvable
+    const _check: CreateAttendanceData = null as never;
+    void _check;
     expect(true).toBe(true);
   });
 
   it('UpdateAttendanceData type is importable', () => {
-    type _Check = UpdateAttendanceData;
+    const _check: UpdateAttendanceData = null as never;
+    void _check;
     expect(true).toBe(true);
   });
 });

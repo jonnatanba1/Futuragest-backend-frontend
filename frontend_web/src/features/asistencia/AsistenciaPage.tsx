@@ -22,6 +22,7 @@ import {
 import { buildSupervisorLabelMap } from '../operarios/supervisor-label';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
+import { VerificationBadge } from '../../components/VerificationBadge';
 import { AttendanceDetailDrawer } from './AttendanceDetailDrawer';
 import { useAttendances } from './attendance-queries';
 import { formatTime } from './format';
@@ -34,6 +35,8 @@ export function AsistenciaPage() {
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [filterSupervisorId, setFilterSupervisorId] = useState<string | null>(null);
+  const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<AttendanceDto | null>(null);
   const [drawerOpened, drawer] = useDisclosure(false);
@@ -56,6 +59,18 @@ export function AsistenciaPage() {
     () => new Map((zones.data ?? []).map((z) => [z.id, z.name])),
     [zones.data],
   );
+  const supervisorMap = useMemo(
+    () => new Map((supervisors.data ?? []).map((s) => [s.id, s])),
+    [supervisors.data],
+  );
+  const supervisorOptions = useMemo(
+    () => (supervisors.data ?? []).map((s) => ({ value: s.id, label: supervisorLabel.get(s.id) ?? s.id })),
+    [supervisors.data, supervisorLabel],
+  );
+  const municipioOptions = useMemo(
+    () => (municipios.data ?? []).map((m) => ({ value: m.id, label: m.name })),
+    [municipios.data],
+  );
 
   const nameOf = (id: string) => operarioName.get(id) ?? id;
   const supOf = (id: string) => supervisorLabel.get(id) ?? id;
@@ -68,11 +83,16 @@ export function AsistenciaPage() {
         status === 'all' ? true : status === 'completed' ? a.completedAt != null : a.completedAt == null,
       )
       .filter((a) => {
+        if (filterSupervisorId && a.supervisorId !== filterSupervisorId) return false;
+        if (filterMunicipioId) {
+          const sup = supervisorMap.get(a.supervisorId);
+          if (!sup || sup.municipioId !== filterMunicipioId) return false;
+        }
         if (!q) return true;
         return nameOf(a.operarioId).toLowerCase().includes(q) || supOf(a.supervisorId).toLowerCase().includes(q);
       })
       .sort((a, b) => (b.checkInReceivedAt ?? '').localeCompare(a.checkInReceivedAt ?? ''));
-  }, [attendances.data, date, status, search, operarioName, supervisorLabel]);
+  }, [attendances.data, date, status, search, filterSupervisorId, filterMunicipioId, operarioName, supervisorLabel, supervisorMap]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -96,42 +116,56 @@ export function AsistenciaPage() {
     <Stack>
       <Title order={2}>Asistencia</Title>
 
-      <Group>
-        <TextInput
-          placeholder="Buscar por operario o supervisor"
-          aria-label="Buscar asistencia"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.currentTarget.value);
-            setPage(1);
-          }}
-          flex={1}
-        />
-        <TextInput
-          type="date"
-          aria-label="Filtrar por fecha"
-          value={date}
-          onChange={(e) => {
-            setDate(e.currentTarget.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          aria-label="Filtrar por estado"
-          data={[
-            { value: 'all', label: 'Todas' },
-            { value: 'open', label: 'Abiertas' },
-            { value: 'completed', label: 'Completadas' },
-          ]}
-          value={status}
-          onChange={(v) => {
-            setStatus((v as StatusFilter) ?? 'all');
-            setPage(1);
-          }}
-          allowDeselect={false}
-          w={140}
-        />
-      </Group>
+      <Stack gap="xs">
+        <Group wrap="wrap">
+          <TextInput
+            placeholder="Buscar por operario o supervisor"
+            aria-label="Buscar asistencia"
+            value={search}
+            onChange={(e) => { setSearch(e.currentTarget.value); setPage(1); }}
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <TextInput
+            type="date"
+            aria-label="Filtrar por fecha"
+            value={date}
+            onChange={(e) => { setDate(e.currentTarget.value); setPage(1); }}
+          />
+          <Select
+            aria-label="Filtrar por estado"
+            data={[
+              { value: 'all', label: 'Todas' },
+              { value: 'open', label: 'Abiertas' },
+              { value: 'completed', label: 'Completadas' },
+            ]}
+            value={status}
+            onChange={(v) => { setStatus((v as StatusFilter) ?? 'all'); setPage(1); }}
+            allowDeselect={false}
+            w={140}
+          />
+        </Group>
+        <Group wrap="wrap" gap="sm">
+          <Select
+            placeholder="Supervisor"
+            aria-label="Filtrar por supervisor"
+            data={supervisorOptions}
+            value={filterSupervisorId}
+            onChange={(v) => { setFilterSupervisorId(v); setPage(1); }}
+            clearable
+            searchable
+            w={220}
+          />
+          <Select
+            placeholder="Municipio"
+            aria-label="Filtrar por municipio"
+            data={municipioOptions}
+            value={filterMunicipioId}
+            onChange={(v) => { setFilterMunicipioId(v); setPage(1); }}
+            clearable
+            w={180}
+          />
+        </Group>
+      </Stack>
 
       {attendances.isLoading ? (
         <TableSkeleton />
@@ -152,6 +186,7 @@ export function AsistenciaPage() {
                 <Table.Th>Ingreso</Table.Th>
                 <Table.Th>Salida</Table.Th>
                 <Table.Th>Estado</Table.Th>
+                <Table.Th>Verificación</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -178,6 +213,9 @@ export function AsistenciaPage() {
                     <Badge color={a.completedAt != null ? 'teal' : 'yellow'} variant="light">
                       {a.completedAt != null ? 'Completada' : 'Abierta'}
                     </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <VerificationBadge method={a.checkInVerification} />
                   </Table.Td>
                 </Table.Tr>
               ))}

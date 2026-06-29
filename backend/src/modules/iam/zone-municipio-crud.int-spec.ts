@@ -46,7 +46,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 const request: import('supertest').SuperTestStatic = require('supertest');
 import { AppModule } from '../../app.module';
 import { createPrismaClient } from '../../database/prisma-client';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
@@ -147,7 +147,7 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
 
     async function createUser(email: string, role: string) {
       const user = await prisma.user.create({
-        data: { email, passwordHash, role: role as any, mustChangePassword: false },
+        data: { email, passwordHash, role: role as Role, mustChangePassword: false },
       });
       createdUserIds.push(user.id);
       await prisma.deviceSession.create({
@@ -252,7 +252,7 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
 
       const row = await prisma.zone.findUnique({ where: { id } });
       expect(row).not.toBeNull();
-      expect(row!.name).toBe(name);
+      expect(row?.name).toBe(name);
     });
 
     it('ZC-02 — Duplicate zone name → 409', async () => {
@@ -315,7 +315,7 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
       expect(resp.body).toHaveProperty('updatedAt');
 
       const row = await prisma.zone.findUnique({ where: { id: zoneId } });
-      expect(row!.name).toBe(newName);
+      expect(row?.name).toBe(newName);
     });
 
     it('ZC-06 — Zone not found → 404', async () => {
@@ -475,8 +475,8 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
 
       const row = await prisma.municipio.findUnique({ where: { id } });
       expect(row).not.toBeNull();
-      expect(row!.name).toBe(name);
-      expect(row!.zoneId).toBe(testZoneId);
+      expect(row?.name).toBe(name);
+      expect(row?.zoneId).toBe(testZoneId);
     });
 
     it('MC-02 — Duplicate (zoneId, name) → 409', async () => {
@@ -551,7 +551,7 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
       expect(resp.body).toHaveProperty('updatedAt');
 
       const row = await prisma.municipio.findUnique({ where: { id: muniId } });
-      expect(row!.name).toBe(newName);
+      expect(row?.name).toBe(newName);
     });
 
     it('MC-06 — Move municipio to different zone → 200', async () => {
@@ -568,7 +568,7 @@ describe('Zone & Municipio CRUD Integration Suite', () => {
       expect(resp.body.name).toBe(name);
 
       const row = await prisma.municipio.findUnique({ where: { id: muniId } });
-      expect(row!.zoneId).toBe(patch2ZoneId);
+      expect(row?.zoneId).toBe(patch2ZoneId);
     });
 
     it('MC-07 — Municipio not found → 404', async () => {

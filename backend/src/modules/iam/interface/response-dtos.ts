@@ -8,7 +8,7 @@
  * Runtime behavior is unchanged — controllers return plain objects/interfaces.
  */
 
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 // ─── GET /iam/supervisors, GET /iam/supervisors/:id ───────────────────────────
 
@@ -51,6 +51,9 @@ export class OperarioResponseDto {
 
   @ApiProperty({ format: 'uuid' })
   supervisorId!: string;
+
+  @ApiProperty({ description: 'Free-text job position (e.g. "Barrido", "Recolección")' })
+  cargo!: string;
 
   @ApiProperty({ description: 'Derived: deactivatedAt === null' })
   active!: boolean;

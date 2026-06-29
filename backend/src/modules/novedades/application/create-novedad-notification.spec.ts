@@ -11,6 +11,7 @@
  * Written FIRST (TDD RED) before implementing the notification wiring in the use case.
  */
 
+import { Logger } from '@nestjs/common';
 import { CreateNovedadUseCase } from './create-novedad.use-case';
 import type { NovedadRepositoryPort } from '../domain/ports/novedad-repository.port';
 import type { AttendanceRepositoryPort } from '../../asistencia/domain/ports/attendance-repository.port';
@@ -49,7 +50,7 @@ function makeAttendance(overrides: Record<string, unknown> = {}) {
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: null,
+    checkInPhotoKey: null,
     clientRef: 'ref-001',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -174,42 +175,133 @@ describe('CreateNovedadUseCase — notification fire-and-forget', () => {
   });
 
   describe('PN-3 — notification failure does NOT affect novedad response', () => {
-    it('use case returns { record, created: true } even when notificationPort rejects', async () => {
-      const notificationPort = makeMockNotificationPort({
-        notifyNovedadCreated: jest.fn().mockRejectedValue(new Error('FCM network error')),
-      });
-      const novedadRepo = makeMockNovedadRepo();
-      const attendanceRepo = makeMockAttendanceRepo();
-      const scopeHolder = makeScopeHolder();
+    it('use case returns { record, created: true } even when notificationPort rejects, and logs the error', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        const notificationPort = makeMockNotificationPort({
+          notifyNovedadCreated: jest.fn().mockRejectedValue(new Error('FCM network error')),
+        });
+        const novedadRepo = makeMockNovedadRepo();
+        const attendanceRepo = makeMockAttendanceRepo();
+        const scopeHolder = makeScopeHolder();
 
-      const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort);
+        const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort);
 
-      // Must NOT throw — novedad response is unaffected
-      const result = await useCase.execute({ attendanceId: 'att-a1', horasExtra: '2.50' });
+        // Must NOT throw — novedad response is unaffected
+        const result = await useCase.execute({ attendanceId: 'att-a1', horasExtra: '2.50' });
 
-      await new Promise((r) => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
-      expect(result.created).toBe(true);
-      expect(result.record.id).toBe('nov-1');
+        expect(result.created).toBe(true);
+        expect(result.record.id).toBe('nov-1');
+        // The catch handler must actually run — removing it would leave an unhandled rejection.
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('notifyNovedadCreated failed for novedad nov-1'),
+          expect.any(Error),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 
   describe('PN-4 — notification error is swallowed, does not propagate', () => {
-    it('does NOT throw when notificationPort throws synchronously', async () => {
-      const notificationPort = makeMockNotificationPort({
-        notifyNovedadCreated: jest.fn().mockRejectedValue(new Error('Port unavailable')),
+    it('does NOT throw when notificationPort throws SYNCHRONOUSLY, and logs the error', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        const notificationPort = makeMockNotificationPort({
+          // GENUINE sync throw — not a rejected promise. Must not escape as a 500
+          // after the novedad has already been persisted.
+          notifyNovedadCreated: jest.fn().mockImplementation(() => {
+            throw new Error('Port unavailable');
+          }),
+        });
+        const novedadRepo = makeMockNovedadRepo();
+        const attendanceRepo = makeMockAttendanceRepo();
+        const scopeHolder = makeScopeHolder();
+
+        const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort);
+
+        const result = await useCase.execute({ attendanceId: 'att-a1', horasExtra: '2.50' });
+
+        await new Promise((r) => setTimeout(r, 0));
+
+        // The persisted novedad must still be returned
+        expect(result.created).toBe(true);
+        expect(result.record.id).toBe('nov-1');
+        // The sync throw must have been caught and logged
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('notifyNovedadCreated failed for novedad nov-1'),
+          expect.any(Error),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('PN-7 — notification port NOT called on the P2002 clientRef-race replay path', () => {
+    it('returns { created: false } via the catch branch without notifying', async () => {
+      const existing = makeNovedad({ id: 'nov-race', clientRef: 'uuid-race' });
+      const notificationPort = makeMockNotificationPort();
+      const p2002 = Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+        meta: { target: ['clientRef'] },
       });
-      const novedadRepo = makeMockNovedadRepo();
+      const novedadRepo = makeMockNovedadRepo({
+        // Pre-check misses (race window), create hits the unique index, re-fetch finds it.
+        findByClientRef: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(existing),
+        create: jest.fn().mockRejectedValue(p2002),
+      });
       const attendanceRepo = makeMockAttendanceRepo();
       const scopeHolder = makeScopeHolder();
 
       const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort);
-
-      await expect(
-        useCase.execute({ attendanceId: 'att-a1', horasExtra: '2.50' }),
-      ).resolves.not.toThrow();
+      const result = await useCase.execute({
+        attendanceId: 'att-a1',
+        horasExtra: '2.00',
+        clientRef: 'uuid-race',
+      });
 
       await new Promise((r) => setTimeout(r, 0));
+
+      expect(result.created).toBe(false);
+      expect(result.record.id).toBe('nov-race');
+      expect(notificationPort.notifyNovedadCreated).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PN-8 — a throwing logger inside the dispatch catch cannot break the response', () => {
+    it('resolves with created:true when the port sync-throws AND logger.error itself throws', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {
+        throw new Error('logger transport down');
+      });
+      try {
+        const notificationPort = makeMockNotificationPort({
+          notifyNovedadCreated: jest.fn().mockImplementation(() => {
+            throw new Error('Port unavailable');
+          }),
+        });
+        const novedadRepo = makeMockNovedadRepo();
+        const attendanceRepo = makeMockAttendanceRepo();
+        const scopeHolder = makeScopeHolder();
+
+        const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder, notificationPort);
+
+        // Even with BOTH the port and the logger failing, the persisted novedad
+        // must be returned — never a 500 after the row exists.
+        const result = await useCase.execute({ attendanceId: 'att-a1', horasExtra: '2.50' });
+
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(result.created).toBe(true);
+        expect(result.record.id).toBe('nov-1');
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 

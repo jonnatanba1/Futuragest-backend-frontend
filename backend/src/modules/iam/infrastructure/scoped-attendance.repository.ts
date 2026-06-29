@@ -125,7 +125,7 @@ export class ScopedAttendanceRepository
   }
 
   /**
-   * Partial update of an attendance record (check-out, signatureKey).
+   * Partial update of an attendance record (check-out, checkInPhotoKey, checkOutPhotoKey).
    * Returns the updated record.
    */
   async update(id: string, data: UpdateAttendanceData): Promise<Attendance> {

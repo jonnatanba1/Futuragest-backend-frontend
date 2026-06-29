@@ -6,6 +6,7 @@
 
 import { ScopedOperarioRepository } from './scoped-operario.repository';
 import type { ScopeContextHolder } from '../../auth/domain/scope-context';
+import type { PrismaService } from '../../../database/prisma.service';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ function makePrisma() {
       }
       return Promise.resolve(ops);
     }),
-  } as any;
+  };
 }
 
 function makeHolder(role = 'SYSTEM_ADMIN'): ScopeContextHolder {
@@ -45,14 +46,14 @@ describe('ScopedOperarioRepository — write methods', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    repo = new ScopedOperarioRepository(prisma as any, makeHolder());
+    repo = new ScopedOperarioRepository(prisma as unknown as PrismaService, makeHolder());
   });
 
   describe('create', () => {
     it('calls prisma.operario.create with data and deactivatedAt:null', async () => {
-      await repo.create({ fullName: 'Ana', documento: '111', supervisorId: 'sup-1' });
+      await repo.create({ fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '' });
       expect(prisma.operario.create).toHaveBeenCalledWith({
-        data: { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', deactivatedAt: null },
+        data: { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '', deactivatedAt: null },
       });
     });
   });
@@ -118,8 +119,8 @@ describe('ScopedOperarioRepository — write methods', () => {
   describe('bulkCreate', () => {
     it('calls prisma.$transaction with array of create operations', async () => {
       const rows = [
-        { fullName: 'Ana', documento: '111', supervisorId: 'sup-1' },
-        { fullName: 'Luis', documento: '222', supervisorId: 'sup-1' },
+        { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '' },
+        { fullName: 'Luis', documento: '222', supervisorId: 'sup-1', cargo: 'Recolección' },
       ];
       const count = await repo.bulkCreate(rows);
       expect(prisma.$transaction).toHaveBeenCalled();
@@ -139,7 +140,7 @@ describe('ScopedOperarioRepository — isActive', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    repo = new ScopedOperarioRepository(prisma as any, makeHolder());
+    repo = new ScopedOperarioRepository(prisma as unknown as PrismaService, makeHolder());
   });
 
   it('returns true when operario found and deactivatedAt is null', async () => {
