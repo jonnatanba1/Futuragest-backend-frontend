@@ -11,16 +11,25 @@
  */
 
 import type { AuthRepositoryPort } from '../domain/auth-repository.port';
+import { MissingDeviceContextError } from '../domain/auth.errors';
 
 export interface UnregisterPushTokenInput {
   userId: string;
-  deviceId: string;
+  /**
+   * From JWT claims — may be absent on legacy/deviceId-less tokens. The use case
+   * rejects those: an undefined deviceId would be silently dropped by Prisma's
+   * updateMany filter and clear the token on ALL of the user's sessions.
+   */
+  deviceId: string | undefined;
 }
 
 export class UnregisterPushTokenUseCase {
   constructor(private readonly repo: AuthRepositoryPort) {}
 
   async execute(input: UnregisterPushTokenInput): Promise<void> {
+    if (!input.deviceId) {
+      throw new MissingDeviceContextError();
+    }
     await this.repo.clearPushToken(input.userId, input.deviceId);
   }
 }

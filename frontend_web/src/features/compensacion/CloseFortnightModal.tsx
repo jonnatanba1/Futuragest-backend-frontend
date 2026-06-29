@@ -99,20 +99,11 @@ export function CloseFortnightModal({
       handleClose();
       onSuccess?.();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        notifications.show({
-          color: 'red',
-          title: 'Período ya cerrado',
-          message: 'Este período ya fue cerrado con una referencia diferente.',
-        });
-      } else {
-        notifications.show({
-          color: 'red',
-          title: 'Error',
-          message:
-            err instanceof ApiError ? err.message : 'Ocurrió un error al cerrar el período.',
-        });
-      }
+      notifications.show({
+        color: 'red',
+        title: 'Error',
+        message: err instanceof ApiError ? err.message : 'Ocurrió un error al cerrar el período.',
+      });
     }
   });
 

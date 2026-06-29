@@ -44,7 +44,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 const request: import('supertest').SuperTestStatic = require('supertest');
 import { AppModule } from '../../app.module';
 import { createPrismaClient } from '../../database/prisma-client';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
@@ -91,9 +91,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
   // Fixture ids
   let zoneZ1Id: string;
-  let s1UserId: string;
   let s1Id: string;
-  let s2UserId: string;
   let s2Id: string;
   let adminUserId: string;
   let talentoUserId: string;
@@ -167,7 +165,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
     async function createUser(email: string, role: string) {
       const user = await prisma.user.create({
-        data: { email, passwordHash, role: role as any, mustChangePassword: false },
+        data: { email, passwordHash, role: role as Role, mustChangePassword: false },
       });
       createdUserIds.push(user.id);
       await prisma.deviceSession.create({
@@ -199,12 +197,10 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
     // Supervisor S1 for scope
     const s1 = await createSupervisor('s1-operario-test@futuragest.co');
-    s1UserId = s1.userId;
     s1Id = s1.supervisorId;
 
     // Supervisor S2 (for supervisor resolution tests in PR-2)
     const s2 = await createSupervisor('s2-operario-test@futuragest.co');
-    s2UserId = s2.userId;
     s2Id = s2.supervisorId;
 
     // TALENTO_HUMANO user
@@ -287,10 +283,10 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
       const row = await prisma.operario.findUnique({ where: { id } });
       expect(row).not.toBeNull();
-      expect(row!.fullName).toBe('Juan Perez');
-      expect(row!.documento).toBe('op01-12345678');
-      expect(row!.supervisorId).toBe(s1Id);
-      expect(row!.deactivatedAt).toBeNull();
+      expect(row?.fullName).toBe('Juan Perez');
+      expect(row?.documento).toBe('op01-12345678');
+      expect(row?.supervisorId).toBe(s1Id);
+      expect(row?.deactivatedAt).toBeNull();
     });
 
     it('OP-02 — TALENTO_HUMANO creates operario', async () => {
@@ -304,12 +300,12 @@ describe('Operario Management Integration Suite (PR-1)', () => {
       createdOperarioIds.push(resp.body.id);
 
       const row = await prisma.operario.findUnique({ where: { id: resp.body.id } });
-      expect(row!.deactivatedAt).toBeNull();
+      expect(row?.deactivatedAt).toBeNull();
     });
 
     it('OP-03 — Duplicate documento → 409', async () => {
       const documento = 'op03-dup-doc-11111';
-      const id = await createOperario(s1Id, documento, 'First');
+      await createOperario(s1Id, documento, 'First');
 
       await request(app.getHttpServer())
         .post('/iam/operarios')
@@ -390,7 +386,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
       expect(resp.body.deactivatedAt).not.toBeNull();
 
       const row = await prisma.operario.findUnique({ where: { id: opId } });
-      expect(row!.deactivatedAt).not.toBeNull();
+      expect(row?.deactivatedAt).not.toBeNull();
     });
 
     it('OP-27 — Deactivate already-inactive → 409', async () => {
@@ -401,7 +397,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
         .expect(200);
 
       const beforeRow = await prisma.operario.findUnique({ where: { id: opId } });
-      const firstDeactivatedAt = beforeRow!.deactivatedAt;
+      const firstDeactivatedAt = beforeRow?.deactivatedAt;
 
       // Second deactivation — must be 409
       await request(app.getHttpServer())
@@ -411,7 +407,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
       // deactivatedAt must not have changed
       const afterRow = await prisma.operario.findUnique({ where: { id: opId } });
-      expect(afterRow!.deactivatedAt?.toISOString()).toBe(firstDeactivatedAt?.toISOString());
+      expect(afterRow?.deactivatedAt?.toISOString()).toBe(firstDeactivatedAt?.toISOString());
     });
 
     it('OP-28 — Reactivate inactive operario → 200, deactivatedAt cleared', async () => {
@@ -431,7 +427,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
       expect(resp.body.deactivatedAt).toBeNull();
 
       const row = await prisma.operario.findUnique({ where: { id: opId } });
-      expect(row!.deactivatedAt).toBeNull();
+      expect(row?.deactivatedAt).toBeNull();
     });
 
     it('OP-29 — Reactivate already-active → 409', async () => {
@@ -462,7 +458,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
         .expect(200);
 
       const row = await prisma.operario.findUnique({ where: { id: opId } });
-      expect(row!.deactivatedAt).toBeNull();
+      expect(row?.deactivatedAt).toBeNull();
     });
 
     it('OP-35 — Deactivation does NOT delete existing attendance rows', async () => {
@@ -556,7 +552,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
       // Assert deactivatedAt=null (active)
       const created = await prisma.operario.findFirst({ where: { documento: docs[0] } });
-      expect(created!.deactivatedAt).toBeNull();
+      expect(created?.deactivatedAt).toBeNull();
     });
 
     it('OP-17 — supervisor resolved by email: created operario.supervisorId == S2.id', async () => {
@@ -577,7 +573,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
       // Assert supervisorId matches S2
       const row = await prisma.operario.findFirst({ where: { documento: doc } });
       expect(row).not.toBeNull();
-      expect(row!.supervisorId).toBe(s2Id);
+      expect(row?.supervisorId).toBe(s2Id);
     });
 
     it('OP-11 — mixed CSV: valid + dup documento + unknown supervisor → partial success', async () => {
@@ -794,7 +790,7 @@ describe('Operario Management Integration Suite (PR-1)', () => {
 
       // All active (deactivatedAt=null)
       const created = await prisma.operario.findFirst({ where: { documento: docs[0] } });
-      expect(created!.deactivatedAt).toBeNull();
+      expect(created?.deactivatedAt).toBeNull();
     });
 
     it('OP-19 — mixed XLSX: one invalid row → partial success', async () => {

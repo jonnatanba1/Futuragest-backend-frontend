@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   useBalanceQuery,
   useClosePeriodMutation,
+  useConfirmPayoutMutation,
   useCreateJornadaPolicyMutation,
   useJornadaPoliciesQuery,
   usePayoutQuery,
@@ -16,13 +17,14 @@ import {
 
 // ─── Module-level mock ────────────────────────────────────────────────────────
 
-const { getBalanceMock, getPayoutMock, getJornadaPoliciesMock, closePeriodMock, createJornadaPolicyMock } =
+const { getBalanceMock, getPayoutMock, getJornadaPoliciesMock, closePeriodMock, createJornadaPolicyMock, confirmPayoutMock } =
   vi.hoisted(() => ({
     getBalanceMock: vi.fn(),
     getPayoutMock: vi.fn(),
     getJornadaPoliciesMock: vi.fn(),
     closePeriodMock: vi.fn(),
     createJornadaPolicyMock: vi.fn(),
+    confirmPayoutMock: vi.fn(),
   }));
 
 vi.mock('../../lib/api/client', () => ({
@@ -32,6 +34,7 @@ vi.mock('../../lib/api/client', () => ({
     getJornadaPolicies: getJornadaPoliciesMock,
     closePeriod: closePeriodMock,
     createJornadaPolicy: createJornadaPolicyMock,
+    confirmPayout: confirmPayoutMock,
   },
 }));
 
@@ -158,6 +161,34 @@ describe('useClosePeriodMutation', () => {
       desde: '2026-05-01',
       hasta: '2026-05-15',
     });
+  });
+});
+
+// ─── useConfirmPayoutMutation ─────────────────────────────────────────────────
+
+describe('useConfirmPayoutMutation', () => {
+  it('calls confirmPayout with operarioId and body', async () => {
+    confirmPayoutMock.mockResolvedValueOnce({
+      operarioId: 'op-1',
+      periodKey: '2026-05-Q1',
+      saldoHoras: '2.50',
+      horasBase: '2.50',
+      factorRecargo: '1.25',
+      horasPagables: '3.13',
+      paidAt: '2026-06-10T12:00:00.000Z',
+      payoutRef: 'ref-uuid-001',
+    });
+
+    const { result } = renderHook(() => useConfirmPayoutMutation(), { wrapper: makeWrapper() });
+
+    const confirmed = await result.current.mutateAsync({
+      operarioId: 'op-1',
+      body: { periodKey: '2026-05-Q1' },
+    });
+
+    expect(confirmPayoutMock).toHaveBeenCalledWith('op-1', { periodKey: '2026-05-Q1' });
+    expect(confirmed.paidAt).toBe('2026-06-10T12:00:00.000Z');
+    expect(confirmed.payoutRef).toBe('ref-uuid-001');
   });
 });
 

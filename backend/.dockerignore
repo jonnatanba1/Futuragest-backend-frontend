@@ -1,0 +1,12 @@
+# Local-only dev files that must NOT reach the image.
+# pnpm-workspace.yaml carries the pnpm 11+ build-script approval (allowBuilds) used
+# on dev machines. The Dockerfile pins pnpm@9, which REQUIRES a `packages:` field in
+# any pnpm-workspace.yaml and aborts `pnpm run build` with "packages field missing or
+# empty" if it sees this file. pnpm 9 doesn't need build-script approval anyway, so the
+# file has no purpose in the image — keep it out.
+pnpm-workspace.yaml
+
+# Standard excludes — never needed in the build context.
+node_modules
+.git
+dist

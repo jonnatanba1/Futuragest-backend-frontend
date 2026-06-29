@@ -88,9 +88,12 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
   }
 
   async revokeDeviceSession(userId: string, deviceId: string): Promise<void> {
+    // Also null the push fields: a revoked session must not keep a stale FCM token
+    // (the recipient resolver already filters revokedAt: null, but permanently revoked
+    // rows would otherwise hold dead tokens forever). Re-login re-registers the token.
     await this.prisma.deviceSession.updateMany({
       where: { userId, deviceId },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), pushToken: null, pushPlatform: null },
     });
   }
 
@@ -114,9 +117,12 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     });
   }
 
+  // revokedAt: null on both token writes — revoked sessions must NEVER receive push-token
+  // writes. Prisma's updateMany silently drops undefined filter keys, so this is the
+  // defense-in-depth layer behind the use-case deviceId validation.
   async updatePushToken(userId: string, deviceId: string, pushToken: string, platform?: string): Promise<void> {
     await this.prisma.deviceSession.updateMany({
-      where: { userId, deviceId },
+      where: { userId, deviceId, revokedAt: null },
       data: {
         pushToken,
         pushPlatform: platform ?? null,
@@ -126,7 +132,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
 
   async clearPushToken(userId: string, deviceId: string): Promise<void> {
     await this.prisma.deviceSession.updateMany({
-      where: { userId, deviceId },
+      where: { userId, deviceId, revokedAt: null },
       data: {
         pushToken: null,
         pushPlatform: null,

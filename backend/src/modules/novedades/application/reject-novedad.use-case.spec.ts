@@ -93,4 +93,36 @@ describe('RejectNovedadUseCase', () => {
       expect(repo.updateStatus).not.toHaveBeenCalled();
     });
   });
+
+  // ── VM-08..VM-09 — VerificationMethod (decisionVerification) ──────────────
+
+  describe('VM-08 — reject with verification → persists decisionVerification', () => {
+    it('passes decisionVerification: BIOMETRIC to updateStatus when provided', async () => {
+      const repo = makeMockRepo();
+      const scopeHolder = makeScopeHolder('lider-user-id');
+
+      const useCase = new RejectNovedadUseCase(repo, scopeHolder);
+      await useCase.execute('nov-1', 'BIOMETRIC');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'nov-1',
+        expect.objectContaining({ decisionVerification: 'BIOMETRIC' }),
+      );
+    });
+  });
+
+  describe('VM-09 — reject without verification → persists null', () => {
+    it('passes decisionVerification: null to updateStatus when absent', async () => {
+      const repo = makeMockRepo();
+      const scopeHolder = makeScopeHolder();
+
+      const useCase = new RejectNovedadUseCase(repo, scopeHolder);
+      await useCase.execute('nov-1');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'nov-1',
+        expect.objectContaining({ decisionVerification: null }),
+      );
+    });
+  });
 });

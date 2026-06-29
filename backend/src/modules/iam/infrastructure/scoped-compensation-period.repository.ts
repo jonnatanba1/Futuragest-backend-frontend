@@ -11,7 +11,7 @@
  *   — these automatically apply applyScopeFilter(ctx, 'CompensationPeriod').
  *   SCOPE_MAPS.CompensationPeriod entry MUST exist (added in B3, scope-filter.ts).
  *
- * findOverlappingLiquidated: GLOBAL (no scope) — called by SetJornadaPolicyUseCase
+ * findOverlappingClosed: GLOBAL (no scope) — called by SetJornadaPolicyUseCase
  *   which runs with TALENTO_HUMANO / SYSTEM_ADMIN authority to check ALL periods.
  *   Uses this.delegate.findFirst directly (not via findFirstScoped).
  *
@@ -102,7 +102,7 @@ export class ScopedCompensationPeriodRepository
    * TALENTO_HUMANO / SYSTEM_ADMIN authority and needs to see ALL periods.
    * Uses this.delegate.findFirst directly (bypassing findFirstScoped intentionally).
    */
-  async findOverlappingLiquidated(vigenteDesde: Date): Promise<{ desde: string; hasta: string } | null> {
+  async findOverlappingClosed(vigenteDesde: Date): Promise<{ desde: string; hasta: string } | null> {
     // Convert Date to YYYY-MM-DD Colombia local string for string comparison.
     // We compare against the string columns `desde` and `hasta`.
     // Colombia is UTC-5; stored dates already use YYYY-MM-DD Colombia local.
@@ -149,5 +149,68 @@ export class ScopedCompensationPeriodRepository
         clientRef: data.clientRef ?? null,
       },
     }) as Promise<CompensationPeriodRecord>;
+  }
+
+  // ── SANCTIONED MUTATIONS (Fix 4 + Fix 5) ─────────────────────────────────────
+  //
+  // CompensationPeriod is otherwise immutable (Design §6). The two methods below
+  // are the ONLY permitted UPDATEs, each guarded at the DB level via updateMany
+  // with a WHERE clause ensuring idempotency.
+
+  /**
+   * Mark a period as paid (payout confirmed by HR). Fix 4.
+   *
+   * Guarded UPDATE WHERE paidAt IS NULL — only the first concurrent confirm wins.
+   * Returns the count of rows actually updated (1 = won, 0 = already paid by concurrent call).
+   * Callers must re-read and return existing when count = 0.
+   */
+  async markPaid(id: string, paidAt: Date, payoutRef: string): Promise<number> {
+    const result = await this.delegate.updateMany({
+      where: {
+        id,
+        paidAt: null,
+      } as Parameters<typeof this.delegate.updateMany>[0]['where'],
+      data: {
+        paidAt,
+        payoutRef,
+      } as Parameters<typeof this.delegate.updateMany>[0]['data'],
+    });
+    return result.count;
+  }
+
+  /**
+   * Mark a period as diverged (attendance data changed inside a closed period). Fix 5.
+   *
+   * Guarded UPDATE WHERE divergedAt IS NULL — idempotent; only first call sets the timestamp.
+   */
+  async markDiverged(id: string, divergedAt: Date): Promise<void> {
+    await this.delegate.updateMany({
+      where: {
+        id,
+        divergedAt: null,
+      } as Parameters<typeof this.delegate.updateMany>[0]['where'],
+      data: {
+        divergedAt,
+      } as Parameters<typeof this.delegate.updateMany>[0]['data'],
+    });
+  }
+
+  /**
+   * Find a closed period that covers the given YYYY-MM-DD date for an operario. Fix 5.
+   *
+   * GLOBAL read (no scope filter) — used by drift detection which is an internal
+   * cross-module concern, not a user-facing filtered query.
+   */
+  async findClosedContainingDate(
+    operarioId: string,
+    date: string,
+  ): Promise<CompensationPeriodRecord | null> {
+    return this.delegate.findFirst({
+      where: {
+        operarioId,
+        desde: { lte: date },
+        hasta: { gte: date },
+      },
+    } as Parameters<typeof this.delegate.findFirst>[0]) as Promise<CompensationPeriodRecord | null>;
   }
 }

@@ -38,7 +38,13 @@ function isSanctioned(filePath: string): boolean {
     normalized.includes('.int-spec.ts') ||
     normalized.includes('prisma/seed') ||
     normalized.includes('jest-global-setup') ||
-    normalized.includes('prisma-auth.repository')
+    normalized.includes('prisma-auth.repository') ||
+    // Fix 5: drift-marker adapter accesses CompensationPeriod globally (internal cross-module
+    // concern, not a user-facing scoped query — only touches a period found by exact id+date).
+    normalized.includes('compensation-drift-marker.adapter') ||
+    // Fix 7: supervisor zone reader uses a direct unique-key lookup on Supervisor by id
+    // (not a scoped MANY query) to resolve zoneId for close-period snapshot.
+    normalized.includes('supervisor-zone-reader')
   );
 }
 

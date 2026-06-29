@@ -22,6 +22,9 @@ function makePeriod(saldo: string): CompensationPeriodRecord {
     decidedAt: null,
     closedAt: new Date('2026-05-16T00:00:00Z'),
     clientRef: null,
+    paidAt: null,
+    payoutRef: null,
+    divergedAt: null,
     createdAt: new Date('2026-05-16T00:00:00Z'),
     updatedAt: new Date('2026-05-16T00:00:00Z'),
   };

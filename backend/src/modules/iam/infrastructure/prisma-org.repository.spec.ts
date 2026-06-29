@@ -24,6 +24,7 @@ import { PrismaOrgRepository } from './prisma-org.repository';
 import type { ScopedZoneRepository } from './scoped-zone.repository';
 import type { ScopedMunicipioRepository } from './scoped-municipio.repository';
 import type { Zone, Municipio } from '@prisma/client';
+import type { PrismaService } from '../../../database/prisma.service';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -75,9 +76,9 @@ describe('PrismaOrgRepository — createManagementUser', () => {
     const prisma = makePrisma();
     prisma.user.create.mockResolvedValue({ id: 'new-id' });
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      makeZoneRepo() as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.createManagementUser({
@@ -102,9 +103,9 @@ describe('PrismaOrgRepository — createManagementUser', () => {
     const prisma = makePrisma();
     prisma.user.create.mockResolvedValue({ id: 'new-id' });
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      makeZoneRepo() as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.createManagementUser({
@@ -121,9 +122,9 @@ describe('PrismaOrgRepository — createManagementUser', () => {
     const prisma = makePrisma();
     prisma.user.create.mockResolvedValue({ id: 'abc-123' });
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      makeZoneRepo() as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     const result = await repo.createManagementUser({
@@ -140,9 +141,9 @@ describe('PrismaOrgRepository — createManagementUser', () => {
     const p2002 = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
     prisma.user.create.mockRejectedValue(p2002);
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      makeZoneRepo() as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await expect(
@@ -160,9 +161,9 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
     // findById resolves null → zone not found
     zoneRepo.findById.mockResolvedValue(null);
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await expect(
@@ -179,9 +180,9 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
     zoneRepo.findById.mockResolvedValue({ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
     prisma.user.findUnique.mockResolvedValue(null); // user not found
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await expect(
@@ -201,9 +202,9 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
       email: 'sup@test.co',
     });
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await expect(
@@ -238,9 +239,9 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     });
 
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -275,9 +276,9 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     });
 
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -308,15 +309,20 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     });
 
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
 
+    // capturedTx is always assigned inside $transaction before assignCoordinador resolves.
+    // TS cannot see the closure assignment, so it flow-narrows capturedTx to null — go via unknown.
+    expect(capturedTx).not.toBeNull();
+    const tx = capturedTx as unknown as FakePrisma;
+
     // The updateMany (clear) must target the zone being assigned to
-    expect(capturedTx!.user.updateMany).toHaveBeenCalledWith(
+    expect(tx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ coordinatedZoneId: ZONE_ID }),
         data: { coordinatedZoneId: null },
@@ -346,15 +352,20 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
     });
 
     const repo = new PrismaOrgRepository(
-      prisma as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      prisma as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
 
+    // capturedTx is always assigned inside $transaction before assignCoordinador resolves.
+    // TS cannot see the closure assignment, so it flow-narrows capturedTx to null — go via unknown.
+    expect(capturedTx).not.toBeNull();
+    const tx = capturedTx as unknown as FakePrisma;
+
     // The update (set) must target the user being assigned
-    expect(capturedTx!.user.update).toHaveBeenCalledWith(
+    expect(tx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: USER_ID },
         data: { coordinatedZoneId: ZONE_ID },
@@ -372,9 +383,9 @@ describe('PrismaOrgRepository — findZones and findMunicipios delegation', () =
     ];
     const zoneRepo = makeZoneRepo(fakeZones);
     const repo = new PrismaOrgRepository(
-      makePrisma() as any,
-      zoneRepo as any,
-      makeMunicipioRepo() as any,
+      makePrisma() as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
     );
 
     const result = await repo.findZones();
@@ -389,9 +400,9 @@ describe('PrismaOrgRepository — findZones and findMunicipios delegation', () =
     ];
     const municipioRepo = makeMunicipioRepo(fakeMunicipios);
     const repo = new PrismaOrgRepository(
-      makePrisma() as any,
-      makeZoneRepo() as any,
-      municipioRepo as any,
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      municipioRepo as unknown as ScopedMunicipioRepository,
     );
 
     const result = await repo.findMunicipios();

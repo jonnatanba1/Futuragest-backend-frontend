@@ -192,4 +192,40 @@ describe('NovedadController (unit — mocked use-cases)', () => {
         .expect(400);
     });
   });
+
+  // ── VM-12..VM-14 — verification field forwarding on approve/reject ─────────
+
+  describe('VM-12 — PATCH approve with verification=BIOMETRIC → forwarded to use-case', () => {
+    it('calls approveUseCase.execute with verification BIOMETRIC', async () => {
+      mockApproveUseCase.execute.mockResolvedValue(makeNovedad({ status: 'APPROVED' }));
+      await request(app.getHttpServer())
+        .patch('/novedades/nov-1/approve')
+        .set('Authorization', 'Bearer skip')
+        .send({ verification: 'BIOMETRIC' })
+        .expect(200);
+      expect(mockApproveUseCase.execute).toHaveBeenCalledWith('nov-1', 'BIOMETRIC');
+    });
+  });
+
+  describe('VM-13 — PATCH reject with verification=NONE → forwarded to use-case', () => {
+    it('calls rejectUseCase.execute with verification NONE', async () => {
+      mockRejectUseCase.execute.mockResolvedValue(makeNovedad({ status: 'REJECTED' }));
+      await request(app.getHttpServer())
+        .patch('/novedades/nov-1/reject')
+        .set('Authorization', 'Bearer skip')
+        .send({ verification: 'NONE' })
+        .expect(200);
+      expect(mockRejectUseCase.execute).toHaveBeenCalledWith('nov-1', 'NONE');
+    });
+  });
+
+  describe('VM-14 — PATCH approve with invalid verification → 400', () => {
+    it('returns 400 when verification value is not a valid VerificationMethod', async () => {
+      await request(app.getHttpServer())
+        .patch('/novedades/nov-1/approve')
+        .set('Authorization', 'Bearer skip')
+        .send({ verification: 'FINGERPRINT' })
+        .expect(400);
+    });
+  });
 });

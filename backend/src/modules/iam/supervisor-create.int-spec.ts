@@ -254,18 +254,18 @@ describe('Create Supervisor Integration Suite (SUP-01..06)', () => {
     // Verify Supervisor row
     const sup = await prisma.supervisor.findUnique({ where: { id: supId } });
     expect(sup).not.toBeNull();
-    expect(sup!.zoneId).toBe(zoneZ1Id);
-    expect(sup!.municipioId).toBe(municipioM1Id);
-    expect(sup!.area).toBe('BARRIDO');
+    expect(sup?.zoneId).toBe(zoneZ1Id);
+    expect(sup?.municipioId).toBe(municipioM1Id);
+    expect(sup?.area).toBe('BARRIDO');
 
     // Verify User row
-    const user = await prisma.user.findUnique({ where: { id: sup!.userId } });
+    const user = await prisma.user.findUnique({ where: { id: sup?.userId } });
     expect(user).not.toBeNull();
-    expect(user!.email).toBe(body.email);
-    expect(user!.role).toBe('SUPERVISOR');
-    expect(user!.mustChangePassword).toBe(true);
+    expect(user?.email).toBe(body.email);
+    expect(user?.role).toBe('SUPERVISOR');
+    expect(user?.mustChangePassword).toBe(true);
     // passwordHash must never equal the plaintext
-    expect(user!.passwordHash).not.toBe(body.password);
+    expect(user?.passwordHash).not.toBe(body.password);
 
     // Track user for cleanup
     createdUserIds.push(user!.id);
@@ -286,8 +286,8 @@ describe('Create Supervisor Integration Suite (SUP-01..06)', () => {
     createdSupervisorIds.push(supId);
 
     const sup = await prisma.supervisor.findUnique({ where: { id: supId } });
-    expect(sup!.area).toBe('RECOLECCION');
-    const user = await prisma.user.findUnique({ where: { id: sup!.userId } });
+    expect(sup?.area).toBe('RECOLECCION');
+    const user = await prisma.user.findUnique({ where: { id: sup?.userId } });
     createdUserIds.push(user!.id);
   });
 
@@ -305,7 +305,7 @@ describe('Create Supervisor Integration Suite (SUP-01..06)', () => {
     // Supervisor count for that email must remain 1 (the pre-created fixture)
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     expect(user).not.toBeNull(); // user exists (fixture)
-    const supCount = await prisma.supervisor.count({ where: { userId: user!.id } });
+    const supCount = await prisma.supervisor.count({ where: { userId: user?.id } });
     expect(supCount).toBe(1);
   });
 

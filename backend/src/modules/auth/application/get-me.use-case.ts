@@ -40,20 +40,32 @@ export class GetMeUseCase {
     }
 
     if (profile.role === 'SUPERVISOR') {
+      // These fields are guaranteed non-null for SUPERVISOR rows by the DB schema
+      // and the repository projection. Guard here makes the invariant explicit.
+      if (
+        !profile.supervisorId ||
+        !profile.supervisorArea ||
+        !profile.supervisorZoneId ||
+        !profile.supervisorZoneName ||
+        !profile.supervisorMunicipioId ||
+        !profile.supervisorMunicipioName
+      ) {
+        throw new Error(`Incomplete supervisor profile for user ${profile.id}`);
+      }
       return {
         ...base,
         role: 'SUPERVISOR',
         coordinatedZone: null,
         supervisor: {
-          id: profile.supervisorId!,
-          area: profile.supervisorArea!,
+          id: profile.supervisorId,
+          area: profile.supervisorArea,
           zone: {
-            id: profile.supervisorZoneId!,
-            name: profile.supervisorZoneName!,
+            id: profile.supervisorZoneId,
+            name: profile.supervisorZoneName,
           },
           municipio: {
-            id: profile.supervisorMunicipioId!,
-            name: profile.supervisorMunicipioName!,
+            id: profile.supervisorMunicipioId,
+            name: profile.supervisorMunicipioName,
           },
         },
       };

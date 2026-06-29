@@ -12,8 +12,9 @@ import {
 } from '@mantine/core';
 import type { AttendanceDto } from '@futuragest/contracts';
 import React from 'react';
-import { useSignatureUrl } from './attendance-queries';
+import { usePhotoUrl } from './attendance-queries';
 import { formatDateTime, mapsLink } from './format';
+import { VerificationBadge } from '../../components/VerificationBadge';
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -26,19 +27,19 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function SignatureBlock({
+function PhotoBlock({
   title,
-  signatureId,
+  photoId,
   phase,
   hasKey,
 }: {
   title: string;
   /** Attendance id to fetch for, or null to disable the fetch (drawer closed / no key). */
-  signatureId: string | null;
+  photoId: string | null;
   phase: 'checkin' | 'checkout';
   hasKey: boolean;
 }) {
-  const sig = useSignatureUrl(signatureId, phase);
+  const photo = usePhotoUrl(photoId, phase);
   return (
     <>
       <Title order={5} mt="sm">
@@ -46,16 +47,16 @@ function SignatureBlock({
       </Title>
       {!hasKey ? (
         <Text size="sm" c="dimmed">
-          Sin firma registrada.
+          Sin foto registrada.
         </Text>
-      ) : sig.isLoading ? (
-        <Loader size="sm" aria-label={`Cargando firma de ${phase}`} />
-      ) : sig.isError ? (
+      ) : photo.isLoading ? (
+        <Loader size="sm" aria-label={`Cargando foto de ${phase}`} />
+      ) : photo.isError ? (
         <Alert color="red" variant="light">
-          No se pudo cargar la firma.
+          No se pudo cargar la foto.
         </Alert>
       ) : (
-        <Image src={sig.data?.url} alt={`${title} imagen`} h={160} fit="contain" bg="gray.0" />
+        <Image src={photo.data?.url} alt={`${title} imagen`} h={240} fit="contain" bg="gray.0" />
       )}
     </>
   );
@@ -105,8 +106,8 @@ export function AttendanceDetailDrawer({
   supervisorLabel: string;
   zoneName: string;
 }) {
-  const checkinSigId = opened && attendance?.signatureKey ? attendance.id : null;
-  const checkoutSigId = opened && attendance?.checkOutSignatureKey ? attendance.id : null;
+  const checkinPhotoId = opened && attendance?.checkInPhotoKey ? attendance.id : null;
+  const checkoutPhotoId = opened && attendance?.checkOutPhotoKey ? attendance.id : null;
   const completed = attendance?.completedAt != null;
 
   return (
@@ -134,6 +135,10 @@ export function AttendanceDetailDrawer({
             lng={attendance.checkInLng}
             accuracy={attendance.checkInAccuracy}
           />
+          <Field
+            label="Verificación"
+            value={<VerificationBadge method={attendance.checkInVerification} />}
+          />
 
           <Title order={5} mt="sm">
             Salida
@@ -145,18 +150,22 @@ export function AttendanceDetailDrawer({
             lng={attendance.checkOutLng}
             accuracy={attendance.checkOutAccuracy}
           />
-
-          <SignatureBlock
-            title="Firma de ingreso"
-            signatureId={checkinSigId}
-            phase="checkin"
-            hasKey={attendance.signatureKey != null}
+          <Field
+            label="Verificación"
+            value={<VerificationBadge method={attendance.checkOutVerification} />}
           />
-          <SignatureBlock
-            title="Firma de salida"
-            signatureId={checkoutSigId}
+
+          <PhotoBlock
+            title="Foto de ingreso"
+            photoId={checkinPhotoId}
+            phase="checkin"
+            hasKey={attendance.checkInPhotoKey != null}
+          />
+          <PhotoBlock
+            title="Foto de salida"
+            photoId={checkoutPhotoId}
             phase="checkout"
-            hasKey={attendance.checkOutSignatureKey != null}
+            hasKey={attendance.checkOutPhotoKey != null}
           />
         </Stack>
       )}

@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   AppShell,
+  Avatar,
   Box,
   Burger,
   Center,
@@ -9,10 +10,13 @@ import {
   Loader,
   Menu,
   NavLink,
+  Stack,
+  Text,
   Title,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { IconLogout, IconMoon, IconSun } from '@tabler/icons-react';
 import React, { Suspense } from 'react';
 import { NavLink as RouterNavLink, Outlet, useNavigate } from 'react-router-dom';
 import isotipo from '../../assets/isotipo.png';
@@ -28,7 +32,11 @@ function ColorSchemeToggle() {
       aria-label="Cambiar tema"
       onClick={toggleColorScheme}
     >
-      {colorScheme === 'dark' ? '☀' : '☾'}
+      {colorScheme === 'dark' ? (
+        <IconSun size={18} stroke={1.7} />
+      ) : (
+        <IconMoon size={18} stroke={1.7} />
+      )}
     </ActionIcon>
   );
 }
@@ -39,6 +47,7 @@ export function AppShellLayout() {
   const navigate = useNavigate();
 
   const items = user ? navItemsForRole(user.role) : [];
+  const userInitial = user?.email?.[0]?.toUpperCase() ?? '?';
 
   const handleLogout = () => {
     logout();
@@ -47,16 +56,25 @@ export function AppShellLayout() {
 
   return (
     <AppShell
-      header={{ height: 56 }}
-      navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      header={{ height: 60 }}
+      navbar={{ width: 250, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding="md"
     >
-      <AppShell.Header>
+      <AppShell.Header
+        style={{
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+        }}
+      >
         <Group h="100%" px="md" justify="space-between">
           <Group gap="sm">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Image src={isotipo} alt="" h={32} w="auto" />
-            <Title order={1} size="h4">
+            <Title
+              order={1}
+              size="h4"
+              fw={700}
+              style={{ letterSpacing: '-0.3px' }}
+            >
               FuturaGest
             </Title>
           </Group>
@@ -64,31 +82,58 @@ export function AppShellLayout() {
             <ColorSchemeToggle />
             <Menu position="bottom-end" withArrow>
               <Menu.Target>
-                <ActionIcon variant="default" size="lg" aria-label="Menú de cuenta">
-                  {user?.email?.[0]?.toUpperCase() ?? '?'}
-                </ActionIcon>
+                <Avatar
+                  radius="xl"
+                  color="brand"
+                  size={34}
+                  aria-label="Menú de cuenta"
+                  style={{ cursor: 'pointer' }}
+                >
+                  {userInitial}
+                </Avatar>
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>{user?.email}</Menu.Label>
-                <Menu.Item onClick={handleLogout}>Cerrar sesión</Menu.Item>
+                <Menu.Item
+                  leftSection={<IconLogout size={16} stroke={1.7} />}
+                  onClick={handleLogout}
+                >
+                  Cerrar sesión
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
           </Group>
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="sm">
+      <AppShell.Navbar p="md">
         <nav aria-label="Navegación principal">
-          {items.map((item) => (
-            <NavLink
-              key={item.path}
-              component={RouterNavLink}
-              to={item.path}
-              end={item.path === '/'}
-              label={item.label}
-              onClick={close}
-            />
-          ))}
+          <Text
+            size="xs"
+            c="dimmed"
+            fw={600}
+            tt="uppercase"
+            mb="xs"
+            style={{ letterSpacing: '0.5px' }}
+          >
+            Menú
+          </Text>
+          <Stack gap={4}>
+            {items.map((item) => (
+              <NavLink
+                key={item.path}
+                component={RouterNavLink}
+                to={item.path}
+                end={item.path === '/'}
+                label={item.label}
+                leftSection={<item.icon size={18} stroke={1.7} />}
+                variant="light"
+                fw={500}
+                style={{ borderRadius: 'var(--mantine-radius-md)' }}
+                onClick={close}
+              />
+            ))}
+          </Stack>
         </nav>
       </AppShell.Navbar>
 

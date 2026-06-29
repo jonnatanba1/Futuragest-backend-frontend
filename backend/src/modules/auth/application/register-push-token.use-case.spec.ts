@@ -6,6 +6,7 @@
  */
 
 import { RegisterPushTokenUseCase } from './register-push-token.use-case';
+import { MissingDeviceContextError } from '../domain/auth.errors';
 import type { AuthRepositoryPort } from '../domain/auth-repository.port';
 
 function makeMockRepo(overrides: Partial<AuthRepositoryPort> = {}): AuthRepositoryPort {
@@ -54,6 +55,67 @@ describe('RegisterPushTokenUseCase', () => {
       });
 
       expect(repo.updatePushToken).toHaveBeenCalledWith('user-2', 'device-2', 'fcm-token-xyz', undefined);
+    });
+  });
+
+  describe('PN-17b — trims pushToken/pushPlatform before storage', () => {
+    it("stores ' abc ' as 'abc' (token reaches the repo trimmed)", async () => {
+      const repo = makeMockRepo();
+      const useCase = new RegisterPushTokenUseCase(repo);
+
+      await useCase.execute({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        pushToken: ' abc ',
+      });
+
+      expect(repo.updatePushToken).toHaveBeenCalledWith('user-1', 'device-1', 'abc', undefined);
+    });
+
+    it('trims pushPlatform too when provided', async () => {
+      const repo = makeMockRepo();
+      const useCase = new RegisterPushTokenUseCase(repo);
+
+      await useCase.execute({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        pushToken: '\tfcm-token-abc\n',
+        pushPlatform: ' android ',
+      });
+
+      expect(repo.updatePushToken).toHaveBeenCalledWith('user-1', 'device-1', 'fcm-token-abc', 'android');
+    });
+  });
+
+  describe('PN-18b — rejects when deviceId is missing (deviceId-less JWT footgun)', () => {
+    it('throws MissingDeviceContextError and does NOT call the repo when deviceId is undefined', async () => {
+      const repo = makeMockRepo();
+      const useCase = new RegisterPushTokenUseCase(repo);
+
+      await expect(
+        useCase.execute({
+          userId: 'user-1',
+          deviceId: undefined,
+          pushToken: 'fcm-token-abc',
+        }),
+      ).rejects.toBeInstanceOf(MissingDeviceContextError);
+
+      expect(repo.updatePushToken).not.toHaveBeenCalled();
+    });
+
+    it('throws MissingDeviceContextError and does NOT call the repo when deviceId is empty', async () => {
+      const repo = makeMockRepo();
+      const useCase = new RegisterPushTokenUseCase(repo);
+
+      await expect(
+        useCase.execute({
+          userId: 'user-1',
+          deviceId: '',
+          pushToken: 'fcm-token-abc',
+        }),
+      ).rejects.toBeInstanceOf(MissingDeviceContextError);
+
+      expect(repo.updatePushToken).not.toHaveBeenCalled();
     });
   });
 

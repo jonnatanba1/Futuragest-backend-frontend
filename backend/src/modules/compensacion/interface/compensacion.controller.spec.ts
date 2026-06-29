@@ -23,6 +23,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Decimal } from '@prisma/client/runtime/client';
+import type { Response, Request } from 'express';
 import {
   CompensacionController,
   GET_PERIOD_BALANCE_USE_CASE,
@@ -30,13 +31,32 @@ import {
   GET_JORNADA_POLICY_TIMELINE_USE_CASE,
   CLOSE_COMPENSATION_PERIOD_USE_CASE,
   GET_PERIOD_PAYOUT_USE_CASE,
+  CONFIRM_PERIOD_PAYOUT_USE_CASE,
 } from './compensacion.controller';
 import { ROLES_KEY } from '../../iam/interface/roles.decorator';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
-import { PeriodNotClosedError } from '../domain/compensacion.errors';
+import {
+  PeriodNotClosedError,
+  NonCanonicalPeriodRangeError,
+  NonContiguousCloseError,
+  ClientRefConflictError,
+} from '../domain/compensacion.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type { CompensationPeriodRecord } from '../domain/ports/compensation-period-repository.port';
+import { AuthGuard } from '../../auth/interface/auth.guard';
+import { RolesGuard } from '../../iam/interface/roles.guard';
+import { MustChangePasswordGuard } from '../../auth/interface/must-change-password.guard';
+
+// ─── Test double factories ────────────────────────────────────────────────────
+
+function makeRes(): Response {
+  return { status: jest.fn().mockReturnThis() } as unknown as Response;
+}
+
+function makeReq(user?: Record<string, unknown>): Request {
+  return (user !== undefined ? { user } : {}) as unknown as Request;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -85,6 +105,9 @@ function makePeriodRecord(overrides: Partial<CompensationPeriodRecord> = {}): Co
     decidedAt: new Date(),
     closedAt: new Date(),
     clientRef: 'ref-abc',
+    paidAt: null,
+    payoutRef: null,
+    divergedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -98,6 +121,7 @@ describe('CompensacionController', () => {
   let mockGetTimeline: jest.Mock;
   let mockClosePeriod: jest.Mock;
   let mockPayout: jest.Mock;
+  let mockConfirmPayout: jest.Mock;
 
   beforeEach(async () => {
     mockGetBalance = jest.fn();
@@ -105,6 +129,7 @@ describe('CompensacionController', () => {
     mockGetTimeline = jest.fn();
     mockClosePeriod = jest.fn();
     mockPayout = jest.fn();
+    mockConfirmPayout = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompensacionController],
@@ -114,13 +139,14 @@ describe('CompensacionController', () => {
         { provide: GET_JORNADA_POLICY_TIMELINE_USE_CASE, useValue: { execute: mockGetTimeline } },
         { provide: CLOSE_COMPENSATION_PERIOD_USE_CASE, useValue: { execute: mockClosePeriod } },
         { provide: GET_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockPayout } },
+        { provide: CONFIRM_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockConfirmPayout } },
       ],
     })
-      .overrideGuard(require('../../auth/interface/auth.guard').AuthGuard)
+      .overrideGuard(AuthGuard)
       .useValue({ canActivate: () => true })
-      .overrideGuard(require('../../iam/interface/roles.guard').RolesGuard)
+      .overrideGuard(RolesGuard)
       .useValue({ canActivate: () => true })
-      .overrideGuard(require('../../auth/interface/must-change-password.guard').MustChangePasswordGuard)
+      .overrideGuard(MustChangePasswordGuard)
       .useValue({ canActivate: () => true })
       .compile();
 
@@ -134,8 +160,8 @@ describe('CompensacionController', () => {
       const balance = makeBalance(-0.5);
       mockGetBalance.mockResolvedValue(balance);
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', mockRes);
+      const res = makeRes();
+      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', res);
 
       expect(result).toBeDefined();
       expect(result.saldoHoras).toBe('-0.5');
@@ -148,8 +174,8 @@ describe('CompensacionController', () => {
       const balance = makeBalance(-0.5);
       mockGetBalance.mockResolvedValue(balance);
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', mockRes);
+      const res = makeRes();
+      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', res);
 
       // carryIn must be present and be a string (makeBalance sets carryIn to Decimal(0))
       expect(result.carryIn).toEqual(expect.any(String));
@@ -159,10 +185,10 @@ describe('CompensacionController', () => {
     it('EP-01b — use-case throws OperarioNotInScopeError → NotFoundException (404)', async () => {
       mockGetBalance.mockRejectedValue(new OperarioNotInScopeError('OUT-OF-SCOPE'));
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const res = makeRes();
 
       await expect(
-        controller.getPeriodBalance('OUT-OF-SCOPE', '2026-05-01', '2026-05-15', mockRes),
+        controller.getPeriodBalance('OUT-OF-SCOPE', '2026-05-01', '2026-05-15', res),
       ).rejects.toMatchObject({ status: 404 });
     });
 
@@ -176,8 +202,8 @@ describe('CompensacionController', () => {
       };
       mockGetBalance.mockResolvedValue(balance);
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', mockRes);
+      const res = makeRes();
+      const result = await controller.getPeriodBalance('O1', '2026-05-01', '2026-05-15', res);
 
       expect(result.saldoHoras).toBe('0');
       expect(result.breakdown).toHaveLength(0);
@@ -191,13 +217,13 @@ describe('CompensacionController', () => {
       const created = makePolicy('2026-07-01', 8);
       mockSetPolicy.mockResolvedValue(created);
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const res = makeRes();
       const result = await controller.setJornadaPolicy(
         { horasDiarias: 8, vigenteDesde: '2026-07-01' },
-        mockRes,
+        res,
       );
 
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect((res as unknown as { status: jest.Mock }).status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(result.horasDiarias).toBe('8');
     });
   });
@@ -247,8 +273,8 @@ describe('CompensacionController', () => {
       const period = makePeriodRecord();
       mockClosePeriod.mockResolvedValue({ period, idempotent: false });
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const mockReq = { user: { sub: 'admin-user' } } as any;
+      const res = makeRes();
+      const req = makeReq({ sub: 'admin-user' });
 
       const result = await controller.closeFortnight(
         'O1',
@@ -258,11 +284,11 @@ describe('CompensacionController', () => {
           disposition: 'CARRY_OVER',
           clientRef: 'ref-abc',
         },
-        mockRes,
-        mockReq,
+        res,
+        req,
       );
 
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect((res as unknown as { status: jest.Mock }).status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(result.periodKey).toBe('2026-05-Q1');
       expect(result.disposition).toBe('CARRY_OVER');
       expect(result.saldoHoras).toBe('-0.5');
@@ -272,8 +298,8 @@ describe('CompensacionController', () => {
       const period = makePeriodRecord();
       mockClosePeriod.mockResolvedValue({ period, idempotent: true });
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const mockReq = { user: { sub: 'admin-user' } } as any;
+      const res = makeRes();
+      const req = makeReq({ sub: 'admin-user' });
 
       const result = await controller.closeFortnight(
         'O1',
@@ -283,12 +309,96 @@ describe('CompensacionController', () => {
           disposition: 'CARRY_OVER',
           clientRef: 'ref-abc',
         },
-        mockRes,
-        mockReq,
+        res,
+        req,
       );
 
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.OK);
+      expect((res as unknown as { status: jest.Mock }).status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(result.periodKey).toBe('2026-05-Q1');
+    });
+
+    // ── Fix 9: missing user.sub → UnauthorizedException (401) ─────────────────
+    it('Fix9 — missing req.user.sub → throws UnauthorizedException (401)', async () => {
+      const res = makeRes();
+      const reqNoSub = makeReq(); // no user property at all
+
+      await expect(
+        controller.closeFortnight(
+          'O1',
+          { desde: '2026-05-01', hasta: '2026-05-15', disposition: 'CARRY_OVER' },
+          res,
+          reqNoSub,
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+
+      expect(mockClosePeriod).not.toHaveBeenCalled();
+    });
+
+    it('Fix9-nullsub — req.user exists but sub is undefined → throws UnauthorizedException (401)', async () => {
+      const res = makeRes();
+      const reqNullSub = makeReq({}); // user exists, sub absent
+
+      await expect(
+        controller.closeFortnight(
+          'O1',
+          { desde: '2026-05-01', hasta: '2026-05-15' },
+          res,
+          reqNullSub,
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+
+      expect(mockClosePeriod).not.toHaveBeenCalled();
+    });
+
+    // ── Fix 2: NonCanonicalPeriodRangeError → 422 ──────────────────────────────
+    it('Fix2-ctrl — NonCanonicalPeriodRangeError thrown by use-case → 422', async () => {
+      mockClosePeriod.mockRejectedValue(new NonCanonicalPeriodRangeError('2026-05-Q1', '2026-05-01', '2026-05-15'));
+
+      const res = makeRes();
+      const req = makeReq({ sub: 'admin-user' });
+
+      await expect(
+        controller.closeFortnight(
+          'O1',
+          { desde: '2026-05-01', hasta: '2026-05-31' },
+          res,
+          req,
+        ),
+      ).rejects.toMatchObject({ status: 422 });
+    });
+
+    // ── Fix 3: NonContiguousCloseError → 409 ───────────────────────────────────
+    it('Fix3-ctrl — NonContiguousCloseError thrown by use-case → 409', async () => {
+      mockClosePeriod.mockRejectedValue(new NonContiguousCloseError('2026-05-Q2'));
+
+      const res = makeRes();
+      const req = makeReq({ sub: 'admin-user' });
+
+      await expect(
+        controller.closeFortnight(
+          'O1',
+          { desde: '2026-06-01', hasta: '2026-06-15', disposition: 'CARRY_OVER' },
+          res,
+          req,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    // ── Fix 10: ClientRefConflictError → 409 ───────────────────────────────────
+    it('Fix10-ctrl — ClientRefConflictError thrown by use-case → 409', async () => {
+      mockClosePeriod.mockRejectedValue(new ClientRefConflictError('shared-ref'));
+
+      const res = makeRes();
+      const req = makeReq({ sub: 'admin-user' });
+
+      await expect(
+        controller.closeFortnight(
+          'O1',
+          { desde: '2026-05-01', hasta: '2026-05-15', clientRef: 'shared-ref' },
+          res,
+          req,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
     });
 
     it('EP-04d — CLOSE_ROLES metadata: only TALENTO_HUMANO and SYSTEM_ADMIN', () => {
@@ -313,21 +423,23 @@ describe('CompensacionController', () => {
         horasBase: new Decimal('8'),
         factorRecargo: new Decimal('1.25'),
         horasPagables: new Decimal('10'),
+        paidAt: null,
+        payoutRef: null,
       });
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
-      const result = await controller.getPeriodPayout('O1', '2026-05-Q1', mockRes);
+      const res = makeRes();
+      const result = await controller.getPeriodPayout('O1', '2026-05-Q1', res);
 
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.OK);
+      expect((res as unknown as { status: jest.Mock }).status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(result.horasPagables).toBe('10');
       expect(result.factorRecargo).toBe('1.25');
       expect(result.saldoHoras).toBe('8');
     });
 
     it('EP-05b — invalid periodKey → 400 BadRequest', async () => {
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const res = makeRes();
       await expect(
-        controller.getPeriodPayout('O1', 'not-a-period', mockRes),
+        controller.getPeriodPayout('O1', 'not-a-period', res),
       ).rejects.toMatchObject({ status: 400 });
       expect(mockPayout).not.toHaveBeenCalled();
     });
@@ -335,9 +447,9 @@ describe('CompensacionController', () => {
     it('EP-05c — PeriodNotClosedError → 404 NotFound', async () => {
       mockPayout.mockRejectedValue(new PeriodNotClosedError('O1', '2026-05-Q1'));
 
-      const mockRes = { status: jest.fn().mockReturnThis() } as any;
+      const res = makeRes();
       await expect(
-        controller.getPeriodPayout('O1', '2026-05-Q1', mockRes),
+        controller.getPeriodPayout('O1', '2026-05-Q1', res),
       ).rejects.toMatchObject({ status: 404 });
     });
 

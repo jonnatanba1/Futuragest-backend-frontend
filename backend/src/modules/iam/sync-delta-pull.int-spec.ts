@@ -25,7 +25,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 const request: import('supertest').SuperTestStatic = require('supertest');
 import { AppModule } from '../../app.module';
 import { createPrismaClient } from '../../database/prisma-client';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
@@ -159,7 +159,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
 
     async function createUser(email: string, role: string) {
       const user = await prisma.user.create({
-        data: { email, passwordHash, role: role as any, mustChangePassword: false },
+        data: { email, passwordHash, role: role as Role, mustChangePassword: false },
       });
       createdUserIds.push(user.id);
       await prisma.deviceSession.upsert({
@@ -261,7 +261,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get('/iam/operarios')
       .set('Authorization', `Bearer ${tokenS1}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).toContain(o1Id);
     expect(ids).not.toContain(o2Id); // scope-enforced
   });
@@ -313,7 +313,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/iam/operarios?since=${encodeURIComponent(since)}`)
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).toContain(o1Id);
   });
 
@@ -328,7 +328,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/iam/operarios?since=${encodeURIComponent(cursor)}`)
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).not.toContain(o1Id);
   });
 
@@ -337,6 +337,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
   it('SD-10: operario delta mode includes deactivated tombstones (?since= present)', async () => {
     // Record time before deactivation
     const beforeDeact = await prisma.operario.findUnique({ where: { id: o2Id } });
+    expect(beforeDeact).toBeTruthy();
     const cursor = new Date(beforeDeact!.updatedAt.getTime() - 1).toISOString();
 
     // Deactivate O2 (S2's operario — admin can see all)
@@ -347,7 +348,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get('/iam/operarios')
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(noSince.status).toBe(200);
-    const noSinceIds = noSince.body.map((o: any) => o.id);
+    const noSinceIds = noSince.body.map((o: { id: string }) => o.id);
     expect(noSinceIds).not.toContain(o2Id);
 
     // With ?since= → O2 (tombstone) IS included in delta
@@ -355,7 +356,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/iam/operarios?since=${encodeURIComponent(cursor)}`)
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).toContain(o2Id);
   });
 
@@ -366,7 +367,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get('/iam/operarios?includeInactive=true')
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).toContain(o2Id); // deactivated O2 returned with includeInactive
   });
 
@@ -391,7 +392,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .send({
         operarioId: o1Id,
         date: '2026-06-01',
-        checkInCapturedAt: new Date().toISOString(),
+        checkInCapturedAt: '2026-06-01T08:00:00.000Z',
         checkInLat: 7.5,
         checkInLng: -76.5,
         clientRef: `delta-test-${Date.now()}`,
@@ -409,7 +410,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/asistencia?since=${encodeURIComponent(cursor)}`)
       .set('Authorization', `Bearer ${tokenS1}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((a: any) => a.id);
+    const ids = res.body.map((a: { id: string }) => a.id);
     expect(ids).toContain(attId);
 
     // SD-14: ?clientRef= recovery — returns the same record
@@ -454,7 +455,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .send({
         operarioId: o1Id,
         date: '2026-06-02',
-        checkInCapturedAt: new Date().toISOString(),
+        checkInCapturedAt: '2026-06-02T08:00:00.000Z',
         checkInLat: 7.5,
         checkInLng: -76.5,
         clientRef: `cross-tenant-ref-${Date.now()}`,
@@ -492,7 +493,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .send({
         operarioId: o1Id,
         date: '2026-06-03',
-        checkInCapturedAt: new Date().toISOString(),
+        checkInCapturedAt: '2026-06-03T08:00:00.000Z',
         checkInLat: 7.5,
         checkInLng: -76.5,
         clientRef: `novedad-delta-ref-${Date.now()}`,
@@ -500,11 +501,11 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
     expect(checkInRes.status).toBe(201);
     const attId = checkInRes.body.id;
 
-    // Set signatureKey directly (bypass upload) and complete the record via direct DB update
+    // Set checkInPhotoKey directly (bypass upload) and complete the record via direct DB update
     // so checkout doesn't require a real file upload in this test.
     await prisma.attendance.update({
       where: { id: attId },
-      data: { signatureKey: 'test-sig-key', completedAt: new Date() },
+      data: { checkInPhotoKey: 'test-photo-key', completedAt: new Date() },
     });
 
     // Create novedad (requires completedAt != null)
@@ -520,7 +521,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/novedades?since=${encodeURIComponent(cursor)}`)
       .set('Authorization', `Bearer ${tokenS1}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((n: any) => n.id);
+    const ids = res.body.map((n: { id: string }) => n.id);
     expect(ids).toContain(novId);
   });
 
@@ -551,7 +552,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .get(`/iam/operarios?since=${encodeURIComponent(boundaryTs)}`)
       .set('Authorization', `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     // O1 updatedAt === boundary → inclusive, MUST be included
     expect(ids).toContain(o1Id);
   });
@@ -578,7 +579,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .send({
         operarioId: o1Id,
         date: '2026-06-10',
-        checkInCapturedAt: new Date().toISOString(),
+        checkInCapturedAt: '2026-06-10T08:00:00.000Z',
         checkInLat: 7.5,
         checkInLng: -76.5,
         clientRef: `precedence-ref-${Date.now()}`,
@@ -609,7 +610,7 @@ describe('Sync Delta Pull Integration Suite (SD-01..SD-24)', () => {
       .set('Authorization', `Bearer ${tokenS1}`);
     expect(res.status).toBe(200);
     // S1 sees only their scope — O2 (under S2) excluded
-    const ids = res.body.map((o: any) => o.id);
+    const ids = res.body.map((o: { id: string }) => o.id);
     expect(ids).not.toContain(o2Id);
   });
 });

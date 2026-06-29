@@ -53,7 +53,8 @@ export class MinioStorageAdapter implements StoragePort, OnModuleInit {
         this.logger.log(`Bucket "${bucket}" already exists.`);
       }
     } catch (err) {
-      this.logger.error(`MinIO onModuleInit failed: ${(err as Error).message}`);
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      this.logger.error(`MinIO onModuleInit failed: ${msg}`);
       // Do not throw — let the health check report degraded status
     }
   }

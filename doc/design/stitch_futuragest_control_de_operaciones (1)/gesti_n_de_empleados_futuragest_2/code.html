@@ -1,0 +1,325 @@
+<!DOCTYPE html><html lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FuturaGest - Gestión de Empleados</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f7fafc",
+                        "outline-variant": "#bdcabc",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary-fixed": "#d8e3fb",
+                        "on-tertiary-container": "#f4f6ff",
+                        "tertiary-fixed-dim": "#bcc7de",
+                        "on-tertiary": "#ffffff",
+                        "secondary-container": "#ff6a24",
+                        "surface-variant": "#e0e3e5",
+                        "on-tertiary-fixed": "#111c2d",
+                        "surface-container-low": "#f1f4f6",
+                        "on-surface-variant": "#3e4a3f",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#008243",
+                        "on-secondary-fixed-variant": "#7f2b00",
+                        "on-secondary-fixed": "#370e00",
+                        "surface-white": "#FFFFFF",
+                        "success": "#008243",
+                        "outline": "#6e7a6f",
+                        "primary-fixed-dim": "#73dc92",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#d7dadc",
+                        "background": "#f7fafc",
+                        "secondary-fixed": "#ffdbce",
+                        "on-primary-fixed-variant": "#005228",
+                        "primary": "#006633",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#eef1f3",
+                        "tertiary": "#4e596d",
+                        "secondary": "#a63b00",
+                        "surface-tint": "#006d37",
+                        "text-dark": "#000000",
+                        "surface-bright": "#f7fafc",
+                        "inverse-surface": "#2d3133",
+                        "tertiary-container": "#667186",
+                        "surface-container": "#ebeef0",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#e5e9eb",
+                        "on-primary-container": "#dcffe0",
+                        "inverse-primary": "#73dc92",
+                        "on-background": "#181c1e",
+                        "on-secondary-container": "#5a1c00",
+                        "on-surface": "#181c1e",
+                        "on-primary-fixed": "#00210d",
+                        "secondary-fixed-dim": "#ffb599",
+                        "on-tertiary-fixed-variant": "#3c475a",
+                        "warning": "#EA5B13",
+                        "error": "#ba1a1a",
+                        "primary-fixed": "#8ff9ac",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "8px",
+                        "margin-desktop": "32px",
+                        "gutter": "24px",
+                        "container-max": "1440px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Montserrat"],
+                        "body-md": ["Montserrat"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "body-lg": ["Montserrat"],
+                        "headline-md": ["Montserrat"],
+                        "label-md": ["Montserrat"],
+                        "label-sm": ["Montserrat"],
+                        "body-sm": ["Montserrat"],
+                        "headline-lg": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Montserrat', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-tertiary flex flex-col py-6 px-4 z-20">
+<div class="mb-8 px-4">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKC3goLWFB4bFiZ_Glh86d3MyVxcgW_k-5LfyA8PrTXes8O2fZmB67-5nVGKVO42R1K2tncYJ3DYvOvm0g1hSwb6g4DPrgp73LVJEJpzw5IPMYNZyf1ucNeSN7CQ6a4UpxQZwvinPbLi_Ac1wQRJtMvgR4d3UAZWoVVUafHpG8gNjgJqzJuY1FabhyugvcJ5jajRJVOc8oLzu4gz7JIkCeikskyxj5s3wLWfBUyUU-SXVcwKFA0IS2Gw7TrVTPOmQ3HzfYQd6NaA4w" alt="FuturaGest Logo" class="h-10 w-auto object-contain">
+
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 text-surface-variant hover:text-surface-white hover:bg-tertiary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-surface-variant hover:text-surface-white hover:bg-tertiary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment_ind">assignment_ind</span>
+<span class="font-label-md text-label-md">Asistencia</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-lg scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Empleados</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-surface-variant hover:text-surface-white hover:bg-tertiary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
+<span class="font-label-md text-label-md">Configuración</span>
+</a>
+</nav>
+<div class="mt-auto space-y-2 pt-4 border-t border-outline">
+<a class="flex items-center gap-3 px-4 py-3 text-surface-variant hover:text-surface-white hover:bg-tertiary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Soporte</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-surface-variant hover:text-surface-white hover:bg-tertiary-container transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Cerrar Sesión</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col ml-[260px] min-h-screen">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center h-16 px-margin-desktop bg-surface-white border-b border-outline-variant fixed top-0 w-[calc(100%-260px)] z-10">
+<div class="flex items-center w-1/3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDtX-Qmn9ZADqkgFaHP_hMsO2elifLY_-S6IETYnX0im0mnvEfltidfcBRgfv_zI6ugwU7GS62A_cM0iK0yNrfbLsGVb66_g9MgbaH5z6FHsv5uBoylNV8H44k_G7kdu-3szjWSrv6qoDia4cChGCvt1VYev_jEtQXhVI1We26o7HEFTHmjgCGRGOih2u-0QhC3jnZm-ZxL6hhVzZMWMUYCnMUjiNqDMo9CqGqYwTvmdB7FmSZcV8LcfnlutEBybLSWkWrB-g2koiz" alt="FuturaGest Isotipo" class="h-8 w-auto object-contain">
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="flex items-center gap-2 hover:bg-surface-container-low rounded-full p-1 pr-3 transition-colors border border-outline-variant">
+<img alt="Perfil de Administrador" class="w-8 h-8 rounded-full object-cover" data-alt="A professional headshot of a corporate administrator in a modern office setting, bright lighting, conveying competence and efficiency. Light mode color palette with subtle green accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdrGp4_iSWa16v7VsqtsRfBKmmjwG5VAIlH3JXsv_8kSyboC51xVSDjhWBHNHDbvKqehH-3OF37RVurbcaMzgo9U-Jkx6a6U0Dprf-4mukcTFR4BjRY-nP0kNFe-2nPKRo7EY8YQyAb2GRGALiRTZo_vKy1BlrZrlJd7r7E7necSa9bs8wNsj2YIe_wVRzzajFvTiAn5gZje54W-XfJI_RDUtxcGG1kbnjB-Kt5WvKRFcnYVTBOsh4_N2yD9n8yiRJel21NondYj00">
+<span class="font-label-sm text-label-sm text-on-surface hidden lg:block">Admin</span>
+</button>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex-1 mt-16 p-gutter bg-background overflow-x-hidden">
+<div class="max-w-[1440px] mx-auto space-y-6">
+<!-- Page Header & Actions -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Gestión de Empleados</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Administre el personal operativo y administrativo.</p>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors shadow-sm">
+<span class="material-symbols-outlined">add</span>
+                        Agregar Nuevo Empleado
+                    </button>
+</div>
+<!-- Filters Strip -->
+<div class="bg-surface-white p-4 rounded-xl border border-outline-variant flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+<div class="relative w-full md:w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 py-2.5 border border-outline-variant rounded-lg text-body-sm font-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface text-on-surface" placeholder="Buscar por nombre o cédula..." type="text">
+</div>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg text-body-sm font-label-md hover:bg-surface-container-low transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">filter_list</span>
+                            Filtros
+                        </button>
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg text-body-sm font-label-md hover:bg-surface-container-low transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">download</span>
+                            Exportar
+                        </button>
+</div>
+</div>
+<!-- Data Table Container -->
+<div class="bg-surface-white rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Empleado</th>
+<th class="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cargo</th>
+<th class="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Supervisor Asignado</th>
+<th class="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Municipio Operación</th>
+<th class="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-lowest transition-colors bg-surface-white">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<img alt="Avatar" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A male operational worker looking confident, wearing a standard industrial uniform, set against a neutral light grey background. Professional modern corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCwZG_5uax_Mf60DnMRccVBOQSmjwJXgiOC0dN1KJXrX3fYc7yUrfuzfndiQTYUznGJN85boSlWxwOxfXW7uxYWP1cJsxm_ex5guv790IP7hqtiwp4rkzTYd84wdl66Lvd1FILdtppkY_Z4AXPWhSfFFQRFVE68MI_TC-qw3x6UHfJrfJCEQe4Bkt1qzq7_GBZe6l1gmnJDGfWA9HXVoDyk17zL5vIrtmt-A3a_CqEPFCxkk_6DYxWMpRYMdYJ8l3MIGOGRMaPekQP">
+<div>
+<p class="font-label-md text-label-md text-on-surface">Carlos Mendoza</p>
+<p class="font-body-sm text-body-sm text-outline">CC: 1.023.456.789</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Operario de Limpieza Industrial</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary text-white flex items-center justify-center font-label-sm text-[10px]">MR</div>
+<span class="font-body-sm text-body-sm text-on-surface">María Rodríguez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Medellín</td>
+<td class="py-4 px-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 text-outline hover:text-primary transition-colors rounded-lg hover:bg-surface-container-low" title="Editar">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-outline hover:text-error transition-colors rounded-lg hover:bg-error-container" title="Dar de baja">
+<span class="material-symbols-outlined text-[20px]">person_remove</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-lowest transition-colors bg-surface">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<img alt="Avatar" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A female administrative employee with a friendly, professional smile, wearing a modern business casual outfit, neutral bright background, corporate SaaS context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe1DnFeXH_fD6Fa5taP1_5g12bvYCrZRR9ZgAwjxZe3UCfx7U05o7AAUFu1YO9OPzvcdUpLe4eXJWSQG2khDxaJWxjGPWFCUvj5QH7jMb22S0nVWZqAZUnTP-P7EEWsg890M9NNg0rHCSL46nnhpEcQEMrz4eiU81dJLovq2kQnfPTfCigIz2GKJRThMA8K4qZmH1yjlefEnOnhUwp6hcb6C2_mNy4yYGGZ43UoA7lbZloTTySD3sw3l0VCo0HedwJ6jKe07Wrk-c_">
+<div>
+<p class="font-label-md text-label-md text-on-surface">Ana Silva</p>
+<p class="font-body-sm text-body-sm text-outline">CC: 1.145.678.901</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Coordinadora Logística</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary text-white flex items-center justify-center font-label-sm text-[10px]">JG</div>
+<span class="font-body-sm text-body-sm text-on-surface">Javier Gómez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Envigado</td>
+<td class="py-4 px-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 text-outline hover:text-primary transition-colors rounded-lg hover:bg-surface-container-low" title="Editar">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-outline hover:text-error transition-colors rounded-lg hover:bg-error-container" title="Dar de baja">
+<span class="material-symbols-outlined text-[20px]">person_remove</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-lowest transition-colors bg-surface-white">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Luis Vargas</p>
+<p class="font-body-sm text-body-sm text-outline">CC: 71.555.222</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Técnico de Mantenimiento</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary text-white flex items-center justify-center font-label-sm text-[10px]">MR</div>
+<span class="font-body-sm text-body-sm text-on-surface">María Rodríguez</span>
+</div>
+</td>
+<td class="py-4 px-6 font-body-sm text-body-sm text-on-surface">Bello</td>
+<td class="py-4 px-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 text-outline hover:text-primary transition-colors rounded-lg hover:bg-surface-container-low" title="Editar">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-outline hover:text-error transition-colors rounded-lg hover:bg-error-container" title="Dar de baja">
+<span class="material-symbols-outlined text-[20px]">person_remove</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-surface-white border-t border-outline-variant flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Mostrando 1 a 3 de 45 registros</span>
+<div class="flex gap-1">
+<button class="p-1.5 rounded border border-outline-variant text-outline hover:bg-surface-container-low disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="px-3 py-1.5 rounded bg-primary text-on-primary font-label-sm text-label-sm">1</button>
+<button class="px-3 py-1.5 rounded border border-outline-variant text-on-surface hover:bg-surface-container-low font-label-sm text-label-sm">2</button>
+<button class="px-3 py-1.5 rounded border border-outline-variant text-on-surface hover:bg-surface-container-low font-label-sm text-label-sm">3</button>
+<span class="px-2 py-1.5 text-outline">...</span>
+<button class="p-1.5 rounded border border-outline-variant text-outline hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>

@@ -5,7 +5,7 @@
  * Runtime behavior is unchanged — controllers keep returning plain objects/interfaces.
  */
 
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 // ─── Shared nested DTOs ────────────────────────────────────────────────────────
 

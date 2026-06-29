@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ClosePeriodRequest,
   CompensationPeriodDto,
+  ConfirmPayoutRequest,
   CreateJornadaPolicyRequest,
   JornadaPolicyDto,
   PeriodBalanceDto,
@@ -85,6 +86,27 @@ export function useClosePeriodMutation() {
       qc.invalidateQueries({ queryKey: ['compensacion', 'balance', operarioId] });
       // Also invalidate payout for this operario.
       qc.invalidateQueries({ queryKey: ['compensacion', 'payout', operarioId] });
+    },
+  });
+}
+
+/**
+ * Confirms (liquidates) a payout for a closed period.
+ * On success, invalidates the payout query and the balance query for this operario.
+ */
+export function useConfirmPayoutMutation() {
+  const qc = useQueryClient();
+  return useMutation<
+    PeriodPayoutDto,
+    Error,
+    { operarioId: string; body: ConfirmPayoutRequest }
+  >({
+    mutationFn: ({ operarioId, body }) => compensacionApi.confirmPayout(operarioId, body),
+    onSuccess: (_data, { operarioId }) => {
+      // Invalidate payout so the panel re-fetches with the stamped paidAt/payoutRef.
+      qc.invalidateQueries({ queryKey: ['compensacion', 'payout', operarioId] });
+      // Also invalidate balance — the period record now carries paidAt/payoutRef.
+      qc.invalidateQueries({ queryKey: ['compensacion', 'balance', operarioId] });
     },
   });
 }

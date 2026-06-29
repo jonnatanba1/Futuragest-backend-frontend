@@ -2,6 +2,7 @@ import type {
   AttendanceDto,
   ClosePeriodRequest,
   CompensationPeriodDto,
+  ConfirmPayoutRequest,
   CreateJornadaPolicyRequest,
   CreateOperarioRequest,
   ImportResultDto,
@@ -12,7 +13,7 @@ import type {
   OperarioDto,
   PeriodBalanceDto,
   PeriodPayoutDto,
-  SignatureUrlResponseDto,
+  PhotoUrlResponseDto,
   SupervisorDto,
   ZoneResponseDto,
 } from '@futuragest/contracts';
@@ -288,12 +289,12 @@ export const asistenciaApi = {
       `/asistencia${opts.since ? `?since=${encodeURIComponent(opts.since)}` : ''}`,
     ),
 
-  /** Presigned URL for an attendance signature image (check-in or check-out). */
-  getSignatureUrl: (
+  /** Presigned URL for an attendance photo (check-in or check-out). */
+  getPhotoUrl: (
     id: string,
     phase: 'checkin' | 'checkout' = 'checkin',
-  ): Promise<SignatureUrlResponseDto> =>
-    request<SignatureUrlResponseDto>('GET', `/asistencia/${id}/signature?phase=${phase}`),
+  ): Promise<PhotoUrlResponseDto> =>
+    request<PhotoUrlResponseDto>('GET', `/asistencia/${id}/photo?phase=${phase}`),
 };
 
 export interface HealthResponse {
@@ -326,6 +327,10 @@ export const compensacionApi = {
       'GET',
       `/compensacion/${operarioId}/payout?periodKey=${encodeURIComponent(periodKey)}`,
     ),
+
+  /** POST /compensacion/:operarioId/payout/confirm */
+  confirmPayout: (operarioId: string, body: ConfirmPayoutRequest): Promise<PeriodPayoutDto> =>
+    request<PeriodPayoutDto>('POST', `/compensacion/${operarioId}/payout/confirm`, { body }),
 
   /** GET /jornada-policy */
   getJornadaPolicies: (): Promise<JornadaPolicyDto[]> =>

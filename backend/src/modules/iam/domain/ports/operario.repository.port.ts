@@ -22,6 +22,7 @@ export interface OperarioRepositoryPort {
     fullName: string;
     documento: string;
     supervisorId: string;
+    cargo: string;
   }): Promise<Operario>;
 
   /**
@@ -53,7 +54,7 @@ export interface OperarioRepositoryPort {
    * Returns the count of successfully inserted rows.
    */
   bulkCreate(
-    rows: Array<{ fullName: string; documento: string; supervisorId: string }>,
+    rows: Array<{ fullName: string; documento: string; supervisorId: string; cargo: string }>,
   ): Promise<number>;
 
   /**

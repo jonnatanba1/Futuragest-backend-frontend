@@ -9,7 +9,7 @@
  * scoped-novedad.repository.ts file to satisfy the meta-guard scan.
  */
 
-import type { Novedad, NovedadStatus } from '@prisma/client';
+import type { Novedad, NovedadStatus, VerificationMethod } from '@prisma/client';
 
 export const NOVEDAD_REPOSITORY_PORT = Symbol('NovedadRepositoryPort');
 
@@ -28,6 +28,8 @@ export interface UpdateNovedadStatusData {
   status: NovedadStatus;
   approvedByUserId: string | null;
   decidedAt: Date | null;
+  /** Audit label only — no authorization logic may depend on this field. */
+  decisionVerification: VerificationMethod | null;
 }
 
 export interface NovedadRepositoryPort {

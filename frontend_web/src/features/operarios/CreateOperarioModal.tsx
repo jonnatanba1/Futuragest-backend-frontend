@@ -25,7 +25,7 @@ export function CreateOperarioModal({
   const form = useForm({
     mode: 'uncontrolled',
     validateInputOnBlur: true,
-    initialValues: { fullName: '', documento: '', supervisorId: '' },
+    initialValues: { fullName: '', documento: '', supervisorId: '', cargo: '' },
     validate: {
       fullName: (v) => (v.trim().length > 0 ? null : 'Ingrese el nombre completo'),
       documento: (v) => (/^\d{5,}$/.test(v.trim()) ? null : 'Ingrese un número de documento válido'),
@@ -46,6 +46,7 @@ export function CreateOperarioModal({
         fullName: values.fullName.trim(),
         documento: values.documento.trim(),
         supervisorId: values.supervisorId,
+        cargo: values.cargo.trim(),
       });
       notifications.show({ color: 'teal', message: 'Operario creado' });
       handleClose();
@@ -87,6 +88,12 @@ export function CreateOperarioModal({
             required
             key={form.key('supervisorId')}
             {...form.getInputProps('supervisorId')}
+          />
+          <TextInput
+            label="Cargo"
+            placeholder="Ej: Barrido, Recolección"
+            key={form.key('cargo')}
+            {...form.getInputProps('cargo')}
           />
           <Button type="submit" loading={createOperario.isPending}>
             Crear operario

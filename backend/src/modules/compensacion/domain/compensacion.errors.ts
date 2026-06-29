@@ -106,6 +106,108 @@ export class DispositionRequiredError extends Error {
   }
 }
 
+// ── Audit fix error classes ───────────────────────────────────────────────────
+
+/**
+ * Thrown when the requested [desde, hasta] dates do not match the canonical
+ * fortnight range for the derived periodKey.
+ * Q1 canonical: desde = day 01, hasta = day 15.
+ * Q2 canonical: desde = day 16, hasta = last day of month.
+ * HTTP 422 — NON_CANONICAL_PERIOD_RANGE.
+ */
+export class NonCanonicalPeriodRangeError extends Error {
+  readonly httpStatus = 422 as const;
+  readonly code = 'NON_CANONICAL_PERIOD_RANGE' as const;
+
+  constructor(periodKey: string, expectedDesde: string, expectedHasta: string) {
+    super(
+      `El rango de fechas no corresponde a la quincena canónica "${periodKey}". ` +
+        `Se esperaba desde="${expectedDesde}" hasta="${expectedHasta}".`,
+    );
+    this.name = 'NonCanonicalPeriodRangeError';
+  }
+}
+
+/**
+ * Thrown when attempting to close a fortnight (Q3) while a gap period (Q2)
+ * with unconsumed debt (CARRY_OVER, saldo < 0) exists between the last closed
+ * period and the one being closed.
+ * HTTP 409 — NON_CONTIGUOUS_CLOSE.
+ */
+export class NonContiguousCloseError extends Error {
+  readonly httpStatus = 409 as const;
+  readonly code = 'NON_CONTIGUOUS_CLOSE' as const;
+
+  constructor(gapPeriodKey: string) {
+    super(
+      `Existe una quincena anterior con deuda arrastrada sin cerrar las quincenas intermedias. ` +
+        `La quincena "${gapPeriodKey}" tiene saldo negativo (CARRY_OVER) pendiente. ` +
+        `Cierre primero las quincenas intermedias antes de continuar.`,
+    );
+    this.name = 'NonContiguousCloseError';
+  }
+}
+
+/**
+ * Thrown when a P2002 unique constraint violation occurs on clientRef but
+ * no CompensationPeriod exists for this operario+periodKey (cross-operario collision).
+ * HTTP 409 — CLIENT_REF_CONFLICT.
+ */
+export class ClientRefConflictError extends Error {
+  readonly httpStatus = 409 as const;
+  readonly code = 'CLIENT_REF_CONFLICT' as const;
+
+  constructor(clientRef: string) {
+    super(
+      `El clientRef "${clientRef}" ya está en uso por otra quincena. ` +
+        `Utilice un clientRef único para cada cierre de quincena.`,
+    );
+    this.name = 'ClientRefConflictError';
+  }
+}
+
+// ── Audit fix error classes (Fix 7) ───────────────────────────────────────────
+
+/**
+ * Thrown when the supervisor's zoneId cannot be resolved during period close.
+ * Closing a period without a real zoneId corrupts the snapshot for COORDINADOR
+ * scope filtering — fail loudly instead of defaulting to an empty string.
+ * HTTP 422 — ZONE_ID_RESOLUTION_FAILED.
+ */
+export class ZoneIdResolutionError extends Error {
+  readonly httpStatus = 422 as const;
+  readonly code = 'ZONE_ID_RESOLUTION_FAILED' as const;
+
+  constructor(operarioId: string, supervisorId: string | null) {
+    super(
+      `No se pudo resolver el zoneId del supervisor "${supervisorId ?? '(sin supervisorId)'}" ` +
+        `para el operario "${operarioId}". ` +
+        `El cierre de quincena requiere un zoneId válido para el filtrado de COORDINADOR.`,
+    );
+    this.name = 'ZoneIdResolutionError';
+  }
+}
+
+// ── Fix 4 error classes ─────────────────────────────────────────────────────────
+
+/**
+ * Thrown when a payout confirmation is requested for a period whose saldo <= 0.
+ * A period with zero or negative saldo has nothing to pay.
+ * HTTP 422 — NOTHING_TO_PAY.
+ */
+export class NothingToPayError extends Error {
+  readonly httpStatus = 422 as const;
+  readonly code = 'NOTHING_TO_PAY' as const;
+
+  constructor(operarioId: string, periodKey: string) {
+    super(
+      `El período "${periodKey}" del operario "${operarioId}" tiene saldo cero o negativo. ` +
+        `No hay horas positivas para liquidar.`,
+    );
+    this.name = 'NothingToPayError';
+  }
+}
+
 // ── PR-C error classes ──────────────────────────────────────────────────────────
 
 /**

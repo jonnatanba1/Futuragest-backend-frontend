@@ -1,7 +1,7 @@
 /**
  * Asistencia integration suite.
  *
- * Covers AT-01..AT-11, AT-18..AT-29 (check-in, check-out, signature, reads).
+ * Covers AT-01..AT-11, AT-18..AT-29 (check-in, check-out, photo, reads).
  * StoragePort is MOCKED — no real MinIO calls.
  * Uses --runInBand (configured in test:int script).
  *
@@ -28,6 +28,7 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
+import { toBogotaDate } from './domain/bogota-date';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -263,13 +264,18 @@ describe('Asistencia Integration Suite', () => {
     clientRef?: string;
     extraBody?: Record<string, unknown>;
   }) {
+    const checkInDate = opts.date ?? toBogotaDate(new Date());
+    const checkInCapturedAt = opts.date
+      ? `${opts.date}T08:00:00.000Z`
+      : new Date().toISOString();
+
     return request(app.getHttpServer())
       .post('/asistencia/check-in')
       .set('Authorization', `Bearer ${opts.token}`)
       .send({
         operarioId: opts.operarioId ?? o1Id,
-        date: opts.date ?? '2026-05-31',
-        checkInCapturedAt: new Date().toISOString(),
+        date: checkInDate,
+        checkInCapturedAt,
         checkInLat: opts.lat ?? 7.5,
         checkInLng: opts.lng ?? -76.5,
         clientRef: opts.clientRef ?? `test-ref-${Date.now()}-${Math.random()}`,
@@ -292,8 +298,8 @@ describe('Asistencia Integration Suite', () => {
       expect(body.zoneId).toBe(zoneZ1Id);      // from JWT, not body
       expect(body.operarioId).toBe(o1Id);
       expect(body.completedAt).toBeNull();
-      expect(body.signatureKey).toBeNull();
-      expect(body.checkOutSignatureKey).toBeNull();
+      expect(body.checkInPhotoKey).toBeNull();
+      expect(body.checkOutPhotoKey).toBeNull();
       expect(body.checkInReceivedAt).toBeDefined();
 
       // Cleanup
@@ -308,7 +314,7 @@ describe('Asistencia Integration Suite', () => {
         .send({
           operarioId: o1Id,
           date: '2026-05-31',
-          checkInCapturedAt: new Date().toISOString(),
+          checkInCapturedAt: '2026-05-31T08:00:00.000Z',
           checkInLat: 7.5,
           checkInLng: -76.5,
           clientRef,
@@ -400,10 +406,10 @@ describe('Asistencia Integration Suite', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SIGNATURE scenarios
+  // PHOTO scenarios
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('Signature upload', () => {
+  describe('Photo upload', () => {
     let attId: string;
     const sigDate = '2025-02-01';
     const sigRef = `sig-test-${Date.now()}`;
@@ -419,22 +425,22 @@ describe('Asistencia Integration Suite', () => {
       await prisma.attendance.deleteMany({ where: { id: attId } });
     });
 
-    it('AT-11 — upload signature for own in-progress record → 200 + signatureKey set', async () => {
-      const expectedKey = `signatures/${s1Id}/${attId}.png`;
+    it('AT-11 — upload photo for own in-progress record → 200 + checkInPhotoKey set', async () => {
+      const expectedKey = `photos/${s1Id}/${attId}-checkin.png`;
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
 
       const resp = await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature`)
+        .post(`/asistencia/${attId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'signature.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         })
         .expect(200);
 
       const body = resp.body as any;
       expect(body.attendanceId).toBe(attId);
-      expect(body.signatureKey).toBe(expectedKey);
+      expect(body.photoKey).toBe(expectedKey);
 
       // Verify StoragePort.putObject was called
       expect(mockStoragePort.putObject).toHaveBeenCalledWith(
@@ -446,15 +452,15 @@ describe('Asistencia Integration Suite', () => {
 
       // Verify DB updated
       const dbRecord = await prisma.attendance.findUnique({ where: { id: attId } });
-      expect(dbRecord?.signatureKey).toBe(expectedKey);
+      expect(dbRecord?.checkInPhotoKey).toBe(expectedKey);
     });
 
-    it('AT-12 — upload signature for out-of-scope record (S2 token) → 404', async () => {
+    it('AT-12 — upload photo for out-of-scope record (S2 token) → 404', async () => {
       await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature`)
+        .post(`/asistencia/${attId}/photo`)
         .set('Authorization', `Bearer ${tokenS2}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'signature.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         })
         .expect(404);
@@ -462,29 +468,29 @@ describe('Asistencia Integration Suite', () => {
 
     it('AT-17 — wrong mime type → 422', async () => {
       await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature`)
+        .post(`/asistencia/${attId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from('%PDF'), {
-          filename: 'signature.pdf',
+          filename: 'photo.pdf',
           contentType: 'application/pdf',
         })
         .expect(422);
     });
 
-    it('AT-16 — re-upload overwrites signatureKey (idempotent)', async () => {
-      const expectedKey = `signatures/${s1Id}/${attId}.png`;
+    it('AT-16 — re-upload overwrites checkInPhotoKey (idempotent)', async () => {
+      const expectedKey = `photos/${s1Id}/${attId}-checkin.png`;
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
 
       const resp = await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature`)
+        .post(`/asistencia/${attId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'signature2.png',
+          filename: 'photo2.png',
           contentType: 'image/png',
         })
         .expect(200);
 
-      expect((resp.body as any).signatureKey).toBe(expectedKey);
+      expect((resp.body as any).photoKey).toBe(expectedKey);
     });
   });
 
@@ -493,7 +499,7 @@ describe('Asistencia Integration Suite', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Check-out', () => {
-    it('AT-19 — check-out WITHOUT signature → 422 SignatureRequiredError', async () => {
+    it('AT-19 — check-out WITHOUT photo → 422 PhotoRequiredError', async () => {
       const clientRef = `co-no-sig-${Date.now()}`;
       const ciResp = await checkIn({ token: tokenS1, date: '2025-03-01', clientRef }).expect(201);
       const attId = (ciResp.body as any).id;
@@ -501,7 +507,7 @@ describe('Asistencia Integration Suite', () => {
       await request(app.getHttpServer())
         .post(`/asistencia/${attId}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .send({ checkOutCapturedAt: new Date().toISOString(), checkOutLat: 7.5, checkOutLng: -76.5 })
+        .send({ checkOutCapturedAt: '2025-03-01T16:00:00.000Z', checkOutLat: 7.5, checkOutLng: -76.5 })
         .expect(422);
 
       // completedAt must remain null
@@ -511,19 +517,19 @@ describe('Asistencia Integration Suite', () => {
       await prisma.attendance.deleteMany({ where: { id: attId } });
     });
 
-    it('AT-18 — check-out WITH checkout signature → 200 + completedAt set', async () => {
+    it('AT-18 — check-out WITH checkout photo → 200 + completedAt set', async () => {
       const clientRef = `co-with-sig-${Date.now()}`;
       const date = '2025-03-02';
       const ciResp = await checkIn({ token: tokenS1, date, clientRef }).expect(201);
       const attId = (ciResp.body as any).id;
 
-      // Upload checkout-phase signature (required for check-out)
+      // Upload checkout-phase photo (required for check-out)
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
       await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature?phase=checkout`)
+        .post(`/asistencia/${attId}/photo?phase=checkout`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'sig.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         })
         .expect(200);
@@ -532,7 +538,7 @@ describe('Asistencia Integration Suite', () => {
       const coResp = await request(app.getHttpServer())
         .post(`/asistencia/${attId}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .send({ checkOutCapturedAt: new Date().toISOString(), checkOutLat: 7.5, checkOutLng: -76.5 })
+        .send({ checkOutCapturedAt: '2025-03-02T16:00:00.000Z', checkOutLat: 7.5, checkOutLng: -76.5 })
         .expect(200);
 
       const body = coResp.body as any;
@@ -549,13 +555,13 @@ describe('Asistencia Integration Suite', () => {
       const ciResp = await checkIn({ token: tokenS1, date, clientRef }).expect(201);
       const attId = (ciResp.body as any).id;
 
-      // Upload checkout-phase signature
+      // Upload checkout-phase photo
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
       await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature?phase=checkout`)
+        .post(`/asistencia/${attId}/photo?phase=checkout`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'sig.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         });
 
@@ -563,14 +569,14 @@ describe('Asistencia Integration Suite', () => {
       await request(app.getHttpServer())
         .post(`/asistencia/${attId}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .send({ checkOutCapturedAt: new Date().toISOString(), checkOutLat: 7.5, checkOutLng: -76.5 })
+        .send({ checkOutCapturedAt: '2025-03-03T16:00:00.000Z', checkOutLat: 7.5, checkOutLng: -76.5 })
         .expect(200);
 
       // Second check-out → 409
       await request(app.getHttpServer())
         .post(`/asistencia/${attId}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .send({ checkOutCapturedAt: new Date().toISOString(), checkOutLat: 7.5, checkOutLng: -76.5 })
+        .send({ checkOutCapturedAt: '2025-03-03T16:05:00.000Z', checkOutLat: 7.5, checkOutLng: -76.5 })
         .expect(409);
 
       await prisma.attendance.deleteMany({ where: { id: attId } });
@@ -605,12 +611,12 @@ describe('Asistencia Integration Suite', () => {
       const ciResp = await checkIn({ token: tokenS1, date, clientRef }).expect(201);
       const attId = (ciResp.body as any).id;
 
-      // Upload checkout-phase signature so we get past SignatureRequiredError
+      // Upload checkout-phase photo so we get past PhotoRequiredError
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
       await request(app.getHttpServer())
-        .post(`/asistencia/${attId}/signature?phase=checkout`)
+        .post(`/asistencia/${attId}/photo?phase=checkout`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .attach('file', Buffer.from([0x89]), { filename: 'sig.png', contentType: 'image/png' });
+        .attach('file', Buffer.from([0x89]), { filename: 'photo.png', contentType: 'image/png' });
 
       await request(app.getHttpServer())
         .post(`/asistencia/${attId}/check-out`)
@@ -644,7 +650,7 @@ describe('Asistencia Integration Suite', () => {
         .send({
           operarioId: o2Id,
           date: listDate,
-          checkInCapturedAt: new Date().toISOString(),
+          checkInCapturedAt: `${listDate}T08:00:00.000Z`,
           checkInLat: 7.5,
           checkInLng: -76.5,
           clientRef: listRefS2,
@@ -654,7 +660,7 @@ describe('Asistencia Integration Suite', () => {
     });
 
     afterAll(async () => {
-      await prisma.attendance.deleteMany({ where: { id: { in: [s1AttId, s2AttId] } } });
+      await prisma.attendance.deleteMany({ where: { id: { in: [s1AttId, s2AttId].filter(Boolean) } } });
     });
 
     it('AT-24 — SUPERVISOR S1 GET list → only sees own records (not S2)', async () => {
@@ -726,10 +732,10 @@ describe('Asistencia Integration Suite', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SIGNATURE GET scenarios
+  // PHOTO GET scenarios
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('Signature GET', () => {
+  describe('Photo GET', () => {
     let attWithSigId: string;
     let attNoSigId: string;
     const sigGetDate = '2025-05-01';
@@ -737,15 +743,15 @@ describe('Asistencia Integration Suite', () => {
     const sigGetRef2 = `sig-get-2-${Date.now()}`;
 
     beforeAll(async () => {
-      // Create attendance with signature
+      // Create attendance with photo
       const r1 = await checkIn({ token: tokenS1, date: sigGetDate, clientRef: sigGetRef1 }).expect(201);
       attWithSigId = (r1.body as any).id;
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
       await request(app.getHttpServer())
-        .post(`/asistencia/${attWithSigId}/signature`)
+        .post(`/asistencia/${attWithSigId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'sig.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         });
 
@@ -755,14 +761,14 @@ describe('Asistencia Integration Suite', () => {
     });
 
     afterAll(async () => {
-      await prisma.attendance.deleteMany({ where: { id: { in: [attWithSigId, attNoSigId] } } });
+      await prisma.attendance.deleteMany({ where: { id: { in: [attWithSigId, attNoSigId].filter(Boolean) } } });
     });
 
-    it('AT-13 — SUPERVISOR GET signature for own record → 200 with url', async () => {
+    it('AT-13 — SUPERVISOR GET photo for own record → 200 with url', async () => {
       mockStoragePort.getPresignedGetUrl.mockResolvedValueOnce('https://minio.example/presigned');
 
       const resp = await request(app.getHttpServer())
-        .get(`/asistencia/${attWithSigId}/signature`)
+        .get(`/asistencia/${attWithSigId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .expect(200);
 
@@ -770,45 +776,45 @@ describe('Asistencia Integration Suite', () => {
       expect(mockStoragePort.getPresignedGetUrl).toHaveBeenCalled();
     });
 
-    it('AT-14 — GET signature when none uploaded → 404', async () => {
+    it('AT-14 — GET photo when none uploaded → 404', async () => {
       await request(app.getHttpServer())
-        .get(`/asistencia/${attNoSigId}/signature`)
+        .get(`/asistencia/${attNoSigId}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .expect(404);
     });
 
-    it('AT-16 — COORDINADOR C1 (Z1) GET signature for Z1 record → 200', async () => {
+    it('AT-16 — COORDINADOR C1 (Z1) GET photo for Z1 record → 200', async () => {
       mockStoragePort.getPresignedGetUrl.mockResolvedValueOnce('https://minio.example/presigned');
 
       const resp = await request(app.getHttpServer())
-        .get(`/asistencia/${attWithSigId}/signature`)
+        .get(`/asistencia/${attWithSigId}/photo`)
         .set('Authorization', `Bearer ${tokenC1}`)
         .expect(200);
 
       expect((resp.body as any).url).toBeDefined();
     });
 
-    it('AT-17 — COORDINADOR C2 (Z2) GET signature for Z1 record → 404 (cross-zone fail-closed)', async () => {
+    it('AT-17 — COORDINADOR C2 (Z2) GET photo for Z1 record → 404 (cross-zone fail-closed)', async () => {
       await request(app.getHttpServer())
-        .get(`/asistencia/${attWithSigId}/signature`)
+        .get(`/asistencia/${attWithSigId}/photo`)
         .set('Authorization', `Bearer ${tokenC2}`)
         .expect(404);
     });
 
     it('AT-15 — upload to completed record → 409', async () => {
-      // Create a fresh attendance, upload checkout signature, checkout, then try re-upload
+      // Create a fresh attendance, upload checkout photo, checkout, then try re-upload
       const ref = `completed-sig-${Date.now()}`;
       const date = '2025-05-03';
       const r = await checkIn({ token: tokenS1, date, clientRef: ref }).expect(201);
       const id = (r.body as any).id;
 
-      // Upload checkout-phase signature (required for check-out)
+      // Upload checkout-phase photo (required for check-out)
       mockStoragePort.putObject.mockResolvedValueOnce(undefined);
       await request(app.getHttpServer())
-        .post(`/asistencia/${id}/signature?phase=checkout`)
+        .post(`/asistencia/${id}/photo?phase=checkout`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'sig.png',
+          filename: 'photo.png',
           contentType: 'image/png',
         });
 
@@ -816,15 +822,15 @@ describe('Asistencia Integration Suite', () => {
       await request(app.getHttpServer())
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
-        .send({ checkOutCapturedAt: new Date().toISOString(), checkOutLat: 7.5, checkOutLng: -76.5 })
+        .send({ checkOutCapturedAt: '2025-05-03T16:00:00.000Z', checkOutLat: 7.5, checkOutLng: -76.5 })
         .expect(200);
 
-      // Now try to upload signature again → 409 (record is now completed/immutable)
+      // Now try to upload photo again → 409 (record is now completed/immutable)
       await request(app.getHttpServer())
-        .post(`/asistencia/${id}/signature`)
+        .post(`/asistencia/${id}/photo`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .attach('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
-          filename: 'sig2.png',
+          filename: 'photo2.png',
           contentType: 'image/png',
         })
         .expect(409);
@@ -839,7 +845,7 @@ describe('Asistencia Integration Suite', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Check-out idempotency (SI-09..SI-14)', () => {
-    // Helper: create an attendance with checkout signature set directly in DB
+    // Helper: create an attendance with checkout photo set directly in DB
     async function createAttendanceWithSig(opts: {
       date: string;
       clientRef: string;
@@ -853,10 +859,10 @@ describe('Asistencia Integration Suite', () => {
         operarioId: opts.operarioId,
       }).expect(201);
       const id = (ciResp.body as any).id as string;
-      // Set checkOutSignatureKey directly so we bypass signature upload for checkout
+      // Set checkOutPhotoKey directly so we bypass photo upload for checkout
       await prisma.attendance.update({
         where: { id },
-        data: { checkOutSignatureKey: `signatures/${s1Id}/${id}-checkout.png` },
+        data: { checkOutPhotoKey: `photos/${s1Id}/${id}-checkout.png` },
       });
       return { id, clientRef: opts.clientRef };
     }
@@ -872,7 +878,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-01T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI09',
@@ -902,7 +908,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-02T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI10',
@@ -917,7 +923,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date(Date.now() + 60_000).toISOString(),
+          checkOutCapturedAt: '2025-06-02T16:01:00.000Z',
           checkOutLat: 9.0,
           checkOutLng: -77.0,
           checkOutClientRef: 'CREF-SI10',
@@ -947,7 +953,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-03T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI11',
@@ -959,7 +965,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-03T16:05:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-OTHER',
@@ -988,7 +994,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-04T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI12',
@@ -1000,7 +1006,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-04T16:05:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
         })
@@ -1024,7 +1030,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-05T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
         })
@@ -1038,7 +1044,7 @@ describe('Asistencia Integration Suite', () => {
       await prisma.attendance.deleteMany({ where: { id } });
     });
 
-    it('SI-14 — check-out: no signature → 422 (unchanged)', async () => {
+    it('SI-14 — check-out: no photo → 422 (unchanged)', async () => {
       const clientRef = `si14-${Date.now()}`;
       const ciResp = await checkIn({ token: tokenS1, date: '2025-06-06', clientRef }).expect(201);
       const id = (ciResp.body as any).id;
@@ -1047,7 +1053,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-06T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-NEW',
@@ -1074,7 +1080,7 @@ describe('Asistencia Integration Suite', () => {
       const id = (ciResp.body as any).id as string;
       await prisma.attendance.update({
         where: { id },
-        data: { checkOutSignatureKey: `signatures/${s1Id}/${id}-checkout.png` },
+        data: { checkOutPhotoKey: `photos/${s1Id}/${id}-checkout.png` },
       });
       return { id, clientRef: opts.clientRef };
     }
@@ -1091,7 +1097,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/by-client-ref/${checkInClientRef}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-07T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
         })
@@ -1114,7 +1120,7 @@ describe('Asistencia Integration Suite', () => {
         .send({
           operarioId: o2Id,
           date: '2025-06-08',
-          checkInCapturedAt: new Date().toISOString(),
+          checkInCapturedAt: '2025-06-08T08:00:00.000Z',
           checkInLat: 7.5,
           checkInLng: -76.5,
           clientRef: checkInRef,
@@ -1164,7 +1170,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/by-client-ref/${checkInClientRef}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-09T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI22',
@@ -1178,7 +1184,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/by-client-ref/${checkInClientRef}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date(Date.now() + 60_000).toISOString(),
+          checkOutCapturedAt: '2025-06-09T16:01:00.000Z',
           checkOutLat: 9.0,
           checkOutLng: -77.0,
           checkOutClientRef: 'CREF-SI22',
@@ -1205,7 +1211,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/by-client-ref/${checkInClientRef}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-10T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI23',
@@ -1217,7 +1223,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/by-client-ref/${checkInClientRef}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-10T16:05:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-OTHER',
@@ -1280,14 +1286,14 @@ describe('Asistencia Integration Suite', () => {
       const id = (ciResp.body as any).id;
       await prisma.attendance.update({
         where: { id },
-        data: { checkOutSignatureKey: `signatures/${s1Id}/${id}-checkout.png` },
+        data: { checkOutPhotoKey: `photos/${s1Id}/${id}-checkout.png` },
       });
 
       await request(app.getHttpServer())
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-22T16:00:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-SI26',
@@ -1298,7 +1304,7 @@ describe('Asistencia Integration Suite', () => {
         .post(`/asistencia/${id}/check-out`)
         .set('Authorization', `Bearer ${tokenS1}`)
         .send({
-          checkOutCapturedAt: new Date().toISOString(),
+          checkOutCapturedAt: '2025-06-22T16:05:00.000Z',
           checkOutLat: 7.5,
           checkOutLng: -76.5,
           checkOutClientRef: 'CREF-DIFF',

@@ -24,7 +24,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { Zone, Municipio } from '@prisma/client';
+import type { Zone, Municipio, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
   OrgRepositoryPort,
@@ -104,9 +104,9 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
     //    Step A: release current holder of target zone (if any)
     //    Step B: assign target user to the zone
     //    This ordering is MANDATORY: set-before-clear would transiently violate @unique.
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Step A: clear coordinatedZoneId on any user currently holding this zone
-      await (tx as any).user.updateMany({
+      await tx.user.updateMany({
         where: { coordinatedZoneId: zoneId },
         data: { coordinatedZoneId: null },
       });
@@ -114,7 +114,7 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
       // Step B: set coordinatedZoneId on the target user
       // This also moves the user off any OTHER zone they previously coordinated,
       // because coordinatedZoneId is a single column — overwriting it is the move.
-      await (tx as any).user.update({
+      await tx.user.update({
         where: { id: userId },
         data: { coordinatedZoneId: zoneId },
       });

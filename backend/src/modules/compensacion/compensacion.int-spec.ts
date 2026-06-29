@@ -22,6 +22,7 @@
 
 import type { PrismaClient } from '@prisma/client';
 import { createPrismaClient } from '../../database/prisma-client';
+import type { PrismaService } from '../../database/prisma.service';
 import { SetJornadaPolicyUseCase } from './application/set-jornada-policy.use-case';
 import { CalculatePeriodBalanceUseCase } from './application/calculate-period-balance.use-case';
 import { GetPeriodBalanceUseCase } from './application/get-period-balance.use-case';
@@ -35,6 +36,7 @@ import { ScopedAttendanceRepository } from '../iam/infrastructure/scoped-attenda
 import { ScopedOperarioRepository } from '../iam/infrastructure/scoped-operario.repository';
 import { ScopedCompensationPeriodRepository } from '../iam/infrastructure/scoped-compensation-period.repository';
 import { ScopeContextHolder } from '../auth/domain/scope-context';
+import { SupervisorZoneReaderAdapter } from '../iam/infrastructure/supervisor-zone-reader';
 
 // ─── NOTE ────────────────────────────────────────────────────────────────────
 // These tests require a real Postgres connection (DATABASE_URL in .env.test).
@@ -74,8 +76,6 @@ describe('Compensacion integration (real Prisma)', () => {
   // Real seeded SYSTEM_ADMIN user id — used as approvedByUserId (FK to User)
   let adminUserId: string;
 
-  // Seed IDs used by INT-04 (supervisor must exist in test DB for FK)
-  const INT04_SUPERVISOR_ID = 'int04-supervisor';
   const INT04_OPERARIO_ID = 'int04-operario';
   // INT-02/INT-03: separate seed operario to avoid conflicts
   const INT02_OPERARIO_ID = 'int02-operario';
@@ -83,14 +83,14 @@ describe('Compensacion integration (real Prisma)', () => {
   beforeAll(async () => {
     prisma = createPrismaClient();
     await prisma.$connect();
-    policyRepo = new JornadaPolicyRepository(prisma as any);
+    policyRepo = new JornadaPolicyRepository(prisma as unknown as PrismaService);
     calcUseCase = new CalculatePeriodBalanceUseCase();
 
     // Set up real scoped repos with an unrestricted scope (SYSTEM_ADMIN)
     const scopeHolder = new UnrestrictedScopeHolder();
-    attendanceRepo = new ScopedAttendanceRepository(prisma as any, scopeHolder);
-    operarioRepo = new ScopedOperarioRepository(prisma as any, scopeHolder);
-    periodRepo = new ScopedCompensationPeriodRepository(prisma as any, scopeHolder);
+    attendanceRepo = new ScopedAttendanceRepository(prisma as unknown as PrismaService, scopeHolder);
+    operarioRepo = new ScopedOperarioRepository(prisma as unknown as PrismaService, scopeHolder);
+    periodRepo = new ScopedCompensationPeriodRepository(prisma as unknown as PrismaService, scopeHolder);
 
     // PR-B: real period lookup (replaces NullCompensationPeriodLookup stub)
     setJornadaPolicy = new SetJornadaPolicyUseCase(policyRepo, periodRepo);
@@ -103,12 +103,15 @@ describe('Compensacion integration (real Prisma)', () => {
       periodRepo,
     );
 
+    const supervisorZoneReader = new SupervisorZoneReaderAdapter(prisma as unknown as PrismaService);
+
     closePeriod = new CloseCompensationPeriodUseCase(
       periodRepo,
       attendanceRepo,
       policyRepo,
       calcUseCase,
       operarioRepo,
+      supervisorZoneReader,
     );
 
     // Resolve the seeded SYSTEM_ADMIN to satisfy the approvedByUserId FK
@@ -215,7 +218,7 @@ describe('Compensacion integration (real Prisma)', () => {
         checkOutCapturedAt: new Date('2026-05-01T14:00:00Z'), // 7h
         completedAt: new Date('2026-05-01T14:00:00Z'),
         clientRef: clientRef1,
-        signatureKey: null,
+        checkInPhotoKey: null,
         checkInAccuracy: null,
       },
     });
@@ -233,7 +236,7 @@ describe('Compensacion integration (real Prisma)', () => {
         checkOutCapturedAt: new Date('2026-05-02T16:00:00Z'), // 9h
         completedAt: new Date('2026-05-02T16:00:00Z'),
         clientRef: clientRef2,
-        signatureKey: null,
+        checkInPhotoKey: null,
         checkInAccuracy: null,
       },
     });

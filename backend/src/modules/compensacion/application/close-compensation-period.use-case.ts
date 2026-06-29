@@ -20,11 +20,12 @@
  */
 
 import { Decimal } from '@prisma/client/runtime/client';
-import { derivePeriodKey } from './derive-period-key';
+import { derivePeriodKey, deriveFortnightRange, derivePreviousPeriodKey } from './derive-period-key';
 import { CalculatePeriodBalanceUseCase } from './calculate-period-balance.use-case';
 import type { AttendanceReaderPort } from '../domain/ports/attendance-reader.port';
 import type { JornadaPolicyRepositoryPort } from '../domain/ports/jornada-policy-repository.port';
 import type { OperarioReaderPort } from '../domain/ports/operario-reader.port';
+import type { SupervisorZoneReaderPort } from '../domain/ports/supervisor-zone-reader.port';
 import type {
   CompensationPeriodRepositoryPort,
   CompensationPeriodRecord,
@@ -33,6 +34,10 @@ import type {
 import {
   CompensationPeriodAlreadyClosedError,
   DispositionRequiredError,
+  NonCanonicalPeriodRangeError,
+  NonContiguousCloseError,
+  ClientRefConflictError,
+  ZoneIdResolutionError,
 } from '../domain/compensacion.errors';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 
@@ -58,6 +63,7 @@ export class CloseCompensationPeriodUseCase {
     private readonly policyRepo: JornadaPolicyRepositoryPort,
     private readonly calcUseCase: CalculatePeriodBalanceUseCase,
     private readonly operarioReader: OperarioReaderPort,
+    private readonly supervisorZoneReader: SupervisorZoneReaderPort,
   ) {}
 
   async execute(input: CloseCompensationPeriodInput): Promise<CloseCompensationPeriodResult> {
@@ -72,6 +78,12 @@ export class CloseCompensationPeriodUseCase {
     // Derive periodKey from the `desde` date (Q1 = days 1-15, Q2 = days 16-end)
     const periodKey = derivePeriodKey(desde);
 
+    // Fix 2: Canonical fortnight range validation — hasta must match exactly
+    const canonical = deriveFortnightRange(periodKey);
+    if (desde !== canonical.desde || hasta !== canonical.hasta) {
+      throw new NonCanonicalPeriodRangeError(periodKey, canonical.desde, canonical.hasta);
+    }
+
     // 2. Idempotency check — if period already closed for this operario+periodKey
     const existing = await this.periodRepo.findByOperarioAndPeriod(operarioId, periodKey);
     if (existing !== null) {
@@ -84,14 +96,31 @@ export class CloseCompensationPeriodUseCase {
     }
 
     // 3. Compute live balance
-    //    carryIn: if previous period exists with CARRY_OVER disposition and negative saldo,
-    //    carry its saldo into this period. Otherwise carryIn = 0.
+    //    Fix 3: carryIn applies ONLY from the IMMEDIATE predecessor (exact prevKey match).
+    //    If the most-recent earlier closed period is NOT the immediate predecessor AND
+    //    it carries unconsumed debt (CARRY_OVER, saldo < 0) → NonContiguousCloseError (409).
+    //    If the gap-period has no debt, proceed with carryIn = 0 (harmless gap).
     const prevKey = derivePreviousPeriodKey(periodKey);
     let carryIn = new Decimal(0);
     if (prevKey !== null) {
-      const prevPeriod = await this.periodRepo.findPreviousClosed(operarioId, periodKey);
-      if (prevPeriod !== null && prevPeriod.disposition === 'CARRY_OVER' && prevPeriod.saldo.isNegative()) {
-        carryIn = prevPeriod.saldo;
+      // Look up the EXACT immediate predecessor
+      const exactPrev = await this.periodRepo.findByOperarioAndPeriod(operarioId, prevKey);
+      if (exactPrev !== null && exactPrev.disposition === 'CARRY_OVER' && exactPrev.saldo.isNegative()) {
+        carryIn = exactPrev.saldo;
+      }
+
+      // Gap-debt check: is there a more-recent-than-prevKey period with unconsumed debt?
+      // If the most-recent earlier closed period is NOT prevKey and has CARRY_OVER debt → reject.
+      if (exactPrev === null) {
+        const mostRecentPrev = await this.periodRepo.findPreviousClosed(operarioId, periodKey);
+        if (
+          mostRecentPrev !== null &&
+          mostRecentPrev.periodKey !== prevKey &&
+          mostRecentPrev.disposition === 'CARRY_OVER' &&
+          mostRecentPrev.saldo.isNegative()
+        ) {
+          throw new NonContiguousCloseError(mostRecentPrev.periodKey);
+        }
       }
     }
 
@@ -105,23 +134,25 @@ export class CloseCompensationPeriodUseCase {
       throw new DispositionRequiredError(periodKey);
     }
 
-    // Resolve denormalized scope fields from operario record
-    // (operario shape from OperarioReaderPort may include supervisorId; fallback to empty string)
+    // Fix 7: resolve denormalized scope fields via separate supervisor query (W4 rule).
+    // zoneId is NOT a field on Operario — it lives on the Supervisor model.
+    // We must issue a separate query (resolveSupervisorByEmail precedent in ScopedOperarioRepository).
+    // Fail loudly if the supervisor's zoneId cannot be resolved — a '' default would silently
+    // corrupt every snapshot and break COORDINADOR scope filtering.
     const operarioRecord = operario as {
       id: string;
       supervisorId?: string | null;
-      supervisor?: { id?: string; zoneId?: string } | null;
-      zoneId?: string | null;
     };
 
-    // supervisorId is a direct field on Operario; zoneId comes via supervisor relation.
-    // In integration, the real scoped operario record will have these fields.
-    // For unit tests, we read from the record or default to empty strings.
-    const resolvedSupervisorId = operarioRecord.supervisorId ?? '';
-    // zoneId is not directly on Operario — it's on supervisor. The int-spec provides it
-    // via the full Operario record from the DB. In unit tests we mock supervisorId/zoneId
-    // through a helper operario object.
-    const resolvedZoneId = (operarioRecord as Record<string, unknown>)['zoneId'] as string ?? '';
+    const resolvedSupervisorId = operarioRecord.supervisorId ?? null;
+    if (!resolvedSupervisorId) {
+      throw new ZoneIdResolutionError(operarioId, null);
+    }
+
+    const resolvedZoneId = await this.supervisorZoneReader.findZoneIdBySupervisorId(resolvedSupervisorId);
+    if (!resolvedZoneId) {
+      throw new ZoneIdResolutionError(operarioId, resolvedSupervisorId);
+    }
 
     // 5. Single immutable CREATE
     try {
@@ -144,15 +175,21 @@ export class CloseCompensationPeriodUseCase {
 
       return { period, idempotent: false };
     } catch (err: unknown) {
-      // P2002 = unique constraint violation (race: concurrent close request)
+      // P2002 = unique constraint violation (race: concurrent close request, or cross-operario clientRef collision)
       if (isPrismaP2002(err)) {
-        // Re-fetch — another request already closed this period
+        // Re-fetch — another request may have already closed this period
         const raceExisting = await this.periodRepo.findByOperarioAndPeriod(operarioId, periodKey);
         if (raceExisting !== null) {
+          // Same operario+periodKey was closed concurrently
           if (clientRef && raceExisting.clientRef === clientRef) {
             return { period: raceExisting, idempotent: true };
           }
           throw new CompensationPeriodAlreadyClosedError(operarioId, periodKey);
+        }
+        // Fix 10: No period found for THIS operario+key → the constraint was on clientRef
+        // from a DIFFERENT operario (cross-operario collision). Throw a clean 409.
+        if (clientRef) {
+          throw new ClientRefConflictError(clientRef);
         }
       }
       throw err;
@@ -161,36 +198,6 @@ export class CloseCompensationPeriodUseCase {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Derives the period key immediately preceding the given one.
- * "YYYY-MM-Q1" → "YYYY-(MM-1)-Q2" (or previous month's Q2).
- * "YYYY-MM-Q2" → "YYYY-MM-Q1".
- * Returns null if the period is the very first possible key.
- */
-function derivePreviousPeriodKey(periodKey: string): string | null {
-  // periodKey format: "YYYY-MM-Q1" or "YYYY-MM-Q2"
-  const parts = periodKey.split('-'); // ["YYYY", "MM", "Q1"] or ["YYYY", "MM", "Q2"]
-  if (parts.length !== 3) return null;
-
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  const half = parts[2]; // "Q1" or "Q2"
-
-  if (half === 'Q2') {
-    // Previous is Q1 of the same month
-    return `${parts[0]}-${parts[1]}-Q1`;
-  }
-
-  // half === "Q1" → previous is Q2 of the previous month
-  if (month === 1) {
-    // January Q1 → December Q2 of previous year
-    return `${year - 1}-12-Q2`;
-  }
-
-  const prevMonth = String(month - 1).padStart(2, '0');
-  return `${parts[0]}-${prevMonth}-Q2`;
-}
 
 /**
  * Type guard for Prisma P2002 unique constraint violation errors.

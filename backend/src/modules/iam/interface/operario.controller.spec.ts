@@ -26,14 +26,9 @@ import {
   OperarioNotFoundError,
 } from '../domain/operario.errors';
 import { RolesGuard } from './roles.guard';
-import { ROLES_KEY } from './roles.decorator';
 import { Reflector } from '@nestjs/core';
 
 // ─── Mock guards ─────────────────────────────────────────────────────────────
-
-const mockAuthGuard = {
-  canActivate: jest.fn().mockReturnValue(true),
-};
 
 const mockRolesGuard = {
   canActivate: jest.fn().mockReturnValue(true),
@@ -110,6 +105,7 @@ describe('OperarioController', () => {
         fullName: 'Ana Lopez',
         documento: '99887766',
         supervisorId: 'sup-1',
+        cargo: '',
       });
     });
 

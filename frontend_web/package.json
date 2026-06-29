@@ -11,18 +11,20 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@futuragest/contracts": "workspace:*",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@mantine/charts": "^7",
     "@mantine/core": "^7",
     "@mantine/form": "^7",
     "@mantine/hooks": "^7",
     "@mantine/notifications": "^7",
+    "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6"
+    "react-router-dom": "^6",
+    "recharts": "^2"
   },
   "devDependencies": {
-    "@futuragest/tsconfig": "workspace:*",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

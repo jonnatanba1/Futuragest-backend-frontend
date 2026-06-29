@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, authApi, compensacionApi, setUnauthorizedHandler } from './client';
+import type { ConfirmPayoutRequest } from '@futuragest/contracts';
 import { tokenStore } from '../auth/token-store';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -176,6 +177,36 @@ describe('compensacionApi', () => {
     expect(result[0].horasDiarias).toBe('8.00');
     const [url] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/jornada-policy$/);
+  });
+
+  it('confirmPayout POSTs to /compensacion/:operarioId/payout/confirm with body', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          operarioId: 'op-1',
+          periodKey: '2026-05-Q1',
+          saldoHoras: '2.50',
+          horasBase: '2.50',
+          factorRecargo: '1.25',
+          horasPagables: '3.13',
+          paidAt: '2026-06-10T12:00:00.000Z',
+          payoutRef: 'ref-uuid-001',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const body: ConfirmPayoutRequest = { periodKey: '2026-05-Q1' };
+    const result = await compensacionApi.confirmPayout('op-1', body);
+
+    expect(result.paidAt).toBe('2026-06-10T12:00:00.000Z');
+    expect(result.payoutRef).toBe('ref-uuid-001');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/compensacion/op-1/payout/confirm');
+    expect(init?.method).toBe('POST');
+    const sent = JSON.parse(init?.body as string);
+    expect(sent.periodKey).toBe('2026-05-Q1');
   });
 
   it('createJornadaPolicy POSTs to /jornada-policy', async () => {

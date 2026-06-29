@@ -30,6 +30,7 @@ import {
   Query,
   Req,
   Res,
+  UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiProperty } from '@nestjs/swagger';
@@ -48,6 +49,7 @@ import type { SetJornadaPolicyUseCase } from '../application/set-jornada-policy.
 import type { GetJornadaPolicyTimelineUseCase } from '../application/get-jornada-policy-timeline.use-case';
 import type { CloseCompensationPeriodUseCase } from '../application/close-compensation-period.use-case';
 import type { GetPeriodPayoutUseCase, PeriodPayout } from '../application/get-period-payout.use-case';
+import type { ConfirmPeriodPayoutUseCase, ConfirmedPayout } from '../application/confirm-period-payout.use-case';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type {
@@ -61,7 +63,12 @@ import {
   JornadaPolicyInvalidHorasError,
   CompensationPeriodAlreadyClosedError,
   DispositionRequiredError,
+  NonCanonicalPeriodRangeError,
+  NonContiguousCloseError,
+  ClientRefConflictError,
   PeriodNotClosedError,
+  NothingToPayError,
+  ZoneIdResolutionError,
 } from '../domain/compensacion.errors';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import {
@@ -79,6 +86,7 @@ export const SET_JORNADA_POLICY_USE_CASE = Symbol('SetJornadaPolicyUseCase');
 export const GET_JORNADA_POLICY_TIMELINE_USE_CASE = Symbol('GetJornadaPolicyTimelineUseCase');
 export const CLOSE_COMPENSATION_PERIOD_USE_CASE = Symbol('CloseCompensationPeriodUseCase');
 export const GET_PERIOD_PAYOUT_USE_CASE = Symbol('GetPeriodPayoutUseCase');
+export const CONFIRM_PERIOD_PAYOUT_USE_CASE = Symbol('ConfirmPeriodPayoutUseCase');
 
 // ─── Role constants ────────────────────────────────────────────────────────────
 
@@ -179,6 +187,24 @@ function mapDomainError(err: unknown): never {
   if (err instanceof PeriodNotClosedError) {
     throw new NotFoundException({ error: err.code, message: err.message });
   }
+  // Audit fix errors
+  if (err instanceof NonCanonicalPeriodRangeError) {
+    throw new UnprocessableEntityException({ error: err.code, message: err.message });
+  }
+  if (err instanceof NonContiguousCloseError) {
+    throw new ConflictException({ error: err.code, message: err.message });
+  }
+  if (err instanceof ClientRefConflictError) {
+    throw new ConflictException({ error: err.code, message: err.message });
+  }
+  // Fix 4 errors
+  if (err instanceof NothingToPayError) {
+    throw new UnprocessableEntityException({ error: err.code, message: err.message });
+  }
+  // Fix 7 errors
+  if (err instanceof ZoneIdResolutionError) {
+    throw new UnprocessableEntityException({ error: err.code, message: err.message });
+  }
   throw err;
 }
 
@@ -234,11 +260,19 @@ function serializePeriod(period: CompensationPeriodRecord): CompensationPeriodRe
     decidedAt: period.decidedAt?.toISOString() ?? null,
     closedAt: period.closedAt.toISOString(),
     clientRef: period.clientRef,
+    paidAt: period.paidAt?.toISOString() ?? null,
+    payoutRef: period.payoutRef ?? null,
+    divergedAt: period.divergedAt?.toISOString() ?? null,
     createdAt: period.createdAt.toISOString(),
   };
 }
 
-function serializePayout(payout: PeriodPayout): PeriodPayoutResponseDto {
+function serializePayout(
+  payout: PeriodPayout | ConfirmedPayout,
+  paidAt?: Date | null,
+  payoutRef?: string | null,
+): PeriodPayoutResponseDto {
+  const confirmedPayout = payout as ConfirmedPayout;
   return {
     operarioId: payout.operarioId,
     periodKey: payout.periodKey,
@@ -246,10 +280,21 @@ function serializePayout(payout: PeriodPayout): PeriodPayoutResponseDto {
     horasBase: payout.horasBase.toString(),
     factorRecargo: payout.factorRecargo.toString(),
     horasPagables: payout.horasPagables.toString(),
+    paidAt: (confirmedPayout.paidAt ?? paidAt ?? null)?.toISOString() ?? null,
+    payoutRef: confirmedPayout.payoutRef ?? payoutRef ?? null,
   };
 }
 
 // ─── Controller ───────────────────────────────────────────────────────────────
+
+// Body DTO for confirm-payout endpoint
+export class ConfirmPayoutBody {
+  @ApiProperty({ description: 'Canonical fortnight identifier e.g. "2026-05-Q1"', example: '2026-05-Q1' })
+  @MatchesValidator(/^\d{4}-\d{2}-Q[12]$/, {
+    message: 'periodKey debe tener el formato YYYY-MM-Q1 o YYYY-MM-Q2',
+  })
+  periodKey!: string;
+}
 
 @Controller()
 export class CompensacionController {
@@ -264,6 +309,8 @@ export class CompensacionController {
     private readonly closeUseCase: Pick<CloseCompensationPeriodUseCase, 'execute'>,
     @Inject(GET_PERIOD_PAYOUT_USE_CASE)
     private readonly payoutUseCase: Pick<GetPeriodPayoutUseCase, 'execute'>,
+    @Inject(CONFIRM_PERIOD_PAYOUT_USE_CASE)
+    private readonly confirmPayoutUseCase: Pick<ConfirmPeriodPayoutUseCase, 'execute'>,
   ) {}
 
   // ── GET /compensacion/:operarioId?desde&hasta ─────────────────────────────
@@ -354,8 +401,14 @@ export class CompensacionController {
       throw new BadRequestException('"desde" no puede ser posterior a "hasta"');
     }
 
-    // Extract authenticated user id from JWT subject (set by AuthGuard)
-    const approvedByUserId = (req as unknown as { user?: { sub?: string } }).user?.sub ?? 'unknown';
+    // Extract authenticated user id from JWT subject (set by AuthGuard).
+    // Fix 9: missing sub → UnauthorizedException (401) — closing a fortnight with an
+    // anonymous author is not permitted (immutable audit trail requires a real user id).
+    const sub = (req as unknown as { user?: { sub?: string } }).user?.sub;
+    if (!sub) {
+      throw new UnauthorizedException('Se requiere autenticación para cerrar una quincena.');
+    }
+    const approvedByUserId = sub;
 
     try {
       const { period, idempotent } = await this.closeUseCase.execute({
@@ -396,6 +449,39 @@ export class CompensacionController {
       const payout = await this.payoutUseCase.execute({ operarioId, periodKey });
       res.status(HttpStatus.OK);
       return serializePayout(payout);
+    } catch (err) {
+      mapDomainError(err);
+    }
+  }
+
+  // ── POST /compensacion/:operarioId/payout/confirm ─────────────────────────
+  // Confirms (liquidates) a closed period's payout — stamps paidAt + payoutRef.
+  // Idempotent: repeated calls with the same period return the existing confirmation.
+  // Fix 4: payout is no longer infinitely re-executable without a record.
+
+  @Roles(...PAYOUT_ROLES)
+  @Post('compensacion/:operarioId/payout/confirm')
+  @ApiOkResponse({ type: PeriodPayoutResponseDto })
+  async confirmPeriodPayout(
+    @Param('operarioId') operarioId: string,
+    @Body() body: ConfirmPayoutBody,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ): Promise<PeriodPayoutResponseDto> {
+    // confirmedByUserId from JWT subject — required for audit trail
+    const sub = (req as unknown as { user?: { sub?: string } }).user?.sub;
+    if (!sub) {
+      throw new UnauthorizedException('Se requiere autenticación para confirmar un pago.');
+    }
+
+    try {
+      const confirmed = await this.confirmPayoutUseCase.execute({
+        operarioId,
+        periodKey: body.periodKey,
+        confirmedByUserId: sub,
+      });
+      res.status(HttpStatus.OK);
+      return serializePayout(confirmed);
     } catch (err) {
       mapDomainError(err);
     }

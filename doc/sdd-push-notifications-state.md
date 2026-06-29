@@ -23,14 +23,16 @@ All gates green: contracts build, typecheck clean, migration deployed, firebase-
 
 ## IMPORTANT — Flutter Team API Note
 
-### Token Registration Route (CORRECTED)
+### Token Registration Route (CORRECTED 2026-06-10 — matches deployed code)
 
-**Endpoint**: `PUT /auth/devices/me/push-token` (NOT `POST /auth/push-token`)
+**Endpoint**: `POST /auth/push-token` (verified against `auth.controller.ts`; an earlier
+version of this note incorrectly stated `PUT /auth/devices/me/push-token` — that route
+does not exist)
 
 Route resolves the device from JWT claims (`userId` + `deviceId`), NOT from request body.
 
 ```
-PUT /auth/devices/me/push-token
+POST /auth/push-token
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
@@ -42,8 +44,11 @@ Content-Type: application/json
 
 **Response**:
 - `204 No Content` — success
-- `400 Bad Request` — missing `pushToken` field
+- `400 Bad Request` — missing or empty `pushToken` field
 - `401 Unauthorized` — no JWT, unauthenticated, or session revoked
+
+**Unregister**: `DELETE /auth/push-token` (no body) — clears the token for the current
+device session. Returns `204` (idempotent), `401` if unauthenticated.
 
 The `pushPlatform` field is optional and stored for future APNs/platform-specific routing.
 
@@ -51,7 +56,8 @@ The `pushPlatform` field is optional and stored for future APNs/platform-specifi
 
 1. Set `FIREBASE_ENABLED=true` in the environment
 2. Provide Firebase service-account JSON credentials (backend/secrets/firebase-service-account.json, not committed)
-3. Add `firebase-admin` to backend dependencies: `pnpm add firebase-admin`
+3. `firebase-admin` is already a backend dependency (added in c9975b9; the adapter still
+   loads it lazily inside the send path, so the module stays import-safe)
 4. The FcmNotificationAdapter's dynamic-import send path will light up automatically
 5. No backend code changes required — NotificationsModule selects FcmAdapter at runtime
 
@@ -96,7 +102,8 @@ Push notifications sent to all active LIDER_OPERATIVO users with registered toke
 - DeviceSession.revokedAt = null
 - DeviceSession.pushToken ≠ null
 
-Optional: include SYSTEM_ADMIN via `NOTIFY_SYSTEM_ADMIN=true` (default off)
+Optional: include SYSTEM_ADMIN via `PUSH_NOTIFY_SYSTEM_ADMIN=true` (default off; the
+env var the code reads is `PUSH_NOTIFY_SYSTEM_ADMIN`, see `recipient-resolver.ts`)
 
 System-level query (no zone filtering; LIDER_OPERATIVO is globally scoped)
 
@@ -130,10 +137,11 @@ Exported from `@futuragest/contracts` package.
 
 ## Warnings (Non-Critical)
 
-1. **Route naming discrepancy** (doc level only)
-   - Earlier spec/design text mentioned `POST /auth/push-token`
-   - Implementation deployed as `PUT /auth/devices/me/push-token`
-   - Implementation is correct and tested; documentation needs sync
+1. **Route naming discrepancy** (RESOLVED 2026-06-10)
+   - Implementation is `POST /auth/push-token` + `DELETE /auth/push-token`
+     (controller, contracts package, and tests all agree)
+   - An earlier version of this document claimed `PUT /auth/devices/me/push-token`;
+     that route never existed in code — the Flutter API note above is now corrected
 
 2. **Migration timestamp hand-authored**
    - `20260531220000` chosen to sort after `20260531210000_add_reference_updatedat`

@@ -28,25 +28,32 @@ import { ATTENDANCE_REPOSITORY_PORT } from './domain/ports/attendance-repository
 import type { AttendanceRepositoryPort } from './domain/ports/attendance-repository.port';
 import { STORAGE_PORT } from '../storage/domain/storage.port';
 import type { StoragePort } from '../storage/domain/storage.port';
+// Fix 5: drift marker port — CompensacionModule provides the adapter under this token.
+import {
+  COMPENSATION_DRIFT_MARKER_PORT,
+  type CompensationDriftMarkerPort,
+} from './domain/ports/compensation-drift-marker.port';
 import { CheckInAttendanceUseCase } from './application/check-in-attendance.use-case';
 import { CheckOutAttendanceUseCase } from './application/check-out-attendance.use-case';
 import { ListAttendanceUseCase } from './application/list-attendance.use-case';
 import { GetAttendanceUseCase } from './application/get-attendance.use-case';
-import { UploadSignatureUseCase } from './application/upload-signature.use-case';
-import { GetSignatureUrlUseCase } from './application/get-signature-url.use-case';
+import { UploadPhotoUseCase } from './application/upload-photo.use-case';
+import { GetPhotoUrlUseCase } from './application/get-photo-url.use-case';
 import {
   AttendanceController,
   CHECK_IN_USE_CASE,
   CHECK_OUT_USE_CASE,
   LIST_ATTENDANCE_USE_CASE,
   GET_ATTENDANCE_USE_CASE,
-  UPLOAD_SIGNATURE_USE_CASE,
-  GET_SIGNATURE_URL_USE_CASE,
+  UPLOAD_PHOTO_USE_CASE,
+  GET_PHOTO_URL_USE_CASE,
   ATTENDANCE_REPO,
 } from './interface/attendance.controller';
+// Fix 5: import CompensacionModule to get the drift-marker adapter for CheckOutAttendanceUseCase.
+import { CompensacionModule } from '../compensacion/compensacion.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, IamModule, StorageModule],
+  imports: [PrismaModule, AuthModule, IamModule, StorageModule, CompensacionModule],
   controllers: [AttendanceController],
   providers: [
     // ── ScopedAttendanceRepository — request-scoped (needs SCOPE_CONTEXT_HOLDER) ──
@@ -81,11 +88,15 @@ import {
     },
 
     // ── CheckOutAttendanceUseCase — REQUEST-SCOPED ────────────────────────────
+    // Fix 5: inject optional drift-marker so completed check-outs trigger divergedAt.
     {
       provide: CHECK_OUT_USE_CASE,
       scope: Scope.REQUEST,
-      useFactory: (repo: AttendanceRepositoryPort) => new CheckOutAttendanceUseCase(repo),
-      inject: [ATTENDANCE_REPOSITORY_PORT],
+      useFactory: (
+        repo: AttendanceRepositoryPort,
+        driftMarker: CompensationDriftMarkerPort,
+      ) => new CheckOutAttendanceUseCase(repo, driftMarker),
+      inject: [ATTENDANCE_REPOSITORY_PORT, COMPENSATION_DRIFT_MARKER_PORT],
     },
 
     // ── ListAttendanceUseCase — REQUEST-SCOPED ────────────────────────────────
@@ -104,21 +115,21 @@ import {
       inject: [ATTENDANCE_REPOSITORY_PORT],
     },
 
-    // ── UploadSignatureUseCase — REQUEST-SCOPED ───────────────────────────────
+    // ── UploadPhotoUseCase — REQUEST-SCOPED ───────────────────────────────────
     {
-      provide: UPLOAD_SIGNATURE_USE_CASE,
+      provide: UPLOAD_PHOTO_USE_CASE,
       scope: Scope.REQUEST,
       useFactory: (repo: AttendanceRepositoryPort, storage: StoragePort) =>
-        new UploadSignatureUseCase(repo, storage),
+        new UploadPhotoUseCase(repo, storage),
       inject: [ATTENDANCE_REPOSITORY_PORT, STORAGE_PORT],
     },
 
-    // ── GetSignatureUrlUseCase — REQUEST-SCOPED ───────────────────────────────
+    // ── GetPhotoUrlUseCase — REQUEST-SCOPED ───────────────────────────────────
     {
-      provide: GET_SIGNATURE_URL_USE_CASE,
+      provide: GET_PHOTO_URL_USE_CASE,
       scope: Scope.REQUEST,
       useFactory: (repo: AttendanceRepositoryPort, storage: StoragePort) =>
-        new GetSignatureUrlUseCase(repo, storage),
+        new GetPhotoUrlUseCase(repo, storage),
       inject: [ATTENDANCE_REPOSITORY_PORT, STORAGE_PORT],
     },
   ],

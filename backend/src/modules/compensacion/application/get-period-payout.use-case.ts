@@ -29,6 +29,10 @@ export interface PeriodPayout extends PayoutResult {
   periodKey: string;
   /** The frozen saldo of the closed period (can be <= 0). */
   saldoHoras: Decimal;
+  /** When the payout was confirmed by HR. Null until ConfirmPeriodPayoutUseCase is called. */
+  paidAt: Date | null;
+  /** Server-generated UUID — idempotency key for the payout confirmation. Null until confirmed. */
+  payoutRef: string | null;
 }
 
 export class GetPeriodPayoutUseCase {
@@ -62,6 +66,8 @@ export class GetPeriodPayoutUseCase {
       operarioId,
       periodKey,
       saldoHoras: period.saldo,
+      paidAt: period.paidAt,
+      payoutRef: period.payoutRef,
       ...payout,
     };
   }

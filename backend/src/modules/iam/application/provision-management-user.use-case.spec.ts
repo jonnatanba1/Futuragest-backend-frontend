@@ -25,6 +25,7 @@ import {
   UnsupportedProvisionRoleError,
   EmailInUseError,
 } from '../domain/org.errors';
+import type { Role } from '@prisma/client';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
 
     await expect(
-      useCase.execute({ email: 'sup@test.co', password: 'Temp1234!', role: 'SUPERVISOR' as any }),
+      useCase.execute({ email: 'sup@test.co', password: 'Temp1234!', role: 'SUPERVISOR' as Role }),
     ).rejects.toThrow(UnsupportedProvisionRoleError);
 
     expect(repo.createManagementUser).not.toHaveBeenCalled();
@@ -117,7 +118,7 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
 
     await expect(
-      useCase.execute({ email: 'coord@test.co', password: 'Temp1234!', role: 'COORDINADOR' as any }),
+      useCase.execute({ email: 'coord@test.co', password: 'Temp1234!', role: 'COORDINADOR' as Role }),
     ).rejects.toThrow(UnsupportedProvisionRoleError);
   });
 
@@ -128,7 +129,7 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
 
     await expect(
-      useCase.execute({ email: 'sa@test.co', password: 'Temp1234!', role: 'SYSTEM_ADMIN' as any }),
+      useCase.execute({ email: 'sa@test.co', password: 'Temp1234!', role: 'SYSTEM_ADMIN' as Role }),
     ).rejects.toThrow(UnsupportedProvisionRoleError);
   });
 });

@@ -37,7 +37,7 @@ import type { OperarioReaderPort } from '../domain/ports/operario-reader.port';
 import type { CompensationPeriodRepositoryPort } from '../domain/ports/compensation-period-repository.port';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import { CalculatePeriodBalanceUseCase } from './calculate-period-balance.use-case';
-import { derivePeriodKey } from './derive-period-key';
+import { derivePeriodKey, derivePreviousPeriodKey } from './derive-period-key';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 
 export interface GetPeriodBalanceInput {
@@ -76,13 +76,18 @@ export class GetPeriodBalanceUseCase {
     // 3. Fetch full policy timeline
     const policyTimeline = await this.policyRepo.findTimeline();
 
-    // 4. Resolve carryIn from previous CARRY_OVER period (PR-B)
+    // 4. Resolve carryIn from previous CARRY_OVER period (PR-B / Fix 3)
+    //    Fix 3: carryIn applies ONLY from the IMMEDIATE predecessor (exact prevKey match).
+    //    Live balance never throws NonContiguousCloseError — it's a read; the UI must not break.
     let carryIn = new Decimal(0);
     if (this.periodRepo) {
       const currentPeriodKey = derivePeriodKey(desde);
-      const prevPeriod = await this.periodRepo.findPreviousClosed(operarioId, currentPeriodKey);
-      if (prevPeriod !== null && prevPeriod.disposition === 'CARRY_OVER' && prevPeriod.saldo.isNegative()) {
-        carryIn = prevPeriod.saldo;
+      const prevKey = derivePreviousPeriodKey(currentPeriodKey);
+      if (prevKey !== null) {
+        const exactPrev = await this.periodRepo.findByOperarioAndPeriod(operarioId, prevKey);
+        if (exactPrev !== null && exactPrev.disposition === 'CARRY_OVER' && exactPrev.saldo.isNegative()) {
+          carryIn = exactPrev.saldo;
+        }
       }
     }
 

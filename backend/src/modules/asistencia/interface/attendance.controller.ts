@@ -5,21 +5,23 @@
  *   POST /asistencia/check-in                               → check-in (SUPERVISOR, 201/200)
  *   POST /asistencia/by-client-ref/:clientRef/check-out    → checkout by check-in clientRef (SUPERVISOR, 200)
  *   POST /asistencia/:id/check-out                         → checkout by server id (SUPERVISOR, 200)
- *   POST /asistencia/:id/signature                         → upload signature (SUPERVISOR, 200)
- *   GET  /asistencia/:id/signature                         → presigned GET URL (scoped, 200)
+ *   POST /asistencia/:id/photo                             → upload photo (SUPERVISOR, 200)
+ *   GET  /asistencia/:id/photo                             → presigned GET URL (scoped, 200)
  *   GET  /asistencia                                       → scoped list (200)
  *   GET  /asistencia/:id                                   → scoped detail (200)
  *
  * Domain error → HTTP mapping (spec §3 + REQ-09..REQ-12):
- *   AttendanceAlreadyExistsError → 409 ConflictException (structured ConflictResponseDto)
- *   AttendanceNotFoundError      → 404 NotFoundException
- *   ImmutableAttendanceError     → 409 ConflictException (structured ConflictResponseDto)
- *   InactiveOperarioError        → 409 ConflictException (plain — not structured)
- *   SignatureRequiredError        → 422 UnprocessableEntityException
- *   InvalidGpsError              → 400 BadRequestException
- *   OperarioNotInScopeError      → 404 NotFoundException (fail-closed)
+ *   AttendanceAlreadyExistsError  → 409 ConflictException (structured ConflictResponseDto)
+ *   AttendanceNotFoundError       → 404 NotFoundException
+ *   ImmutableAttendanceError      → 409 ConflictException (structured ConflictResponseDto)
+ *   InactiveOperarioError         → 409 ConflictException (plain — not structured)
+ *   PhotoRequiredError            → 422 UnprocessableEntityException
+ *   InvalidGpsError               → 400 BadRequestException
+ *   OperarioNotInScopeError       → 404 NotFoundException (fail-closed)
+ *   InvalidShiftDurationError     → 422 UnprocessableEntityException (Fix 6)
+ *   AttendanceDateMismatchError   → 422 UnprocessableEntityException (Fix 8)
  *
- * File validation for signature upload is enforced in the use-case (mime + size).
+ * File validation for photo upload is enforced in the use-case (mime + size).
  * The controller passes the raw file buffer to the use-case.
  */
 
@@ -46,10 +48,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import {
   AttendanceResponseDto,
-  SignatureUploadResponseDto,
-  SignatureUrlDto,
+  PhotoUploadResponseDto,
+  PhotoUrlDto,
 } from './response-dtos';
-import { IsDateString, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsDateString, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { Roles } from '../../iam/interface/roles.decorator';
@@ -57,15 +59,17 @@ import type { CheckInAttendanceUseCase } from '../application/check-in-attendanc
 import type { CheckOutAttendanceUseCase } from '../application/check-out-attendance.use-case';
 import type { ListAttendanceUseCase } from '../application/list-attendance.use-case';
 import type { GetAttendanceUseCase } from '../application/get-attendance.use-case';
-import type { UploadSignatureUseCase } from '../application/upload-signature.use-case';
-import type { GetSignatureUrlUseCase } from '../application/get-signature-url.use-case';
+import type { UploadPhotoUseCase } from '../application/upload-photo.use-case';
+import type { GetPhotoUrlUseCase } from '../application/get-photo-url.use-case';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
 import {
   AttendanceAlreadyExistsError,
+  AttendanceDateMismatchError,
   AttendanceNotFoundError,
   ImmutableAttendanceError,
   InactiveOperarioError,
-  SignatureRequiredError,
+  InvalidShiftDurationError,
+  PhotoRequiredError,
   InvalidGpsError,
   OperarioNotInScopeError,
 } from '../domain/attendance.errors';
@@ -77,8 +81,8 @@ export const CHECK_IN_USE_CASE = Symbol('CheckInAttendanceUseCase');
 export const CHECK_OUT_USE_CASE = Symbol('CheckOutAttendanceUseCase');
 export const LIST_ATTENDANCE_USE_CASE = Symbol('ListAttendanceUseCase');
 export const GET_ATTENDANCE_USE_CASE = Symbol('GetAttendanceUseCase');
-export const UPLOAD_SIGNATURE_USE_CASE = Symbol('UploadSignatureUseCase');
-export const GET_SIGNATURE_URL_USE_CASE = Symbol('GetSignatureUrlUseCase');
+export const UPLOAD_PHOTO_USE_CASE = Symbol('UploadPhotoUseCase');
+export const GET_PHOTO_URL_USE_CASE = Symbol('GetPhotoUrlUseCase');
 export const ATTENDANCE_REPO = Symbol('AttendanceRepositoryPort');
 
 // ─── Role constants ───────────────────────────────────────────────────────────
@@ -128,6 +132,19 @@ export class CheckInBody {
   @ApiProperty({ description: 'Idempotency token' })
   @IsString()
   clientRef!: string;
+
+  /**
+   * Optional audit label — how the supervisor verified identity before check-in.
+   * Stored as-is from the client. AUDIT TRAIL ONLY: no authorization logic may
+   * depend on this field.
+   */
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    description: 'Verification method used by supervisor. Audit label only.',
+  })
+  @IsOptional()
+  @IsIn(['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'])
+  verification?: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE';
 }
 
 // ─── Query DTOs ───────────────────────────────────────────────────────────────
@@ -174,6 +191,19 @@ export class CheckOutBody {
   @IsOptional()
   @IsString()
   checkOutClientRef?: string;
+
+  /**
+   * Optional audit label — how the supervisor verified identity before check-out.
+   * Stored as-is from the client. AUDIT TRAIL ONLY: no authorization logic may
+   * depend on this field.
+   */
+  @ApiPropertyOptional({
+    enum: ['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'],
+    description: 'Verification method used by supervisor. Audit label only.',
+  })
+  @IsOptional()
+  @IsIn(['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'])
+  verification?: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE';
 }
 
 // ─── Error → HTTP helper ──────────────────────────────────────────────────────
@@ -216,7 +246,13 @@ function mapDomainError(err: unknown): never {
   if (err instanceof AttendanceNotFoundError || err instanceof OperarioNotInScopeError) {
     throw new NotFoundException(err.message);
   }
-  if (err instanceof SignatureRequiredError) {
+  if (err instanceof PhotoRequiredError) {
+    throw new UnprocessableEntityException(err.message);
+  }
+  if (err instanceof InvalidShiftDurationError) {
+    throw new UnprocessableEntityException(err.message);
+  }
+  if (err instanceof AttendanceDateMismatchError) {
     throw new UnprocessableEntityException(err.message);
   }
   if (err instanceof InvalidGpsError) {
@@ -238,10 +274,10 @@ export class AttendanceController {
     private readonly listUseCase: Pick<ListAttendanceUseCase, 'execute'>,
     @Inject(GET_ATTENDANCE_USE_CASE)
     private readonly getUseCase: Pick<GetAttendanceUseCase, 'execute'>,
-    @Inject(UPLOAD_SIGNATURE_USE_CASE)
-    private readonly uploadSignatureUseCase: Pick<UploadSignatureUseCase, 'execute'>,
-    @Inject(GET_SIGNATURE_URL_USE_CASE)
-    private readonly getSignatureUrlUseCase: Pick<GetSignatureUrlUseCase, 'execute'>,
+    @Inject(UPLOAD_PHOTO_USE_CASE)
+    private readonly uploadPhotoUseCase: Pick<UploadPhotoUseCase, 'execute'>,
+    @Inject(GET_PHOTO_URL_USE_CASE)
+    private readonly getPhotoUrlUseCase: Pick<GetPhotoUrlUseCase, 'execute'>,
     @Inject(ATTENDANCE_REPO)
     private readonly attendanceRepo: AttendanceRepositoryPort,
   ) {}
@@ -265,6 +301,7 @@ export class AttendanceController {
         checkInLng: body.checkInLng,
         checkInAccuracy: body.checkInAccuracy,
         clientRef: body.clientRef,
+        verification: body.verification,
       });
       res.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
       return result.record;
@@ -299,6 +336,7 @@ export class AttendanceController {
         checkOutLng: body.checkOutLng,
         checkOutAccuracy: body.checkOutAccuracy,
         checkOutClientRef: body.checkOutClientRef,
+        verification: body.verification,
       });
       res.status(HttpStatus.OK);
       return result.record;
@@ -325,6 +363,7 @@ export class AttendanceController {
         checkOutLng: body.checkOutLng,
         checkOutAccuracy: body.checkOutAccuracy,
         checkOutClientRef: body.checkOutClientRef,
+        verification: body.verification,
       });
       res.status(HttpStatus.OK);
       return result.record;
@@ -333,14 +372,14 @@ export class AttendanceController {
     }
   }
 
-  // ── Signature upload ───────────────────────────────────────────────────────
+  // ── Photo upload ───────────────────────────────────────────────────────────
 
   @Roles(...WRITE_ROLES)
-  @Post(':id/signature')
+  @Post(':id/photo')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOkResponse({ type: SignatureUploadResponseDto })
-  async uploadSignature(
+  @ApiOkResponse({ type: PhotoUploadResponseDto })
+  async uploadPhoto(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('phase') phase?: string,
@@ -354,7 +393,7 @@ export class AttendanceController {
     }
 
     try {
-      return await this.uploadSignatureUseCase.execute({
+      return await this.uploadPhotoUseCase.execute({
         id,
         phase: resolvedPhase as 'checkin' | 'checkout',
         file: {
@@ -368,13 +407,13 @@ export class AttendanceController {
     }
   }
 
-  // ── Signature GET ──────────────────────────────────────────────────────────
+  // ── Photo GET ──────────────────────────────────────────────────────────────
 
   @Roles(...READ_ROLES)
-  @Get(':id/signature')
-  @ApiOkResponse({ type: SignatureUrlDto })
-  async getSignatureUrl(@Param('id') id: string, @Query('phase') phase?: string) {
-    // phase must be 'checkin' or 'checkout' (or absent → 'checkin'). Mirrors uploadSignature.
+  @Get(':id/photo')
+  @ApiOkResponse({ type: PhotoUrlDto })
+  async getPhotoUrl(@Param('id') id: string, @Query('phase') phase?: string) {
+    // phase must be 'checkin' or 'checkout' (or absent → 'checkin'). Mirrors uploadPhoto.
     const resolvedPhase = phase ?? 'checkin';
     if (resolvedPhase !== 'checkin' && resolvedPhase !== 'checkout') {
       throw new BadRequestException(
@@ -382,7 +421,7 @@ export class AttendanceController {
       );
     }
     try {
-      return await this.getSignatureUrlUseCase.execute({
+      return await this.getPhotoUrlUseCase.execute({
         id,
         phase: resolvedPhase as 'checkin' | 'checkout',
       });

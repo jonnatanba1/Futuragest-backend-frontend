@@ -46,13 +46,14 @@ import {
   SessionNotFoundError,
   MaxDevicesExceededError,
   UserNotFoundError,
+  MissingDeviceContextError,
 } from '../domain/auth.errors';
 import { LoginDto, ChangePasswordDto, RefreshDto, PushTokenDto } from './dtos';
 import { Public } from './public.decorator';
 import { SkipMustChangePasswordCheck } from './skip-mcp.decorator';
 import type { ScopeContext } from '../domain/scope-context';
 import type { MeResponse } from '@futuragest/contracts';
-import { ApiOkResponse, ApiNoContentResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { ApiOkResponse, ApiNoContentResponse } from '@nestjs/swagger';
 import {
   LoginResponseDto,
   RefreshResponseDto,
@@ -167,7 +168,7 @@ export class AuthController {
    * userId and deviceId are always resolved from the JWT (ScopeContext), never from the body.
    * Returns 204 No Content on success.
    * Returns 400 if pushToken is missing or empty (class-validator).
-   * Returns 401 if unauthenticated (AuthGuard).
+   * Returns 401 if unauthenticated (AuthGuard) or if the JWT carries no deviceId.
    */
   @Post('push-token')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -176,12 +177,20 @@ export class AuthController {
     @Body() dto: PushTokenDto,
     @Request() req: { user: ScopeContext },
   ): Promise<void> {
-    await this.registerPushTokenUseCase.execute({
-      userId: req.user.userId,
-      deviceId: req.user.deviceId!,
-      pushToken: dto.pushToken,
-      pushPlatform: dto.pushPlatform,
-    });
+    try {
+      // deviceId may be absent on deviceId-less JWTs — the use case validates and rejects.
+      await this.registerPushTokenUseCase.execute({
+        userId: req.user.userId,
+        deviceId: req.user.deviceId,
+        pushToken: dto.pushToken,
+        pushPlatform: dto.pushPlatform,
+      });
+    } catch (err) {
+      if (err instanceof MissingDeviceContextError) {
+        throw new UnauthorizedException(err.message);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -189,17 +198,25 @@ export class AuthController {
    * Unregister (clear) the caller's push notification token for their current device session.
    * userId and deviceId are always resolved from the JWT (ScopeContext), never from the body.
    * Carries NO request body. Returns 204 No Content on success.
-   * Returns 401 if unauthenticated (AuthGuard).
+   * Returns 401 if unauthenticated (AuthGuard) or if the JWT carries no deviceId.
    * Idempotent: clearing an already-null token is a no-op (still 204).
    */
   @Delete('push-token')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'Push token unregistered successfully' })
   async unregisterPushToken(@Request() req: { user: ScopeContext }): Promise<void> {
-    await this.unregisterPushTokenUseCase.execute({
-      userId: req.user.userId,
-      deviceId: req.user.deviceId!,
-    });
+    try {
+      // deviceId may be absent on deviceId-less JWTs — the use case validates and rejects.
+      await this.unregisterPushTokenUseCase.execute({
+        userId: req.user.userId,
+        deviceId: req.user.deviceId,
+      });
+    } catch (err) {
+      if (err instanceof MissingDeviceContextError) {
+        throw new UnauthorizedException(err.message);
+      }
+      throw err;
+    }
   }
 
   @Delete('sessions/:deviceId')

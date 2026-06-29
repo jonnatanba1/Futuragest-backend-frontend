@@ -8,9 +8,11 @@
  *   409 — AttendanceAlreadyExistsError (duplicate operarioId+date, diff clientRef)
  *   404 — AttendanceNotFoundError (out-of-scope or missing)
  *   409 — ImmutableAttendanceError (mutation of completed record)
- *   422 — SignatureRequiredError (check-out precondition not met)
+ *   422 — PhotoRequiredError (check-out precondition not met)
  *   400 — InvalidGpsError (lat/lng/accuracy out of range)
  *   404 — OperarioNotInScopeError (fail-closed: don't leak existence)
+ *   422 — InvalidShiftDurationError (Fix 6: negative duration or implausibly long shift)
+ *   422 — AttendanceDateMismatchError (Fix 8: client-provided date ≠ server-derived Bogotá date)
  */
 
 import type { Attendance } from '@prisma/client';
@@ -54,15 +56,15 @@ export class ImmutableAttendanceError extends Error {
   }
 }
 
-export class SignatureRequiredError extends Error {
+export class PhotoRequiredError extends Error {
   readonly httpStatus = 422 as const;
 
   constructor(id: string) {
     super(
       `El registro de asistencia "${id}" no puede ser cerrado: ` +
-        `se debe subir la firma antes del check-out.`,
+        `se debe subir la foto antes del check-out.`,
     );
-    this.name = 'SignatureRequiredError';
+    this.name = 'PhotoRequiredError';
   }
 }
 
@@ -101,5 +103,36 @@ export class InactiveOperarioError extends Error {
       `El operario "${operarioId}" está inactivo. El check-in solo está permitido para operarios activos. Reactive el operario primero.`,
     );
     this.name = 'InactiveOperarioError';
+  }
+}
+
+/**
+ * Thrown by CheckOutAttendanceUseCase when the computed shift duration is
+ * invalid (negative, zero, or implausibly long).
+ * Maps to HTTP 422 (Fix 6 — duration sanity guard).
+ */
+export class InvalidShiftDurationError extends Error {
+  readonly httpStatus = 422 as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidShiftDurationError';
+  }
+}
+
+/**
+ * Thrown by CheckInAttendanceUseCase when the client-provided `date` does not
+ * match the server-derived Bogotá local date for checkInCapturedAt.
+ * Maps to HTTP 422 (Fix 8 — server-side date derivation).
+ */
+export class AttendanceDateMismatchError extends Error {
+  readonly httpStatus = 422 as const;
+
+  constructor(clientDate: string, serverDate: string) {
+    super(
+      `La fecha proporcionada "${clientDate}" no coincide con la fecha derivada del servidor para Bogotá "${serverDate}". ` +
+        `Verifique la zona horaria del dispositivo (Colombia = UTC-5).`,
+    );
+    this.name = 'AttendanceDateMismatchError';
   }
 }

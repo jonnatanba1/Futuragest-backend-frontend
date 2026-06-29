@@ -8,7 +8,6 @@
 import { CreateNovedadUseCase } from './create-novedad.use-case';
 import {
   AttendanceNotFoundError,
-  AttendanceNotCompletedError,
   NovedadAlreadyExistsError,
   InvalidHorasExtraError,
 } from '../domain/novedad.errors';
@@ -49,7 +48,7 @@ function makeAttendance(overrides: Record<string, unknown> = {}) {
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: null,
+    checkInPhotoKey: null,
     clientRef: 'ref-001',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -157,8 +156,8 @@ describe('CreateNovedadUseCase', () => {
     });
   });
 
-  describe('NV-40 — attendance found but not completed → AttendanceNotCompletedError', () => {
-    it('throws AttendanceNotCompletedError when completedAt is null', async () => {
+  describe('NV-40 — attendance OPEN (completedAt null) → overtime pre-authorized (created)', () => {
+    it('creates the novedad on an open attendance (overtime can be requested before check-out)', async () => {
       const novedadRepo = makeMockNovedadRepo();
       const attendanceRepo = makeMockAttendanceRepo({
         findById: jest.fn().mockResolvedValue(makeAttendance({ completedAt: null })),
@@ -166,11 +165,12 @@ describe('CreateNovedadUseCase', () => {
       const scopeHolder = makeScopeHolder();
 
       const useCase = new CreateNovedadUseCase(novedadRepo, attendanceRepo, scopeHolder);
+      const result = await useCase.execute({ attendanceId: 'att-a1', horasExtra: '1.00' });
 
-      await expect(useCase.execute({ attendanceId: 'att-a1', horasExtra: '1.00' })).rejects.toThrow(
-        AttendanceNotCompletedError,
+      expect(novedadRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ attendanceId: 'att-a1' }),
       );
-      expect(novedadRepo.create).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('created', true);
     });
   });
 

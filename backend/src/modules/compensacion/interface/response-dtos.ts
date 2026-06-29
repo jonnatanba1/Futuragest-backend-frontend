@@ -90,6 +90,15 @@ export class CompensationPeriodResponseDto {
   @ApiProperty({ description: 'Client-provided idempotency token', nullable: true })
   clientRef!: string | null;
 
+  @ApiProperty({ description: 'ISO 8601 timestamp — when payout was confirmed by HR. Null until confirmed.', nullable: true })
+  paidAt!: string | null;
+
+  @ApiProperty({ description: 'Server-generated UUID for payout idempotency. Null until confirmed.', nullable: true })
+  payoutRef!: string | null;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp — set when attendance data changes inside this closed period. Null = snapshot is current.', nullable: true })
+  divergedAt!: string | null;
+
   @ApiProperty({ description: 'ISO 8601 timestamp' })
   createdAt!: string;
 }
@@ -142,4 +151,10 @@ export class PeriodPayoutResponseDto {
 
   @ApiProperty({ description: 'horasBase × factorRecargo — payable hours to liquidate. Decimal string.', example: '10.00' })
   horasPagables!: string;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp — when payout was confirmed by HR. Null until confirmed.', nullable: true })
+  paidAt!: string | null;
+
+  @ApiProperty({ description: 'Server-generated UUID for payout idempotency. Null until confirmed.', nullable: true })
+  payoutRef!: string | null;
 }

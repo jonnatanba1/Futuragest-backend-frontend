@@ -17,6 +17,9 @@ import { CalculatePeriodBalanceUseCase } from './calculate-period-balance.use-ca
 import {
   CompensationPeriodAlreadyClosedError,
   DispositionRequiredError,
+  NonCanonicalPeriodRangeError,
+  NonContiguousCloseError,
+  ClientRefConflictError,
 } from '../domain/compensacion.errors';
 import { OperarioNotInScopeError } from '../../asistencia/domain/attendance.errors';
 import type { AttendanceReaderPort, AttendanceReaderRecord } from '../domain/ports/attendance-reader.port';
@@ -26,6 +29,7 @@ import type {
   CompensationPeriodRepositoryPort,
   CompensationPeriodRecord,
 } from '../domain/ports/compensation-period-repository.port';
+import type { SupervisorZoneReaderPort } from '../domain/ports/supervisor-zone-reader.port';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +73,9 @@ function makePeriodRecord(overrides: Partial<CompensationPeriodRecord> = {}): Co
     decidedAt: new Date(),
     closedAt: new Date(),
     clientRef: 'ref-abc',
+    paidAt: null,
+    payoutRef: null,
+    divergedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -96,16 +103,24 @@ function makePeriodRepo(existingPeriod: CompensationPeriodRecord | null = null):
     findByOperarioAndPeriod: jest.fn().mockResolvedValue(existingPeriod),
     findPreviousClosed: jest.fn().mockResolvedValue(null),
     findByClientRef: jest.fn().mockResolvedValue(null),
-    findOverlappingLiquidated: jest.fn().mockResolvedValue(null),
+    findOverlappingClosed: jest.fn().mockResolvedValue(null),
     create: jest.fn().mockResolvedValue(makePeriodRecord()),
+    markPaid: jest.fn().mockResolvedValue(1),
+    markDiverged: jest.fn().mockResolvedValue(undefined),
+    findClosedContainingDate: jest.fn().mockResolvedValue(null),
   };
 }
+
+/** Fix 7: supervisor zone reader mock — returns zone-1 for sup-1, null otherwise. */
+const makeSupervisorZoneReader = (zoneId: string = 'zone-1'): jest.Mocked<SupervisorZoneReaderPort> => ({
+  findZoneIdBySupervisorId: jest.fn().mockResolvedValue(zoneId),
+});
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('CloseCompensationPeriodUseCase', () => {
   const calcUseCase = new CalculatePeriodBalanceUseCase();
-  const baseOperario = { id: 'O1', supervisorId: 'sup-1', zoneId: 'zone-1' };
+  const baseOperario = { id: 'O1', supervisorId: 'sup-1' }; // no zoneId — resolved via supervisor query
   const basePolicy = makePolicy('2026-01-01', 8);
   const baseAttendances = [
     makeAttendance('2026-05-01', 7.5), // +0 extra or -0.5 under
@@ -133,6 +148,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       policyRepo,
       calcUseCase,
       operarioReader,
+      makeSupervisorZoneReader(),
     );
 
     const result = await useCase.execute({
@@ -169,6 +185,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       makePolicyRepo([basePolicy]),
       calcUseCase,
       makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
     );
 
     const result = await useCase.execute({
@@ -198,6 +215,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       makePolicyRepo([basePolicy]),
       calcUseCase,
       makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
     );
 
     await expect(
@@ -226,6 +244,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       makePolicyRepo([basePolicy]),
       calcUseCase,
       makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
     );
 
     await expect(
@@ -253,6 +272,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       makePolicyRepo([basePolicy]),
       calcUseCase,
       makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
     );
 
     await expect(
@@ -279,7 +299,8 @@ describe('CloseCompensationPeriodUseCase', () => {
       makeAttendanceReader([]),
       makePolicyRepo([basePolicy]),
       calcUseCase,
-      makeOperarioReader(null), // null = out of scope
+      makeOperarioReader(null), // null = out of scope,
+      makeSupervisorZoneReader(),
     );
 
     await expect(
@@ -297,6 +318,307 @@ describe('CloseCompensationPeriodUseCase', () => {
     expect(periodRepo.create).not.toHaveBeenCalled();
   });
 
+  // ── Fix 2: canonical fortnight validation ────────────────────────────────────
+
+  it('Fix2-a — hasta beyond Q1 fortnight → NonCanonicalPeriodRangeError (422)', async () => {
+    const periodRepo = makePeriodRepo(null);
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader(baseAttendances),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    await expect(
+      useCase.execute({
+        operarioId: 'O1',
+        desde: '2026-05-01',
+        hasta: '2026-05-31', // beyond Q1 canonical hasta=15
+        disposition: 'CARRY_OVER',
+        approvedByUserId: 'admin-user',
+      }),
+    ).rejects.toThrow(NonCanonicalPeriodRangeError);
+    expect(periodRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('Fix2-b — desde not on day 1 or 16 → NonCanonicalPeriodRangeError (422)', async () => {
+    const periodRepo = makePeriodRepo(null);
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader(baseAttendances),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    await expect(
+      useCase.execute({
+        operarioId: 'O1',
+        desde: '2026-05-05', // not day 1 or 16
+        hasta: '2026-05-15',
+        disposition: 'CARRY_OVER',
+        approvedByUserId: 'admin-user',
+      }),
+    ).rejects.toThrow(NonCanonicalPeriodRangeError);
+  });
+
+  it('Fix2-c — canonical Q1 range passes validation (2026-05-01 to 2026-05-15)', async () => {
+    const periodRepo = makePeriodRepo(null);
+    const created = makePeriodRecord({ disposition: null, saldo: new Decimal('1.00') });
+    periodRepo.create.mockResolvedValue(created);
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([makeAttendance('2026-05-01', 9)]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-01',
+      hasta: '2026-05-15',
+      approvedByUserId: 'admin-user',
+    });
+    expect(result.idempotent).toBe(false);
+  });
+
+  it('Fix2-d — canonical Q2 range passes validation (2026-05-16 to 2026-05-31)', async () => {
+    const periodRepo = makePeriodRepo(null);
+    const created = makePeriodRecord({
+      periodKey: '2026-05-Q2',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+      disposition: null,
+      saldo: new Decimal('1.00'),
+    });
+    periodRepo.create.mockResolvedValue(created);
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([makeAttendance('2026-05-16', 9)]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+      approvedByUserId: 'admin-user',
+    });
+    expect(result.idempotent).toBe(false);
+  });
+
+  // ── Fix 3: exact-prevKey carryIn ──────────────────────────────────────────────
+
+  it('Fix3-a — Q1 closed CARRY_OVER saldo=-2, closing Q2 → carryIn = -2', async () => {
+    const prevQ1 = makePeriodRecord({
+      periodKey: '2026-05-Q1',
+      disposition: 'CARRY_OVER',
+      saldo: new Decimal('-2.00'),
+      carryIn: new Decimal('0'),
+    });
+    const periodRepo = makePeriodRepo(null);
+    // findByOperarioAndPeriod: no existing Q2; findPreviousClosed returns Q1
+    periodRepo.findPreviousClosed.mockResolvedValue(prevQ1);
+    // Also wire exact-key lookup: Fix3 requires exact match on prevKey
+    periodRepo.findByOperarioAndPeriod
+      .mockImplementation((_oid: string, key: string) =>
+        Promise.resolve(key === '2026-05-Q1' ? prevQ1 : null),
+      );
+
+    const created = makePeriodRecord({
+      periodKey: '2026-05-Q2',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+      carryIn: new Decimal('-2.00'),
+      saldo: new Decimal('-2.00'),
+      disposition: 'CARRY_OVER',
+    });
+    periodRepo.create.mockResolvedValue(created);
+
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+      disposition: 'CARRY_OVER',
+      approvedByUserId: 'admin-user',
+    });
+
+    expect(result.idempotent).toBe(false);
+    const createArg = (periodRepo.create as jest.Mock).mock.calls[0][0];
+    expect(createArg.carryIn.toNumber()).toBe(-2);
+  });
+
+  it('Fix3-b — Q1 closed CARRY_OVER saldo=-2, Q2 NOT closed, closing Q3 → NonContiguousCloseError (409)', async () => {
+    const prevQ1 = makePeriodRecord({
+      periodKey: '2026-05-Q1',
+      disposition: 'CARRY_OVER',
+      saldo: new Decimal('-2.00'),
+    });
+
+    const periodRepo = makePeriodRepo(null);
+    // No Q2 period (gap)
+    periodRepo.findByOperarioAndPeriod.mockResolvedValue(null);
+    // findPreviousClosed (gap-debt check) returns Q1 which has debt and is NOT the immediate predecessor of Q3
+    periodRepo.findPreviousClosed.mockResolvedValue(prevQ1);
+
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    // Closing Q2-of-June (Q1 of June's prev = Q2 of May; Q2 of May's prev = Q1 of May)
+    // Simulate: closing 2026-06-Q1, prevKey = 2026-05-Q2 (gap), most-recent = Q1 CARRY_OVER
+    await expect(
+      useCase.execute({
+        operarioId: 'O1',
+        desde: '2026-06-01',
+        hasta: '2026-06-15',
+        disposition: 'CARRY_OVER',
+        approvedByUserId: 'admin-user',
+      }),
+    ).rejects.toThrow(NonContiguousCloseError);
+    expect(periodRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('Fix3-c — gap period has no debt (saldo >= 0), closing Q3 → no throw, carryIn = 0', async () => {
+    const prevQ1NoDept = makePeriodRecord({
+      periodKey: '2026-05-Q1',
+      disposition: null,
+      saldo: new Decimal('1.00'), // positive — no debt
+    });
+
+    const periodRepo = makePeriodRepo(null);
+    periodRepo.findByOperarioAndPeriod.mockResolvedValue(null);
+    periodRepo.findPreviousClosed.mockResolvedValue(prevQ1NoDept);
+
+    const created = makePeriodRecord({
+      periodKey: '2026-06-Q1',
+      desde: '2026-06-01',
+      hasta: '2026-06-15',
+      carryIn: new Decimal('0'),
+      saldo: new Decimal('1.00'),
+      disposition: null,
+    });
+    periodRepo.create.mockResolvedValue(created);
+
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([makeAttendance('2026-06-01', 9)]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-06-01',
+      hasta: '2026-06-15',
+      approvedByUserId: 'admin-user',
+    });
+    expect(result.idempotent).toBe(false);
+    const createArg = (periodRepo.create as jest.Mock).mock.calls[0][0];
+    expect(createArg.carryIn.toNumber()).toBe(0);
+  });
+
+  it('Fix3-d — month-boundary prevKey: June Q1 → May Q2 (exact key lookup)', async () => {
+    const mayQ2 = makePeriodRecord({
+      periodKey: '2026-05-Q2',
+      desde: '2026-05-16',
+      hasta: '2026-05-31',
+      disposition: 'CARRY_OVER',
+      saldo: new Decimal('-1.50'),
+      carryIn: new Decimal('0'),
+    });
+
+    const periodRepo = makePeriodRepo(null);
+    periodRepo.findByOperarioAndPeriod
+      .mockImplementation((_oid: string, key: string) =>
+        Promise.resolve(key === '2026-05-Q2' ? mayQ2 : null),
+      );
+    periodRepo.findPreviousClosed.mockResolvedValue(mayQ2);
+
+    const created = makePeriodRecord({
+      periodKey: '2026-06-Q1',
+      desde: '2026-06-01',
+      hasta: '2026-06-15',
+      carryIn: new Decimal('-1.50'),
+      saldo: new Decimal('-1.50'),
+      disposition: 'CARRY_OVER',
+    });
+    periodRepo.create.mockResolvedValue(created);
+
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    const result = await useCase.execute({
+      operarioId: 'O1',
+      desde: '2026-06-01',
+      hasta: '2026-06-15',
+      disposition: 'CARRY_OVER',
+      approvedByUserId: 'admin-user',
+    });
+    expect(result.idempotent).toBe(false);
+    const createArg = (periodRepo.create as jest.Mock).mock.calls[0][0];
+    expect(createArg.carryIn.toNumber()).toBe(-1.5);
+  });
+
+  // ── Fix 10: P2002 + null existing → ClientRefConflictError ───────────────────
+
+  it('Fix10 — P2002 with no existing period for that operario+key → ClientRefConflictError (409)', async () => {
+    const periodRepo = makePeriodRepo(null);
+    const p2002 = Object.assign(new Error('Unique constraint failed on clientRef'), { code: 'P2002' });
+    periodRepo.create.mockRejectedValue(p2002);
+    // findByOperarioAndPeriod returns null even after P2002 (cross-operario collision)
+    periodRepo.findByOperarioAndPeriod.mockResolvedValue(null);
+
+    const useCase = new CloseCompensationPeriodUseCase(
+      periodRepo,
+      makeAttendanceReader([makeAttendance('2026-05-01', 9)]),
+      makePolicyRepo([basePolicy]),
+      calcUseCase,
+      makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
+    );
+
+    await expect(
+      useCase.execute({
+        operarioId: 'O1',
+        desde: '2026-05-01',
+        hasta: '2026-05-15',
+        approvedByUserId: 'admin-user',
+        clientRef: 'shared-ref',
+      }),
+    ).rejects.toThrow(ClientRefConflictError);
+  });
+
   // ── Positive saldo — disposition null is OK (no deduction needed) ──────────
 
   it('EP-04-positive-saldo — positive saldo with no disposition → allowed (no DispositionRequiredError)', async () => {
@@ -312,6 +634,7 @@ describe('CloseCompensationPeriodUseCase', () => {
       makePolicyRepo([basePolicy]),
       calcUseCase,
       makeOperarioReader(baseOperario),
+      makeSupervisorZoneReader(),
     );
 
     const result = await useCase.execute({

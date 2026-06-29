@@ -43,6 +43,7 @@ export class BulkImportOperariosUseCase {
       fullName: string;
       documento: string;
       supervisorId: string;
+      cargo: string;
     }> = [];
 
     for (const row of rows) {
@@ -56,6 +57,7 @@ export class BulkImportOperariosUseCase {
           fullName: row.fullName,
           documento: row.documento,
           supervisorId: validationResult.supervisorId,
+          cargo: '',  // CSV import does not have a cargo column — defaults to empty
         });
       }
     }

@@ -14,6 +14,7 @@
  * PN-23 — clearPushToken rejection is isolated (purge error never escapes fire-and-forget).
  */
 
+import { Logger } from '@nestjs/common';
 import { FcmNotificationAdapter } from './fcm-notification.adapter';
 import type { RecipientResolver, PushRecipient } from './recipient-resolver';
 import type { AuthRepositoryPort } from '../../auth/domain/auth-repository.port';
@@ -27,14 +28,18 @@ const mockCert = jest.fn().mockReturnValue({ _isCert: true });
 const mockInitializeApp = jest.fn();
 const mockApps: unknown[] = [];
 
-jest.mock('firebase-admin', () => ({
+// Named factory so PN-12 can restore the standard mock after swapping in a
+// throwing factory (module-not-found simulation) inside an isolated registry.
+const mockFirebaseAdminFactory = () => ({
   apps: mockApps,
   credential: { cert: mockCert },
   initializeApp: mockInitializeApp,
   messaging: jest.fn().mockReturnValue({
     sendEachForMulticast: mockSendEachForMulticast,
   }),
-}));
+});
+
+jest.mock('firebase-admin', () => mockFirebaseAdminFactory());
 
 // ---------------------------------------------------------------------------
 // fs mock — used for FIREBASE_SERVICE_ACCOUNT_PATH loading
@@ -131,10 +136,56 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED not set)', () => {
     }
   });
 
-  it('PN-12 — module loads without requiring firebase-admin at top level', () => {
-    // If firebase-admin were imported at top level without being installed,
-    // the module load itself would throw. Reaching this assertion proves import-safety.
-    expect(FcmNotificationAdapter).toBeDefined();
+  it('PN-12 — import-safety: module loads, instantiates, and send degrades gracefully when firebase-admin is unavailable', async () => {
+    // Isolated module registry where ANY require('firebase-admin') throws —
+    // a real module-not-found simulation. A top-level `import 'firebase-admin'`
+    // in the adapter would make the require() of the adapter module below throw,
+    // so this test genuinely pins the import-safety invariant.
+    jest.resetModules();
+    jest.doMock('firebase-admin', () => {
+      throw new Error("Cannot find module 'firebase-admin'");
+    });
+
+    const origEnabled = process.env.FIREBASE_ENABLED;
+    const origJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    process.env.FIREBASE_ENABLED = 'true';
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify(SERVICE_ACCOUNT_OBJ);
+
+    let warnSpy: jest.SpyInstance | undefined;
+    try {
+      // Spy on the Logger class of the SAME fresh registry the adapter will use.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const common = require('@nestjs/common') as typeof import('@nestjs/common');
+      warnSpy = jest.spyOn(common.Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      // (1) Requiring the adapter module succeeds (no top-level firebase-admin import).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('./fcm-notification.adapter') as typeof import('./fcm-notification.adapter');
+
+      // (2) Instantiation succeeds.
+      const resolver = {
+        getActivePushTokens: jest.fn().mockResolvedValue(toRecipients(['tok-a'])),
+      } as unknown as RecipientResolver;
+      const isolatedAdapter = new mod.FcmNotificationAdapter(
+        resolver,
+        makeAuthRepo() as unknown as AuthRepositoryPort,
+      );
+
+      // (3) Sending with FIREBASE_ENABLED=true resolves (never throws) and warns.
+      await expect(isolatedAdapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('firebase-admin could not be loaded'),
+      );
+    } finally {
+      warnSpy?.mockRestore();
+      // Restore the standard firebase-admin mock for the rest of the suite.
+      jest.doMock('firebase-admin', () => mockFirebaseAdminFactory());
+      jest.resetModules();
+      if (origEnabled === undefined) delete process.env.FIREBASE_ENABLED;
+      else process.env.FIREBASE_ENABLED = origEnabled;
+      if (origJson === undefined) delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      else process.env.FIREBASE_SERVICE_ACCOUNT_JSON = origJson;
+    }
   });
 });
 
@@ -196,6 +247,49 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     mockSendEachForMulticast.mockRejectedValue(new Error('FCM network error'));
     const adapter = makeAdapter(['tok-x']);
     await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+  });
+
+  it('PN-15b — thrown-batch tokens are counted in the failure metric of the summary log (and are not purge candidates)', async () => {
+    mockSendEachForMulticast.mockRejectedValue(new Error('FCM network error'));
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const { adapter, authRepo } = makeAdapterWithRepo(['tok-x', 'tok-y']);
+      await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+      // The whole 2-token batch threw → the summary log must report Failure: 2, not 0.
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Failure: 2'));
+      // Thrown batches carry no per-token verdict — they must NEVER be purge candidates.
+      expect(authRepo.clearPushToken).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it('PN-30 — SDK returns fewer responses than tokens sent → batch results discarded, no purge (index alignment protected)', async () => {
+    const recipients: PushRecipient[] = [
+      { userId: 'u-a', deviceId: 'd-a', pushToken: 'tok-a' },
+      { userId: 'u-b', deviceId: 'd-b', pushToken: 'tok-b' },
+    ];
+    // SDK contract violation: 2 tokens sent, only 1 response returned. Trusting it
+    // would shift indices and could purge the WRONG recipient's token.
+    mockSendEachForMulticast.mockResolvedValue({
+      successCount: 0,
+      failureCount: 1,
+      responses: [
+        { success: false, error: { code: 'messaging/registration-token-not-registered' } },
+      ],
+    });
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      const { adapter, authRepo } = makeAdapterWithRepo(recipients);
+      await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+      // Misaligned batch → no per-token verdicts trusted → no purge at all.
+      expect(authRepo.clearPushToken).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('returned 1 response(s) for 2 token(s)'),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('PN-16 — credential loading prefers FIREBASE_SERVICE_ACCOUNT_PATH over inline JSON', async () => {
@@ -290,7 +384,7 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     expect(authRepo.clearPushToken).toHaveBeenCalledWith('user-dead', 'dev-dead');
   });
 
-  it('PN-21b — invalid-registration-token and invalid-argument codes also purge', async () => {
+  it('PN-21b — invalid-registration-token purges, but invalid-argument does NOT (payload bugs must not mass-purge)', async () => {
     const recipients: PushRecipient[] = [
       { userId: 'u-a', deviceId: 'd-a', pushToken: 'tok-a' },
       { userId: 'u-b', deviceId: 'd-b', pushToken: 'tok-b' },
@@ -300,6 +394,8 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
       failureCount: 2,
       responses: [
         { success: false, error: { code: 'messaging/invalid-registration-token' } },
+        // invalid-argument is ALSO returned for malformed message payloads — a single
+        // payload bug would otherwise purge every recipient's token fleet-wide.
         { success: false, error: { code: 'messaging/invalid-argument' } },
       ],
     });
@@ -307,9 +403,9 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     const { adapter, authRepo } = makeAdapterWithRepo(recipients);
     await adapter.notifyNovedadCreated(PAYLOAD);
 
-    expect(authRepo.clearPushToken).toHaveBeenCalledTimes(2);
+    expect(authRepo.clearPushToken).toHaveBeenCalledTimes(1);
     expect(authRepo.clearPushToken).toHaveBeenCalledWith('u-a', 'd-a');
-    expect(authRepo.clearPushToken).toHaveBeenCalledWith('u-b', 'd-b');
+    expect(authRepo.clearPushToken).not.toHaveBeenCalledWith('u-b', 'd-b');
   });
 
   it('PN-22 — non-dead-token failure (e.g. internal/unavailable) → clearPushToken NOT called', async () => {
@@ -326,6 +422,88 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     await adapter.notifyNovedadCreated(PAYLOAD);
 
     expect(authRepo.clearPushToken).not.toHaveBeenCalled();
+  });
+
+  it('PN-27 — chunks >500 tokens into batches of ≤500 (1200 → 500/500/200)', async () => {
+    const tokens = Array.from({ length: 1200 }, (_, i) => `tok-${i}`);
+    mockSendEachForMulticast.mockImplementation(
+      (msg: { tokens: string[] }) =>
+        Promise.resolve({
+          successCount: msg.tokens.length,
+          failureCount: 0,
+          responses: msg.tokens.map(() => ({ success: true })),
+        }),
+    );
+
+    const adapter = makeAdapter(tokens);
+    await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(3);
+    const sizes = mockSendEachForMulticast.mock.calls.map(
+      (call) => (call[0] as { tokens: string[] }).tokens.length,
+    );
+    expect(sizes).toEqual([500, 500, 200]);
+    // Batches preserve order and cover all tokens exactly once
+    expect((mockSendEachForMulticast.mock.calls[0][0] as { tokens: string[] }).tokens[0]).toBe('tok-0');
+    expect((mockSendEachForMulticast.mock.calls[1][0] as { tokens: string[] }).tokens[0]).toBe('tok-500');
+    expect((mockSendEachForMulticast.mock.calls[2][0] as { tokens: string[] }).tokens[499 - 300]).toBe('tok-1199');
+  });
+
+  it('PN-28 — dead tokens detected across different batches are all purged', async () => {
+    const tokens = Array.from({ length: 600 }, (_, i) => `tok-${i}`);
+    const deadTokens = new Set(['tok-0', 'tok-599']); // batch 1 and batch 2
+    mockSendEachForMulticast.mockImplementation((msg: { tokens: string[] }) => {
+      const responses = msg.tokens.map((t) =>
+        deadTokens.has(t)
+          ? { success: false, error: { code: 'messaging/registration-token-not-registered' } }
+          : { success: true },
+      );
+      const failureCount = responses.filter((r) => !r.success).length;
+      return Promise.resolve({
+        successCount: responses.length - failureCount,
+        failureCount,
+        responses,
+      });
+    });
+
+    const { adapter, authRepo } = makeAdapterWithRepo(tokens);
+    await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(2);
+    expect(authRepo.clearPushToken).toHaveBeenCalledTimes(2);
+    expect(authRepo.clearPushToken).toHaveBeenCalledWith('user-0', 'device-0');
+    expect(authRepo.clearPushToken).toHaveBeenCalledWith('user-599', 'device-599');
+  });
+
+  it('PN-29 — a rejecting batch does not prevent remaining batches from sending (and their purges still run)', async () => {
+    const tokens = Array.from({ length: 1000 }, (_, i) => `tok-${i}`);
+    let call = 0;
+    mockSendEachForMulticast.mockImplementation((msg: { tokens: string[] }) => {
+      call += 1;
+      if (call === 1) {
+        return Promise.reject(new Error('FCM batch outage'));
+      }
+      // Second batch: last token is dead
+      const responses = msg.tokens.map((t) =>
+        t === 'tok-999'
+          ? { success: false, error: { code: 'messaging/registration-token-not-registered' } }
+          : { success: true },
+      );
+      return Promise.resolve({
+        successCount: responses.length - 1,
+        failureCount: 1,
+        responses,
+      });
+    });
+
+    const { adapter, authRepo } = makeAdapterWithRepo(tokens);
+    await expect(adapter.notifyNovedadCreated(PAYLOAD)).resolves.toBeUndefined();
+
+    // Both batches attempted despite batch 1 rejecting
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(2);
+    // Dead token from batch 2 still purged with the CORRECT recipient (index alignment kept)
+    expect(authRepo.clearPushToken).toHaveBeenCalledTimes(1);
+    expect(authRepo.clearPushToken).toHaveBeenCalledWith('user-999', 'device-999');
   });
 
   it('PN-23 — clearPushToken rejection is isolated (purge error never escapes fire-and-forget)', async () => {

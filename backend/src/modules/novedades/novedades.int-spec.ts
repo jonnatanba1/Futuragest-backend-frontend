@@ -349,12 +349,20 @@ describe('Novedades Integration Suite (NV-01..NV-37 + SI-01..SI-04)', () => {
       expect(body.supervisorId).not.toBe('BOGUS-SUP');
     });
 
-    it('NV-03 — create on INCOMPLETE attendance (completedAt null) → 409', async () => {
-      await postNovedad({ token: tokenS1, attendanceId: aIncompleteId, horasExtra: '1.00' }).expect(409);
+    it('NV-03 — create on OPEN attendance (completedAt null) → 201 (overtime pre-authorized)', async () => {
+      const resp = await postNovedad({
+        token: tokenS1,
+        attendanceId: aIncompleteId,
+        horasExtra: '1.00',
+      }).expect(201);
 
-      // No Novedad row should exist
+      const body = resp.body as Record<string, unknown>;
+      expect(body.status).toBe('PENDING');
+      expect(body.attendanceId).toBe(aIncompleteId);
+
+      // The novedad row exists for the still-open attendance.
       const count = await prisma.novedad.count({ where: { attendanceId: aIncompleteId } });
-      expect(count).toBe(0);
+      expect(count).toBe(1);
     });
 
     it('NV-04 — create when PENDING already exists → 409', async () => {

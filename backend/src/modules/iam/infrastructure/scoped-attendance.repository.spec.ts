@@ -12,6 +12,7 @@
 
 import { ScopedAttendanceRepository } from './scoped-attendance.repository';
 import type { Attendance } from '@prisma/client';
+import type { PrismaService } from '../../../database/prisma.service';
 
 function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
   return {
@@ -30,8 +31,10 @@ function makeAttendance(overrides: Partial<Attendance> = {}): Attendance {
     checkOutLat: null,
     checkOutLng: null,
     checkOutAccuracy: null,
-    signatureKey: 'sig-key',
-    checkOutSignatureKey: null,
+    checkInVerification: null,
+    checkOutVerification: null,
+    checkInPhotoKey: 'photos/S1/ATT-1-checkin.png',
+    checkOutPhotoKey: null,
     clientRef: 'REF-A',
     checkOutClientRef: 'CREF-Z',
     completedAt: new Date(),
@@ -54,7 +57,7 @@ function makeRepo(findFirstResult: Attendance | null) {
   };
 
   // Provide a minimal PrismaService-like object
-  const prisma = { attendance: delegate } as any;
+  const prisma = { attendance: delegate } as unknown as PrismaService;
   const repo = new ScopedAttendanceRepository(
     prisma,
     scopeHolder as unknown as import('../../auth/domain/scope-context').ScopeContextHolder,

@@ -19,6 +19,7 @@
 import { BulkImportOperariosUseCase } from './bulk-import-operarios.use-case';
 import type { OperarioRepositoryPort } from '../domain/ports/operario.repository.port';
 import type { OperarioImportRow } from '@futuragest/contracts';
+import type { Operario } from '@prisma/client';
 
 // ─── Mock repo factory ────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ describe('BulkImportOperariosUseCase', () => {
           return Promise.resolve({ id: 'sup-1' });
         }),
         findByDocumento: jest.fn().mockImplementation((doc: string) => {
-          if (doc === 'DUP-DB') return Promise.resolve({ id: 'existing', documento: 'DUP-DB' } as any); // DB dup
+          if (doc === 'DUP-DB') return Promise.resolve({ id: 'existing', documento: 'DUP-DB' } as unknown as Operario); // DB dup
           return Promise.resolve(null);
         }),
         bulkCreate: jest.fn().mockResolvedValue(2),

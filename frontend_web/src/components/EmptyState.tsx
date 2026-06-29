@@ -14,13 +14,13 @@ export function EmptyState({
   icon?: string;
 }) {
   return (
-    <Stack align="center" gap="xs" py="xl">
-      <Text fz={44} aria-hidden>
+    <Stack align="center" gap="sm" py="2xl">
+      <Text fz={48} aria-hidden lh={1}>
         {icon}
       </Text>
-      <Text fw={600}>{title}</Text>
+      <Text fw={600} size="lg">{title}</Text>
       {message && (
-        <Text size="sm" c="dimmed" ta="center" maw={360}>
+        <Text size="sm" c="dimmed" ta="center" maw={380}>
           {message}
         </Text>
       )}

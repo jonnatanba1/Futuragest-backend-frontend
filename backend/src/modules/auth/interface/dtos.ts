@@ -6,7 +6,15 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({ format: 'email', example: 'user@futuragest.co' })
@@ -59,13 +67,16 @@ export class RefreshDto {
 }
 
 export class PushTokenDto {
-  @ApiProperty()
+  @ApiProperty({ maxLength: 4096 })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(4096)
+  @Matches(/\S/, { message: 'pushToken must not be blank' })
   pushToken!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ maxLength: 16 })
   @IsString()
   @IsOptional()
+  @MaxLength(16)
   pushPlatform?: string;
 }

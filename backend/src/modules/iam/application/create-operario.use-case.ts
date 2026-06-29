@@ -23,6 +23,7 @@ export interface CreateOperarioInput {
   fullName: string;
   documento: string;
   supervisorId: string;
+  cargo: string;
 }
 
 export interface CreateOperarioOutput {
@@ -38,6 +39,7 @@ export class CreateOperarioUseCase {
         fullName: input.fullName,
         documento: input.documento,
         supervisorId: input.supervisorId,
+        cargo: input.cargo,
       });
       return { id: operario.id };
     } catch (err: unknown) {

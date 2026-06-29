@@ -14,6 +14,7 @@
 import { ScopedZoneRepository } from './scoped-zone.repository';
 import { applyScopeFilter } from '../domain/scope-filter';
 import type { ScopeContext, ScopeContextHolder } from '../../auth/domain/scope-context';
+import type { PrismaService } from '../../../database/prisma.service';
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ describe('ScopedZoneRepository — COORDINADOR with zoneId', () => {
   it('findMany passes { id: zoneId } where-fragment to the delegate', async () => {
     const delegate = makeDelegate([]);
     const ctx: ScopeContext = { userId: 'u-1', role: 'COORDINADOR', zoneId: ZONE_ID };
-    const repo = new ScopedZoneRepository(makePrisma(delegate) as any, makeHolder(ctx));
+    const repo = new ScopedZoneRepository(makePrisma(delegate) as unknown as PrismaService, makeHolder(ctx));
 
     await repo.findMany();
 
@@ -66,7 +67,7 @@ describe('ScopedZoneRepository — COORDINADOR with zoneId', () => {
   it('findById scopes correctly via findFirstScoped', async () => {
     const delegate = makeDelegate([{ id: ZONE_ID, name: 'Zona Urabá', createdAt: new Date() }]);
     const ctx: ScopeContext = { userId: 'u-1', role: 'COORDINADOR', zoneId: ZONE_ID };
-    const repo = new ScopedZoneRepository(makePrisma(delegate) as any, makeHolder(ctx));
+    const repo = new ScopedZoneRepository(makePrisma(delegate) as unknown as PrismaService, makeHolder(ctx));
 
     await repo.findById(ZONE_ID);
 
@@ -84,7 +85,7 @@ describe('ScopedZoneRepository — COORDINADOR missing zoneId (structural deny)'
   it('findMany produces { id: { in: [] } } (INV-01 fail-closed)', async () => {
     const delegate = makeDelegate([]);
     const ctx: ScopeContext = { userId: 'u-1', role: 'COORDINADOR' }; // no zoneId
-    const repo = new ScopedZoneRepository(makePrisma(delegate) as any, makeHolder(ctx));
+    const repo = new ScopedZoneRepository(makePrisma(delegate) as unknown as PrismaService, makeHolder(ctx));
 
     await repo.findMany();
 
@@ -115,7 +116,7 @@ describe('ScopedZoneRepository — GLOBAL_ROLES pass-through', () => {
     it(`${role} → findMany called with empty where (no scope restriction)`, async () => {
       const delegate = makeDelegate([]);
       const ctx: ScopeContext = { userId: 'u-1', role };
-      const repo = new ScopedZoneRepository(makePrisma(delegate) as any, makeHolder(ctx));
+      const repo = new ScopedZoneRepository(makePrisma(delegate) as unknown as PrismaService, makeHolder(ctx));
 
       await repo.findMany();
 
@@ -133,7 +134,7 @@ describe('ScopedZoneRepository — unknown role (fail-closed)', () => {
   it('role "GHOST" → structural deny { id: { in: [] } }', async () => {
     const delegate = makeDelegate([]);
     const ctx = { userId: 'u-1', role: 'GHOST' } as unknown as ScopeContext;
-    const repo = new ScopedZoneRepository(makePrisma(delegate) as any, makeHolder(ctx));
+    const repo = new ScopedZoneRepository(makePrisma(delegate) as unknown as PrismaService, makeHolder(ctx));
 
     await repo.findMany();
 

@@ -1,8 +1,9 @@
-import { Card, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Badge, Button, Card, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import React from 'react';
 import { ApiError } from '../../lib/api/client';
 import { TableSkeleton } from '../../components/TableSkeleton';
-import { usePayoutQuery } from './compensacion-queries';
+import { usePayoutQuery, useConfirmPayoutMutation } from './compensacion-queries';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,12 +38,44 @@ function StatCard({ label, value }: { label: string; value: string }) {
  * Visible only to COMPENSACION_WRITE_ROLES (canWrite prop).
  * Uses usePayoutQuery enabled-gate so an open period never fires the query.
  * 404 PERIOD_NOT_CLOSED → informational state (not an error).
+ *
+ * Paid state: shows a teal "Liquidado" badge with date + payoutRef, no confirm button.
+ * Unpaid + payable + canWrite: shows "Confirmar liquidación" button.
+ * Zero horasPagables: no button (nothing to pay).
  */
 export function PayoutPanel({ operarioId, periodKey, closed, canWrite }: PayoutPanelProps) {
-  // RBAC gate — render nothing for read-only roles.
-  if (!canWrite) return null;
+  // Hooks first — rules of hooks forbid calls after a conditional return.
+  // The query's enabled-gate also requires canWrite so read-only roles never fetch.
+  const payout = usePayoutQuery(operarioId, periodKey, closed && canWrite);
+  const confirmMutation = useConfirmPayoutMutation();
 
-  const payout = usePayoutQuery(operarioId, periodKey, closed);
+  const handleConfirm = async () => {
+    if (!operarioId || !periodKey) return;
+    try {
+      await confirmMutation.mutateAsync({ operarioId, body: { periodKey } });
+      notifications.show({
+        color: 'teal',
+        message: 'Liquidación confirmada.',
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        notifications.show({
+          color: 'yellow',
+          title: 'Sin horas a liquidar',
+          message: err.message,
+        });
+      } else {
+        notifications.show({
+          color: 'red',
+          title: 'Error',
+          message: err instanceof ApiError ? err.message : 'Ocurrió un error al confirmar la liquidación.',
+        });
+      }
+    }
+  };
+
+  // RBAC gate — render nothing for read-only roles (after hooks).
+  if (!canWrite) return null;
 
   if (payout.isLoading) {
     return <TableSkeleton rows={2} />;
@@ -74,7 +107,8 @@ export function PayoutPanel({ operarioId, periodKey, closed, canWrite }: PayoutP
     return null;
   }
 
-  const { saldoHoras, horasBase, factorRecargo, horasPagables } = payout.data;
+  const { saldoHoras, horasBase, factorRecargo, horasPagables, paidAt, payoutRef } = payout.data;
+  const isPayable = parseFloat(horasPagables) > 0;
 
   return (
     <Card withBorder>
@@ -89,6 +123,27 @@ export function PayoutPanel({ operarioId, periodKey, closed, canWrite }: PayoutP
           <StatCard label="Factor de recargo" value={factorRecargo} />
           <StatCard label="Horas a liquidar" value={horasPagables} />
         </SimpleGrid>
+
+        {paidAt ? (
+          <Stack gap={4}>
+            <Badge color="teal" variant="filled">Liquidado</Badge>
+            <Text size="sm">{paidAt.slice(0, 10)}</Text>
+            {payoutRef && (
+              <Text size="xs" c="dimmed">
+                {payoutRef}
+              </Text>
+            )}
+          </Stack>
+        ) : isPayable ? (
+          <Button
+            data-testid="confirm-payout-btn"
+            color="teal"
+            loading={confirmMutation.isPending}
+            onClick={handleConfirm}
+          >
+            Confirmar liquidación
+          </Button>
+        ) : null}
       </Stack>
     </Card>
   );

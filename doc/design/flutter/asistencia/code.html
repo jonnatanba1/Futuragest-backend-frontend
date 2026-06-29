@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FuturaGest - Asistencia</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#f9f9fc",
+                        "outline": "#6e7a74",
+                        "on-tertiary-fixed": "#001e2d",
+                        "on-background": "#1a1c1e",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#a4ffdd",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#00513d",
+                        "surface-container-highest": "#e2e2e5",
+                        "on-tertiary-fixed-variant": "#004c6b",
+                        "surface-container": "#eeeef0",
+                        "tertiary-fixed": "#c6e7ff",
+                        "inverse-on-surface": "#f0f0f3",
+                        "primary-fixed-dim": "#79d8b7",
+                        "tertiary-fixed-dim": "#81cfff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#95f5d2",
+                        "on-secondary-container": "#613100",
+                        "secondary-fixed-dim": "#ffb77f",
+                        "surface-container-low": "#f3f3f6",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#dadadc",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#e8e8ea",
+                        "on-primary-fixed": "#002117",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#00739f",
+                        "primary": "#005f48",
+                        "inverse-surface": "#2f3133",
+                        "secondary-fixed": "#ffdcc4",
+                        "on-surface": "#1a1c1e",
+                        "on-surface-variant": "#3e4944",
+                        "primary-container": "#007a5e",
+                        "outline-variant": "#bdc9c2",
+                        "tertiary": "#00597d",
+                        "surface-variant": "#e2e2e5",
+                        "on-secondary-fixed-variant": "#6f3900",
+                        "on-tertiary-container": "#ddf0ff",
+                        "on-secondary-fixed": "#2f1500",
+                        "surface-bright": "#f9f9fc",
+                        "surface": "#f9f9fc",
+                        "secondary-container": "#ff8a00",
+                        "secondary": "#914c00",
+                        "inverse-primary": "#79d8b7",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#006c53"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.25rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap": "20px",
+                        "inline-gap": "16px",
+                        "section-margin": "40px",
+                        "unit": "4px",
+                        "container-padding": "24px"
+                    },
+                    "boxShadow": {
+                        "fluid-sm": "0 4px 12px rgba(0,0,0,0.03)",
+                        "fluid": "0 8px 24px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.02)",
+                        "fluid-lg": "0 16px 40px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.03)",
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "title-lg": ["Manrope"],
+                        "display-lg": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "label-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "title-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "headline-lg-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "label-lg": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen pb-28 md:pb-0 pt-20">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/60 dark:bg-surface/60 backdrop-blur-2xl border-b border-outline-variant/10 shadow-fluid-sm h-16 flex justify-between items-center px-container-padding">
+<button class="text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="bubble_chart">bubble_chart</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight md:font-display-lg md:text-display-lg">FuturaGest</h1>
+<button class="text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full shadow-[0_0_0_2px_#f9f9fc]"></span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="max-w-4xl mx-auto px-container-padding mt-8">
+<!-- Header Section -->
+<div class="mb-stack-gap">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-unit">Lista de Asistencia</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Turno Mañana - 24 Octubre 2023</p>
+</div>
+<!-- Search and Filter Bar -->
+<div class="glass-panel rounded-2xl p-inline-gap mb-stack-gap flex items-center gap-inline-gap shadow-fluid relative">
+<span class="material-symbols-outlined text-outline absolute left-6 pointer-events-none" data-icon="search">search</span>
+<input class="w-full bg-surface-container-lowest/50 border-none rounded-xl pl-12 pr-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/30 focus:bg-surface-container-lowest focus:outline-none transition-all shadow-sm" placeholder="Buscar operador..." type="text"/>
+<button class="bg-primary/5 p-3 rounded-xl text-primary hover:bg-primary/10 transition-colors shrink-0">
+<span class="material-symbols-outlined" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+<!-- Statistics Summary -->
+<div class="grid grid-cols-3 gap-inline-gap mb-section-margin">
+<div class="bg-primary/5 rounded-2xl p-4 shadow-fluid-sm flex flex-col items-center justify-center border border-primary/10">
+<span class="font-display-lg text-display-lg text-primary">42</span>
+<span class="font-label-lg text-label-lg text-primary/80 mt-1 text-center uppercase tracking-wider">Presentes</span>
+</div>
+<div class="bg-secondary-container/5 rounded-2xl p-4 shadow-fluid-sm flex flex-col items-center justify-center border border-secondary-container/10">
+<span class="font-display-lg text-display-lg text-secondary-container">3</span>
+<span class="font-label-lg text-label-lg text-secondary-container/80 mt-1 text-center uppercase tracking-wider">Tardes</span>
+</div>
+<div class="bg-error/5 rounded-2xl p-4 shadow-fluid-sm flex flex-col items-center justify-center border border-error/10">
+<span class="font-display-lg text-display-lg text-error">1</span>
+<span class="font-label-lg text-label-lg text-error/80 mt-1 text-center uppercase tracking-wider">Ausentes</span>
+</div>
+</div>
+<!-- Operators List -->
+<div class="space-y-inline-gap">
+<!-- Operator Card 1: Present -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-fluid flex flex-col sm:flex-row sm:items-center justify-between border border-outline-variant/10 hover:-translate-y-1 hover:shadow-fluid-lg transition-all duration-300 group">
+<div class="flex items-center gap-4 mb-4 sm:mb-0">
+<img alt="Carlos Mendoza" class="w-14 h-14 rounded-full object-cover shadow-sm ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all" data-alt="A professional headshot of a male industrial worker wearing a clean uniform. The lighting is bright and studio-quality, emphasizing a modern, reliable workforce aesthetic. The background is a soft, neutral studio grey. The mood is confident and ready for work. High-resolution, crisp details." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1liES5duiw5X-5uNdieElTwGWyFQr6_BZiMRNmPpXbDupQ9EYYomgRGEF9qnNWhFwiNpEC32h6-uUCyjBOqe1BM-XvH1K0WrwlZu9zOmQLSJIE0TSJCPfWuNm0AxuYmgLDNI11bw4Oy8YBBgVm4u7_p1CgrVqk9AGMfTjOGxZhyy8KPamB9BKwZVdF9Txihdn1UuptavF1Mc3ht_Gam88REpAZXCrebMobPk0DJHsV7HKUUHBDpti9vmpKVz4TSOWyFXUQGEhcdt4"/>
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Carlos Mendoza</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">Línea de Ensamblaje A</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+<div class="text-left sm:text-right">
+<p class="font-title-lg text-title-lg text-on-surface">05:45 AM</p>
+<p class="font-label-lg text-label-lg text-on-surface-variant opacity-80 mt-0.5">A tiempo</p>
+</div>
+<div class="bg-gradient-to-r from-primary/10 to-primary/20 text-primary font-label-lg text-label-lg px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-primary/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle">check_circle</span>
+<span>PRESENTE</span>
+</div>
+</div>
+</div>
+<!-- Operator Card 2: Late -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-fluid flex flex-col sm:flex-row sm:items-center justify-between border border-outline-variant/10 hover:-translate-y-1 hover:shadow-fluid-lg transition-all duration-300 group">
+<div class="flex items-center gap-4 mb-4 sm:mb-0">
+<img alt="Ana Ramirez" class="w-14 h-14 rounded-full object-cover shadow-sm ring-2 ring-secondary-container/10 group-hover:ring-secondary-container/30 transition-all" data-alt="A professional headshot of a female logistics supervisor wearing a safety vest. The lighting is slightly warm, suggesting an early morning industrial setting. The background is a softly blurred warehouse interior. The mood is focused and professional. High-resolution, modern corporate style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkw-_i4TVvz0RPPI0C0HomI6VkBAlmm5RyqF-sBewZV5gJPgBQU3HiSDaO_eDdbs0ihlUQGZUG1nPVw2Zwo4iF0pi1H6kQ9ain2NoZuWaqvgndh2pK3CnbchNHyCQWyEUcQI7QbZ-xRDBgHe5YQ1bYGwHZjQmOMN9owEIqxbtXRn9WoOulLwredLfLCJ9-RNpNq32Sh39iRvo_TC2PDUyjLEN1Re7BgM_omfugFarpzJjcSrLE_2q2rktjMT8xZpnr5_jd50kAM3S0"/>
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Ana Ramirez</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">Supervisión Logística</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+<div class="text-left sm:text-right">
+<p class="font-title-lg text-title-lg text-on-surface">06:15 AM</p>
+<p class="font-label-lg text-label-lg text-secondary-container mt-0.5">+15 min</p>
+</div>
+<div class="bg-gradient-to-r from-secondary-container/10 to-secondary-container/20 text-secondary-container font-label-lg text-label-lg px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-secondary-container/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span>TARDE</span>
+</div>
+</div>
+</div>
+<!-- Operator Card 3: Absent -->
+<div class="bg-error/5 rounded-2xl p-5 shadow-fluid flex flex-col sm:flex-row sm:items-center justify-between border border-error/10 hover:-translate-y-1 hover:shadow-fluid-lg transition-all duration-300 group">
+<div class="flex items-center gap-4 mb-4 sm:mb-0">
+<div class="w-14 h-14 rounded-full bg-surface-container-lowest flex items-center justify-center text-error/50 shadow-sm ring-2 ring-error/10 group-hover:ring-error/30 transition-all">
+<span class="material-symbols-outlined text-[24px]" data-icon="person">person</span>
+</div>
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Luis Vargas</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">Mantenimiento Preventivo</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+<div class="text-left sm:text-right">
+<p class="font-title-lg text-title-lg text-outline">--:--</p>
+<p class="font-label-lg text-label-lg text-error mt-0.5">Sin registro</p>
+</div>
+<div class="bg-gradient-to-r from-error/10 to-error/20 text-error font-label-lg text-label-lg px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-error/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+<span class="material-symbols-outlined text-[16px]" data-icon="cancel">cancel</span>
+<span>AUSENTE</span>
+</div>
+</div>
+</div>
+<!-- Operator Card 4: Present -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-fluid flex flex-col sm:flex-row sm:items-center justify-between border border-outline-variant/10 hover:-translate-y-1 hover:shadow-fluid-lg transition-all duration-300 group">
+<div class="flex items-center gap-4 mb-4 sm:mb-0">
+<img alt="Elena Ruiz" class="w-14 h-14 rounded-full object-cover shadow-sm ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all" data-alt="A professional portrait of a female quality control technician in a clean, modern lab environment. Soft, diffuse white lighting highlights her focused expression. She wears a crisp uniform. The background is a sterile, high-tech industrial setting slightly out of focus. Professional and calm mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8NdJwiB1WPjI4mdVlpI6i2F1BDDID6pJXOxaLePPHxfap14E1FfX73InG_RIBinrn0SLqNYNsjkJ_h8HBNWdnRwyk0HqWB7LknqLjPwZdPKUwO80-wRtPx9MU-u0biXKAxeV3x9UaFZQ0BptlGa7RxLkcQifCYk7ii9oCym7INxYTJCx-iI01-Bi25L_7cFBOJES3SsGIgi-zOlVv8Z1NJMxnOZst7RndKaCiHRW5HzYzyEtJ5d6RXew00LhSjuR0X82oLZTk2vgi"/>
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Elena Ruiz</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">Control de Calidad</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+<div class="text-left sm:text-right">
+<p class="font-title-lg text-title-lg text-on-surface">05:50 AM</p>
+<p class="font-label-lg text-label-lg text-on-surface-variant opacity-80 mt-0.5">A tiempo</p>
+</div>
+<div class="bg-gradient-to-r from-primary/10 to-primary/20 text-primary font-label-lg text-label-lg px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-primary/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle">check_circle</span>
+<span>PRESENTE</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-6 left-4 right-4 rounded-3xl z-50 bg-surface/70 dark:bg-surface-container-lowest/70 backdrop-blur-3xl border border-outline-variant/10 shadow-fluid-lg flex justify-around items-center h-[84px] px-3">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:bg-surface-container-highest/30 rounded-2xl active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home_work">home_work</span>
+<span class="font-label-lg text-label-lg">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-6 py-2 shadow-fluid-sm transition-all duration-300 active:scale-95 -translate-y-2" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="notifications" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="font-label-lg text-label-lg">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:bg-surface-container-highest/30 rounded-2xl active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-label-lg text-label-lg">Settings</span>
+</a>
+</nav>
+</body></html>

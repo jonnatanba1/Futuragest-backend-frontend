@@ -20,7 +20,7 @@ export interface CompensationPeriodLookupPort {
    * PR-A: always returns null (stub).
    * PR-B: real implementation queries the CompensationPeriod table.
    */
-  findOverlappingLiquidated(
+  findOverlappingClosed(
     vigenteDesde: Date,
   ): Promise<{ desde: string; hasta: string } | null>;
 }
@@ -32,8 +32,7 @@ export interface CompensationPeriodLookupPort {
  * the CompensationPeriod table). Replace with real adapter in PR-B.
  */
 export class NullCompensationPeriodLookup implements CompensationPeriodLookupPort {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  findOverlappingLiquidated(_vigenteDesde: Date): Promise<{ desde: string; hasta: string } | null> {
+  findOverlappingClosed(_vigenteDesde: Date): Promise<{ desde: string; hasta: string } | null> {
     return Promise.resolve(null);
   }
 }

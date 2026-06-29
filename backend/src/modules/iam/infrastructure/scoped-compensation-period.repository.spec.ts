@@ -5,7 +5,7 @@
  *   - findByOperarioAndPeriod delegates to findFirstScoped with correct where clause.
  *   - findPreviousClosed returns the most recent period with periodKey < beforePeriodKey.
  *   - findByClientRef delegates to findFirstScoped.
- *   - findOverlappingLiquidated queries globally (no scope) via raw delegate.
+ *   - findOverlappingClosed queries globally (no scope) via raw delegate.
  *   - create delegates to this.delegate.create.
  *
  * Pattern mirrors scoped-novedad.repository.spec.ts — mock delegate + scopeHolder.
@@ -134,13 +134,13 @@ describe('ScopedCompensationPeriodRepository', () => {
     });
   });
 
-  describe('findOverlappingLiquidated', () => {
+  describe('findOverlappingClosed', () => {
     it('B4-06 — calls delegate.findFirst directly (global, no scope) with date range overlap', async () => {
       const period = makePeriod({ desde: '2026-05-01', hasta: '2026-05-15' });
       const { repo, mockDelegate } = makeRepo(period);
 
       const vigenteDesde = new Date('2026-05-10T00:00:00Z');
-      const result = await repo.findOverlappingLiquidated(vigenteDesde);
+      const result = await repo.findOverlappingClosed(vigenteDesde);
 
       // findFirst on the raw delegate (global — not scoped)
       expect(mockDelegate.findFirst).toHaveBeenCalledTimes(1);
@@ -149,7 +149,7 @@ describe('ScopedCompensationPeriodRepository', () => {
 
     it('B4-07 — returns null when no overlapping period', async () => {
       const { repo } = makeRepo(null);
-      const result = await repo.findOverlappingLiquidated(new Date('2026-06-01T00:00:00Z'));
+      const result = await repo.findOverlappingClosed(new Date('2026-06-01T00:00:00Z'));
       expect(result).toBeNull();
     });
   });

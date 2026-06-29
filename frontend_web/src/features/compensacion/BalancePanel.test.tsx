@@ -17,6 +17,7 @@ vi.mock('./compensacion-queries', () => ({
   useBalanceQuery: useBalanceQueryMock,
   useClosePeriodMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePayoutQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useConfirmPayoutMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const { useOperariosMock } = vi.hoisted(() => ({ useOperariosMock: vi.fn() }));

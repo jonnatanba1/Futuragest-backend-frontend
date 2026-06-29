@@ -155,4 +155,34 @@ describe('CloseFortnightModal', () => {
     // Modal should still be rendered (onClose not called)
     expect(DEFAULT_PROPS.onClose).not.toHaveBeenCalled();
   });
+
+  // CLO-7: 409 NonContiguous shows the backend message verbatim (not a hardcoded one)
+  it('shows the backend message for 409 NonContiguousCloseError', async () => {
+    const user = userEvent.setup();
+    const backendMessage = 'La quincena anterior tiene saldo pendiente y no ha sido cerrada.';
+    closeMutateAsyncMock.mockRejectedValue(new ApiError(409, backendMessage));
+    renderModal({ saldoHoras: '0.00' });
+
+    await user.click(screen.getByRole('button', { name: /confirmar cierre/i }));
+
+    await waitFor(() => expect(notificationsShowMock).toHaveBeenCalledTimes(1));
+    const call = notificationsShowMock.mock.calls[0][0];
+    expect(call.color).toBe('red');
+    expect(call.message).toBe(backendMessage);
+  });
+
+  // CLO-8: 422 NonCanonicalPeriodRangeError shows the backend message
+  it('shows the backend message for 422 NonCanonicalPeriodRangeError', async () => {
+    const user = userEvent.setup();
+    const backendMessage = 'El rango de fechas no corresponde a una quincena canónica.';
+    closeMutateAsyncMock.mockRejectedValue(new ApiError(422, backendMessage));
+    renderModal({ saldoHoras: '0.00' });
+
+    await user.click(screen.getByRole('button', { name: /confirmar cierre/i }));
+
+    await waitFor(() => expect(notificationsShowMock).toHaveBeenCalledTimes(1));
+    const call = notificationsShowMock.mock.calls[0][0];
+    expect(call.color).toBe('red');
+    expect(call.message).toBe(backendMessage);
+  });
 });

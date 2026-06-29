@@ -63,9 +63,30 @@ export function LoginPage() {
   });
 
   return (
-    <Center mih="100vh" p="md">
-      <Paper withBorder shadow="sm" p="xl" radius="md" w={400} maw="100%">
-        <Box bg="white" p="sm" mb="lg" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+    <Center
+      mih="100vh"
+      p="md"
+      style={{
+        background:
+          'light-dark(linear-gradient(135deg, #e6faf5 0%, #f0fdf9 40%, #f8fffe 100%), linear-gradient(135deg, #0a1f1a 0%, #0d2620 40%, #102b24 100%))',
+      }}
+    >
+      <Paper
+        withBorder
+        shadow="md"
+        p="xl"
+        radius="lg"
+        w={420}
+        maw="100%"
+      >
+        <Box
+          p="sm"
+          mb="lg"
+          style={{
+            borderRadius: 'var(--mantine-radius-md)',
+            background: 'light-dark(white, var(--mantine-color-dark-6))',
+          }}
+        >
           <Image src={logo} alt="Futuraseo" />
         </Box>
         <Title order={1} size="h3" ta="center" mb="lg">

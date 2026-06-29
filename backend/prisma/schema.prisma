@@ -114,6 +114,8 @@ model Operario {
   /// Current supervisor (scope key → zone via supervisor.zoneId)
   supervisorId  String
   supervisor    Supervisor   @relation(fields: [supervisorId], references: [id])
+  /// Free-text job position (e.g. "Barrido", "Recolección"). Defaults to empty string.
+  cargo         String       @default("")
   assignments   Assignment[]
   attendances   Attendance[]
   compensationPeriods CompensationPeriod[]
@@ -165,8 +167,14 @@ model Attendance {
   checkOutLat         Float?
   checkOutLng         Float?
   checkOutAccuracy    Float?
-  signatureKey        String?    // MinIO object key for INGRESO (check-in) signature; null until uploaded
-  checkOutSignatureKey String?   // MinIO object key for SALIDA (check-out) signature; null until uploaded
+  checkInPhotoKey     String?    // MinIO object key for INGRESO (check-in) photo; null until uploaded
+  checkOutPhotoKey    String?    // MinIO object key for SALIDA (check-out) photo; null until uploaded
+  /// Audit label: how the supervisor verified identity at check-in. Null = legacy / old app version.
+  /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
+  checkInVerification  VerificationMethod?
+  /// Audit label: how the supervisor verified identity at check-out. Null = legacy / old app version.
+  /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
+  checkOutVerification VerificationMethod?
   clientRef           String     @unique // client idempotency token (required)
   checkOutClientRef   String?    // optional checkout idempotency token (not globally unique)
   completedAt         DateTime?  // non-null = record locked/immutable
@@ -205,6 +213,10 @@ model Novedad {
   approvedByUserId String?
   approvedBy       User?         @relation("NovedadApprover", fields: [approvedByUserId], references: [id])
   decidedAt        DateTime?
+  /// Audit label: how the líder operativo verified identity when approving/rejecting.
+  /// Null = web admin decision (no biometrics) or legacy row.
+  /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
+  decisionVerification VerificationMethod?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -241,6 +253,18 @@ model JornadaPolicy {
 /// Disposition decision when closing a negative-balance period.
 /// CARRY_OVER  = roll negative saldo into next period's carryIn.
 /// PAYROLL_DEDUCTION = deduct from payroll (debt settled; NOT carried forward).
+/// Biometric verification method used by the supervisor (check-in/check-out)
+/// or líder operativo (novedad approve/reject).
+/// AUDIT LABEL ONLY — no authorization logic may depend on this field.
+/// BIOMETRIC         = fingerprint or face verification succeeded.
+/// DEVICE_CREDENTIAL = PIN/pattern/password used (no biometric).
+/// NONE              = device could not verify / bypass (client reports unsupported hardware).
+enum VerificationMethod {
+  BIOMETRIC
+  DEVICE_CREDENTIAL
+  NONE
+}
+
 enum CompensationDisposition {
   CARRY_OVER
   PAYROLL_DEDUCTION
@@ -272,12 +296,18 @@ model CompensationPeriod {
   decidedAt        DateTime?
   closedAt         DateTime                @default(now())   // immutability lock (mirrors completedAt)
   clientRef        String?                 @unique           // idempotency token for close replay
+  /// Set once when HR confirms the payout. Immutable after set (guarded UPDATE WHERE paidAt IS NULL).
+  paidAt           DateTime?
+  /// Server-generated UUID set alongside paidAt — idempotency key for confirm-payout calls.
+  payoutRef        String?
+  /// Set when attendance data changes inside an already-closed period (snapshot diverged from live data).
+  divergedAt       DateTime?
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  // No @@unique([operarioId, periodKey]) — partial unique index added by hand in migration:
-  // CREATE UNIQUE INDEX "CompensationPeriod_operario_period_key"
-  //   ON "CompensationPeriod"("operarioId","periodKey");
+  // Unique constraint mirrors the hand-authored migration index exactly.
+  // map: name must match the existing DB index so prisma migrate dev generates NO new migration.
+  @@unique([operarioId, periodKey], map: "CompensationPeriod_operario_period_key")
   @@index([operarioId])
   @@index([zoneId])
   @@index([supervisorId])

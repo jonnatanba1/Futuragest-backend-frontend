@@ -17,16 +17,18 @@
  *    - target includes 'operarioId'/'date' → DuplicateAttendanceError (409).
  */
 
-import type { Attendance } from '@prisma/client';
+import type { Attendance, VerificationMethod } from '@prisma/client';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
 import type { ScopeContextHolder } from '../../auth/domain/scope-context';
 import type { OperarioStatusPort } from '../../iam/domain/ports/operario-status.port';
 import {
   AttendanceAlreadyExistsError,
+  AttendanceDateMismatchError,
   InactiveOperarioError,
   InvalidGpsError,
   OperarioNotInScopeError,
 } from '../domain/attendance.errors';
+import { toBogotaDate } from '../domain/bogota-date';
 
 export interface CheckInInput {
   operarioId: string;
@@ -36,6 +38,11 @@ export interface CheckInInput {
   checkInLng: number;
   checkInAccuracy?: number;
   clientRef: string;
+  /**
+   * Audit label: how the supervisor verified identity before check-in.
+   * Comes from the client — AUDIT LABEL ONLY. No authorization logic may depend on this.
+   */
+  verification?: VerificationMethod;
 }
 
 // Minimal interface for the scoped operario repo (avoids importing the full class)
@@ -68,13 +75,17 @@ function getConstraintTarget(err: unknown): string[] {
   if (
     typeof err === 'object' &&
     err !== null &&
-    'meta' in err &&
-    typeof (err as any).meta === 'object' &&
-    (err as any).meta !== null &&
-    'target' in (err as any).meta
+    'meta' in err
   ) {
-    const target = (err as any).meta.target;
-    return Array.isArray(target) ? target : [target];
+    const errWithMeta = err as { meta?: { target?: string | string[] } };
+    if (
+      typeof errWithMeta.meta === 'object' &&
+      errWithMeta.meta !== null &&
+      'target' in errWithMeta.meta
+    ) {
+      const target = errWithMeta.meta.target;
+      return Array.isArray(target) ? target : [String(target)];
+    }
   }
   return [];
 }
@@ -97,10 +108,22 @@ export class CheckInAttendanceUseCase {
     // 1. GPS validation (fail fast)
     validateGps(input.checkInLat, input.checkInLng, input.checkInAccuracy);
 
-    // 2. clientRef idempotency: if already exists, return without creating (created=false)
+    // 2. clientRef idempotency: if already exists, return without creating (created=false).
+    //    This early return MUST precede Fix 8's date guard — offline sync replays may arrive
+    //    with stale date values that would mismatch against today's server-derived date.
     const existing = await this.attendanceRepo.findByClientRef(input.clientRef);
     if (existing) {
       return { record: existing, created: false };
+    }
+
+    // 2b. Fix 8 — server-side date derivation (single point of truth).
+    //     Colombia is UTC-5, no DST. Derive the authoritative Bogotá local date from
+    //     checkInCapturedAt; validate the client-provided date matches it.
+    //     Only fires for NEW records (not idempotent replays, which returned above).
+    const checkInDate = new Date(input.checkInCapturedAt);
+    const serverDate = toBogotaDate(checkInDate);
+    if (input.date !== serverDate) {
+      throw new AttendanceDateMismatchError(input.date, serverDate);
     }
 
     // 3. Operario ownership check via scoped repo (fail-closed: null = not in scope)
@@ -118,25 +141,35 @@ export class CheckInAttendanceUseCase {
       throw new InactiveOperarioError(input.operarioId);
     }
 
-    // supervisorId and zoneId come EXCLUSIVELY from the verified JWT scope
+    // supervisorId and zoneId come EXCLUSIVELY from the verified JWT scope.
+    // The RBAC guard (Roles(Role.SUPERVISOR)) ensures these are always present;
+    // the guard below makes that invariant explicit to the type system.
     const ctx = this.scopeHolder.current();
-    const supervisorId = ctx.supervisorId!;
-    const zoneId = ctx.zoneId!;
+    if (!ctx.supervisorId || !ctx.zoneId) {
+      throw new Error('ScopeContext is missing supervisorId or zoneId — RBAC guard must run first.');
+    }
+    const supervisorId = ctx.supervisorId;
+    const zoneId = ctx.zoneId;
 
-    // 4. Create — catch P2002 for both idempotency race and duplicate (operarioId, date)
+    // 4. Create — catch P2002 for both idempotency race and duplicate (operarioId, date).
+    //    Use serverDate (server-derived Bogotá local date) — NOT input.date — as the
+    //    single point of truth (Fix 8). They are guaranteed equal here by the guard above,
+    //    but using serverDate makes the intent explicit and survives future refactors.
     try {
       const record = await this.attendanceRepo.create({
         supervisorId,
         operarioId: input.operarioId,
         zoneId,
-        date: input.date,
+        date: serverDate,
         checkInCapturedAt: new Date(input.checkInCapturedAt),
         checkInReceivedAt: new Date(),
         checkInLat: input.checkInLat,
         checkInLng: input.checkInLng,
         checkInAccuracy: input.checkInAccuracy ?? null,
+        // Audit label only — no authorization logic may depend on checkInVerification.
+        checkInVerification: input.verification ?? null,
         clientRef: input.clientRef,
-        signatureKey: null,
+        checkInPhotoKey: null,
         completedAt: null,
       });
       return { record, created: true };
@@ -156,7 +189,10 @@ export class CheckInAttendanceUseCase {
         throw new AttendanceAlreadyExistsError(
           input.operarioId,
           input.date,
-          conflicting ?? ({ id: 'unknown', operarioId: input.operarioId, date: input.date } as any),
+          // conflicting is null only when the duplicate row is outside scope — an extreme edge
+          // case. The error object still needs an Attendance reference; we cast a sentinel to
+          // satisfy the type without using `any`.
+          conflicting ?? ({ id: 'unknown', operarioId: input.operarioId, date: input.date } as Attendance),
         );
       }
       throw err;

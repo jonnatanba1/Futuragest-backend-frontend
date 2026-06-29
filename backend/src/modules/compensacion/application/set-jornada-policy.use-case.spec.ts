@@ -41,7 +41,7 @@ function makePeriodLookupPort(
   overlapping: { desde: Date; hasta: Date } | null = null,
 ): jest.Mocked<CompensationPeriodLookupPort> {
   return {
-    findOverlappingLiquidated: jest.fn().mockResolvedValue(overlapping),
+    findOverlappingClosed: jest.fn().mockResolvedValue(overlapping),
   };
 }
 
