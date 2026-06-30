@@ -11,6 +11,16 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ── View Transition API — circular reveal from dark-mode toggle ─────────── */
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* Page content fade-in + KPI hover lift — only when reduced motion is allowed.
    Both use Mantine CSS variables so they adapt to the light/dark color scheme. */
 @media (prefers-reduced-motion: no-preference) {

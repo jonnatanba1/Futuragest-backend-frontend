@@ -17,7 +17,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconLogout, IconMoon, IconSun } from '@tabler/icons-react';
-import React, { Suspense } from 'react';
+import React, { Suspense, useRef } from 'react';
 import { NavLink as RouterNavLink, Outlet, useNavigate } from 'react-router-dom';
 import isotipo from '../../assets/isotipo.png';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -25,12 +25,50 @@ import { navItemsForRole } from './nav-config';
 
 function ColorSchemeToggle() {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleToggle = () => {
+    if (!buttonRef.current || !('startViewTransition' in document)) {
+      toggleColorScheme();
+      return;
+    }
+
+    const rect = buttonRef.current.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y),
+    );
+
+    const transition = document.startViewTransition(() => {
+      toggleColorScheme();
+    });
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0 at ${x}px ${y}px)`,
+            `circle(${endRadius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 500,
+          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          pseudoElement: '::view-transition-new(root)',
+        },
+      );
+    });
+  };
+
   return (
     <ActionIcon
+      ref={buttonRef}
       variant="default"
       size="lg"
       aria-label="Cambiar tema"
-      onClick={toggleColorScheme}
+      onClick={handleToggle}
     >
       {colorScheme === 'dark' ? (
         <IconSun size={18} stroke={1.7} />
