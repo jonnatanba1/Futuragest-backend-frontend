@@ -9,6 +9,7 @@ import { ClassifyAttendanceUseCase } from './application/classify-attendance.use
 import { LateArrivalNovedadService } from './application/late-arrival-novedad.service';
 import { CompensatoryRestService } from './application/compensatory-rest.service';
 import { JornadaController } from './interface/jornada.controller';
+import { CompensatorioController } from './interface/compensatorio.controller';
 import { JORNADA_POLICY_REPOSITORY_PORT } from './domain/ports/jornada-policy-repository.port';
 import { PrismaJornadaPolicyRepository } from './infrastructure/prisma-jornada-policy.repository';
 import { HOLIDAY_REPOSITORY_PORT } from './domain/ports/holiday-repository.port';
@@ -28,7 +29,7 @@ import { PrismaCompensatoryRestRepository } from './infrastructure/prisma-compen
     forwardRef(() => AsistenciaModule),
     forwardRef(() => NovedadesModule),
   ],
-  controllers: [JornadaController],
+  controllers: [JornadaController, CompensatorioController],
   providers: [
     {
       provide: ATTENDANCE_CLASSIFICATION_PORT,

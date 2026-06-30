@@ -14,6 +14,8 @@ export interface CompensatoryRestRecord {
   month: string;
   type: 'OCCASIONAL' | 'HABITUAL';
   status: string;
+  scheduledDate?: string | null;
+  notes?: string | null;
 }
 
 export interface CompensatoryRestRepositoryPort {
@@ -21,6 +23,11 @@ export interface CompensatoryRestRepositoryPort {
    * Count existing CompensatoryRest records for a given operario+month.
    */
   countByOperarioAndMonth(operarioId: string, month: string): Promise<number>;
+
+  /**
+   * Find CompensatoryRest records, optionally filtering by operario and month.
+   */
+  findMany(opts?: { operarioId?: string; month?: string }): Promise<CompensatoryRestRecord[]>;
 
   /**
    * Find all CompensatoryRest records for operario+month.
@@ -42,6 +49,11 @@ export interface CompensatoryRestRepositoryPort {
    * Update the type of an existing CompensatoryRest record (OCCASIONAL → HABITUAL).
    */
   updateType(attendanceId: string, type: 'OCCASIONAL' | 'HABITUAL'): Promise<void>;
+
+  /**
+   * Update schedule, status and notes.
+   */
+  update(id: string, data: { status?: string; scheduledDate?: string | null; notes?: string | null }): Promise<CompensatoryRestRecord>;
 }
 
 export interface CreateCompensatoryRestInput {

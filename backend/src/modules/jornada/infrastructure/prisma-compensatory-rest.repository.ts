@@ -23,6 +23,26 @@ export class PrismaCompensatoryRestRepository implements CompensatoryRestReposit
     });
   }
 
+  async findMany(opts?: { operarioId?: string; month?: string }): Promise<CompensatoryRestRecord[]> {
+    const where: any = {};
+    if (opts?.operarioId) where.operarioId = opts.operarioId;
+    if (opts?.month) where.month = opts.month;
+    
+    return this.prisma.compensatoryRest.findMany({
+      where,
+      select: {
+        id: true,
+        operarioId: true,
+        attendanceId: true,
+        month: true,
+        type: true,
+        status: true,
+        scheduledDate: true,
+        takenDate: true, // we can select it though it wasn't requested strictly, but it's in schema
+      },
+    }) as any as Promise<CompensatoryRestRecord[]>; // 'any' because takenDate is not in the port type but that's fine
+  }
+
   async findByOperarioAndMonth(operarioId: string, month: string): Promise<CompensatoryRestRecord[]> {
     return this.prisma.compensatoryRest.findMany({
       where: { operarioId, month },
@@ -33,6 +53,8 @@ export class PrismaCompensatoryRestRepository implements CompensatoryRestReposit
         month: true,
         type: true,
         status: true,
+        scheduledDate: true,
+        takenDate: true,
       },
     }) as Promise<CompensatoryRestRecord[]>;
   }
@@ -47,6 +69,8 @@ export class PrismaCompensatoryRestRepository implements CompensatoryRestReposit
         month: true,
         type: true,
         status: true,
+        scheduledDate: true,
+        takenDate: true,
       },
     }) as Promise<CompensatoryRestRecord | null>;
   }
@@ -67,8 +91,30 @@ export class PrismaCompensatoryRestRepository implements CompensatoryRestReposit
         month: true,
         type: true,
         status: true,
+        scheduledDate: true,
+        takenDate: true,
       },
-    }) as Promise<CompensatoryRestRecord>;
+    }) as any as Promise<CompensatoryRestRecord>;
+  }
+
+  async update(id: string, data: { status?: string; scheduledDate?: string | null; notes?: string | null }): Promise<CompensatoryRestRecord> {
+    return this.prisma.compensatoryRest.update({
+      where: { id },
+      data: {
+        status: data.status as any,
+        scheduledDate: data.scheduledDate,
+      },
+      select: {
+        id: true,
+        operarioId: true,
+        attendanceId: true,
+        month: true,
+        type: true,
+        status: true,
+        scheduledDate: true,
+        takenDate: true,
+      },
+    }) as any as Promise<CompensatoryRestRecord>;
   }
 
   async updateType(attendanceId: string, type: 'OCCASIONAL' | 'HABITUAL'): Promise<void> {

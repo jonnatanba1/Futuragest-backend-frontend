@@ -1,10 +1,13 @@
 import type { RoleName } from '@futuragest/contracts';
 import {
   IconBellExclamation,
+  IconCalendarDue,
   IconCalendarTime,
   IconClockDollar,
+  IconCoin,
   IconLayoutDashboard,
   IconSettings,
+  IconSun,
   IconUsers,
 } from '@tabler/icons-react';
 import React from 'react';
@@ -24,7 +27,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Asistencia', path: '/asistencia', icon: IconCalendarTime, roles: OFFICE_ROLES },
   { label: 'Novedades', path: '/novedades', icon: IconBellExclamation, roles: OFFICE_ROLES },
   { label: 'Compensación', path: '/compensacion', icon: IconClockDollar, roles: OFFICE_ROLES },
-  { label: 'Administración', path: '/admin', icon: IconSettings, roles: ADMIN_ROLES },
+  { label: 'Compensatorios', path: '/compensacion/compensatorios', icon: IconCalendarDue, roles: OFFICE_ROLES },
+  { label: 'Configuración', path: '/config/jornada', icon: IconSettings, roles: ADMIN_ROLES },
 ];
 
 export function navItemsForRole(role: RoleName): NavItem[] {

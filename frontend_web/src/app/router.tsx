@@ -4,6 +4,7 @@ import { ChangePasswordPage } from '../features/auth/ChangePasswordPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AppShellLayout } from '../features/shell/AppShellLayout';
+import { ConfigLayout } from '../features/config/ConfigLayout';
 import { ADMIN_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../lib/auth/roles';
 import { RequireAuth, RequireAuthAllowChange, RequireGuest } from '../routes/guards';
 
@@ -114,30 +115,36 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
-        <Route
-          path="config/jornada"
-          element={
-            <RequireAuth roles={OFFICE_ROLES}>
-              <ConfigJornadaPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="config/holidays"
-          element={
-            <RequireAuth roles={OFFICE_ROLES}>
-              <ConfigHolidaysPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="config/surcharges"
-          element={
-            <RequireAuth roles={OFFICE_ROLES}>
-              <ConfigSurchargesPage />
-            </RequireAuth>
-          }
-        />
+        <Route path="config" element={<ConfigLayout />}>
+          <Route
+            index
+            element={<Navigate to="jornada" replace />}
+          />
+          <Route
+            path="jornada"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigJornadaPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigHolidaysPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="surcharges"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigSurchargesPage />
+              </RequireAuth>
+            }
+          />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
