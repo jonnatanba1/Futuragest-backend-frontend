@@ -2,36 +2,47 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Group,
   Select,
+  SimpleGrid,
   Stack,
-  Table,
+  Text,
   Title,
+  Tooltip,
 } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import React, { useState } from 'react';
-import type { HolidayType } from '@futuragest/contracts';
+import type { HolidayDto, HolidayType } from '@futuragest/contracts';
 import { ApiError } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/auth-context';
-import { TableSkeleton } from '../../components/TableSkeleton';
 import { useGenerateHolidaysMutation, useHolidaysQuery } from './config-queries';
 
-// ─── Color map for holiday types ──────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<HolidayType, { label: string; color: string }> = {
-  FIXED: { label: 'FIJOS', color: 'red' },
-  EMILIANI: { label: 'EMILIANI', color: 'blue' },
-  EASTER_BASED: { label: 'PASCUA', color: 'green' },
-  MANUAL: { label: 'MANUAL', color: 'orange' },
+const TYPE_MANTINE_COLOR: Record<HolidayType, string> = {
+  FIXED: 'red',
+  EMILIANI: 'blue',
+  EASTER_BASED: 'green',
+  MANUAL: 'orange',
 };
 
-const MONTH_LABELS = [
+const TYPE_LABEL: Record<HolidayType, string> = {
+  FIXED: 'FIJOS',
+  EMILIANI: 'EMILIANI',
+  EASTER_BASED: 'PASCUA',
+  MANUAL: 'MANUAL',
+};
+
+const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-// ─── Year selector generator ──────────────────────────────────────────────────
+const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function yearOptions(): { value: string; label: string }[] {
   const currentYear = new Date().getFullYear();
@@ -41,7 +52,97 @@ function yearOptions(): { value: string; label: string }[] {
   }));
 }
 
-// ─── ConfigHolidaysPage ───────────────────────────────────────────────────────
+/** Build a Monday-start calendar grid for a given year/month. */
+function getMonthGrid(year: number, month: number): (number | null)[] {
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  let startDow = firstDay.getUTCDay(); // 0=Sun … 6=Sat
+  startDow = startDow === 0 ? 6 : startDow - 1; // → Mon=0 … Sun=6
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  return cells;
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+interface MonthCardProps {
+  year: number;
+  month: number;
+  holidays: Map<string, HolidayDto>;
+}
+
+function MonthCard({ year, month, holidays }: MonthCardProps) {
+  const cells = getMonthGrid(year, month);
+
+  return (
+    <Card padding="sm" withBorder>
+      <Text fw={600} ta="center" mb="xs">
+        {MONTH_NAMES[month - 1]}
+      </Text>
+      {/* Day-of-week headers */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: 2,
+        }}
+      >
+        {DAY_LABELS.map((d) => (
+          <Text key={d} size="xs" c="dimmed" ta="center" fw={500}>
+            {d}
+          </Text>
+        ))}
+        {/* Calendar cells */}
+        {cells.map((day, idx) => {
+          if (day === null) {
+            return <div key={`empty-${month}-${idx}`} />;
+          }
+          const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+          const holiday = holidays.get(dateStr);
+          const color = holiday ? TYPE_MANTINE_COLOR[holiday.type] : undefined;
+
+          const dayCell = (
+            <Text
+              size="xs"
+              ta="center"
+              style={{
+                borderRadius: 4,
+                padding: '2px 0',
+                fontWeight: holiday ? 700 : 400,
+                backgroundColor: color
+                  ? `var(--mantine-color-${color}-light)`
+                  : undefined,
+                color: color
+                  ? `var(--mantine-color-${color}-light-color)`
+                  : undefined,
+                cursor: holiday ? 'default' : undefined,
+              }}
+            >
+              {day}
+            </Text>
+          );
+
+          if (holiday) {
+            return (
+              <Tooltip key={dateStr} label={holiday.name} withArrow openDelay={300}>
+                {dayCell}
+              </Tooltip>
+            );
+          }
+          return <div key={dateStr}>{dayCell}</div>;
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function ConfigHolidaysPage() {
   useDocumentTitle('FuturaGest · Festivos');
@@ -68,30 +169,27 @@ export function ConfigHolidaysPage() {
     }
   };
 
-  // Group holidays by month for display
-  const groupedByMonth = React.useMemo(() => {
-    if (!holidays.data) return new Map<number, typeof holidays.data>();
-    const map = new Map<number, typeof holidays.data>();
-    for (const h of holidays.data) {
-      const month = parseInt(h.date.slice(5, 7), 10);
-      if (!map.has(month)) map.set(month, []);
-      map.get(month)!.push(h);
+  // Build date → holiday lookup
+  const holidayMap = React.useMemo(() => {
+    const map = new Map<string, HolidayDto>();
+    if (holidays.data) {
+      for (const h of holidays.data) {
+        map.set(h.date, h);
+      }
     }
     return map;
   }, [holidays.data]);
 
+  const hasHolidays = holidays.data && holidays.data.length > 0;
+
   return (
     <Stack gap="lg">
+      {/* Header */}
       <Group justify="space-between" align="center">
         <Title order={2}>Festivos</Title>
         <Group>
-          {isAdmin && (
-            <Button variant="outline">Agregar manual</Button>
-          )}
-          <Button
-            onClick={handleGenerate}
-            loading={generateMutation.isPending}
-          >
+          {isAdmin && <Button variant="outline">Agregar manual</Button>}
+          <Button onClick={handleGenerate} loading={generateMutation.isPending}>
             Generar automáticamente
           </Button>
         </Group>
@@ -109,69 +207,41 @@ export function ConfigHolidaysPage() {
         />
       </Group>
 
-      {/* Color legend */}
+      {/* Legend */}
       <Group gap="sm">
-        {(Object.entries(TYPE_CONFIG) as [HolidayType, { label: string; color: string }][]).map(
-          ([type, cfg]) => (
-            <Badge key={type} color={cfg.color} variant="light">
-              {cfg.label}
-            </Badge>
-          ),
-        )}
+        {(Object.entries(TYPE_MANTINE_COLOR) as [HolidayType, string][]).map(([type, color]) => (
+          <Badge key={type} color={color} variant="light">
+            {TYPE_LABEL[type]}
+          </Badge>
+        ))}
       </Group>
 
-      {/* Holiday table by month */}
-      {holidays.isLoading && <TableSkeleton rows={5} />}
+      {/* Loading */}
+      {holidays.isLoading && (
+        <Text c="dimmed">Cargando festivos...</Text>
+      )}
 
+      {/* Error */}
       {holidays.isError && (
         <Alert color="red" title="Error">
           No se pudo cargar los festivos.
         </Alert>
       )}
 
-      {!holidays.isLoading && !holidays.isError && holidays.data && (
-        <Table striped highlightOnHover withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Mes</Table.Th>
-              <Table.Th>Fecha</Table.Th>
-              <Table.Th>Nombre</Table.Th>
-              <Table.Th>Tipo</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => {
-              const monthHolidays = groupedByMonth.get(month) ?? [];
-              if (monthHolidays.length === 0) {
-                return (
-                  <Table.Tr key={`empty-${month}`}>
-                    <Table.Td>{MONTH_LABELS[month - 1]}</Table.Td>
-                    <Table.Td colSpan={3}>
-                      <span style={{ color: 'var(--mantine-color-dimmed)' }}>Sin festivos</span>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              }
-              return monthHolidays.map((h, idx) => {
-                const cfg = TYPE_CONFIG[h.type];
-                return (
-                  <Table.Tr key={h.id}>
-                    {idx === 0 && (
-                      <Table.Td rowSpan={monthHolidays.length}>{MONTH_LABELS[month - 1]}</Table.Td>
-                    )}
-                    <Table.Td>{h.date}</Table.Td>
-                    <Table.Td>{h.name}</Table.Td>
-                    <Table.Td>
-                      <Badge color={cfg.color} variant="light" size="sm">
-                        {cfg.label}
-                      </Badge>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              });
-            })}
-          </Table.Tbody>
-        </Table>
+      {/* Empty */}
+      {!holidays.isLoading && !holidays.isError && !hasHolidays && (
+        <Text c="dimmed">
+          No hay festivos para {year}. Usá «Generar automáticamente» para crearlos.
+        </Text>
+      )}
+
+      {/* Calendar grid */}
+      {hasHolidays && (
+        <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+            <MonthCard key={month} year={year} month={month} holidays={holidayMap} />
+          ))}
+        </SimpleGrid>
       )}
     </Stack>
   );

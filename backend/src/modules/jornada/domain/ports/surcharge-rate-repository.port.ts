@@ -1,4 +1,4 @@
-import { SurchargeRate } from '@prisma/client';
+import { SurchargeRate, Prisma } from '@prisma/client';
 
 export const SURCHARGE_RATE_REPOSITORY_PORT = Symbol('SurchargeRateRepositoryPort');
 
@@ -8,4 +8,10 @@ export interface SurchargeRateRepositoryPort {
    * Can be filtered or returned all for resolution in-memory.
    */
   findAll(): Promise<SurchargeRate[]>;
+
+  /**
+   * Create a new surcharge rate.
+   * The unique constraint (category, vigenteDesde) is enforced by the DB.
+   */
+  create(data: Prisma.SurchargeRateCreateInput): Promise<SurchargeRate>;
 }

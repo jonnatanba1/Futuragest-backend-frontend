@@ -59,32 +59,43 @@ afterEach(() => vi.clearAllMocks());
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ConfigHolidaysPage', () => {
-  // HOL-1 — Renders holiday list with color-coded types
-  it('renders holiday rows with names and dates', () => {
+  // CAL-1 — Calendar renders all 12 month cards
+  it('renders all 12 month names', () => {
     defaultSetup();
     renderPage();
-    expect(screen.getByText('Año Nuevo')).toBeInTheDocument();
-    expect(screen.getByText('Día de los Reyes Magos')).toBeInTheDocument();
-    expect(screen.getByText('Jueves Santo')).toBeInTheDocument();
-    expect(screen.getByText('2026-01-01')).toBeInTheDocument();
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    for (const name of monthNames) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
   });
 
-  // HOL-2 — Shows type badges in table rows
-  it('shows holiday type badges on each row', () => {
+  // CAL-2 — Holiday days appear on the calendar (as day numbers)
+  it('renders holiday day numbers in the calendar grid', () => {
     defaultSetup();
     renderPage();
-    // Each holiday has a type badge: 2 FIXED, 1 EMILIANI, 1 EASTER_BASED, 1 MANUAL + legend = 3 FIJOS total
-    const fijos = screen.getAllByText('FIJOS');
-    expect(fijos.length).toBeGreaterThanOrEqual(2); // at least legend + one row
-    const emiliani = screen.getAllByText('EMILIANI');
-    expect(emiliani.length).toBeGreaterThanOrEqual(1);
-    const pascua = screen.getAllByText('PASCUA');
-    expect(pascua.length).toBeGreaterThanOrEqual(1);
-    const manual = screen.getAllByText('MANUAL');
-    expect(manual.length).toBeGreaterThanOrEqual(1);
+    // Day "1" (Enero 1) and "25" (Diciembre 25) appear as text in cells
+    // Need to be specific enough to avoid false matches
+    const allCells = screen.getAllByText(/^\d{1,2}$/);
+    const dayTexts = allCells.map((el) => el.textContent);
+    expect(dayTexts).toContain('1');   // Jan 1
+    expect(dayTexts).toContain('12');  // Jan 12
+    expect(dayTexts).toContain('25');  // Dec 25
   });
 
-  // HOL-3 — Shows year selector
+  // CAL-3 — Legend shows all 4 holiday type badges
+  it('renders color legend for all 4 holiday types', () => {
+    defaultSetup();
+    renderPage();
+    expect(screen.getByText('FIJOS')).toBeInTheDocument();
+    expect(screen.getByText('EMILIANI')).toBeInTheDocument();
+    expect(screen.getByText('PASCUA')).toBeInTheDocument();
+    expect(screen.getByText('MANUAL')).toBeInTheDocument();
+  });
+
+  // CAL-4 — Year selector dropdown
   it('has a year selector dropdown', () => {
     defaultSetup();
     renderPage();
@@ -92,39 +103,42 @@ describe('ConfigHolidaysPage', () => {
     expect(yearInputs.length).toBeGreaterThanOrEqual(1);
   });
 
-  // HOL-4 — Shows "Generar automáticamente" button
+  // CAL-5 — "Generar automáticamente" button
   it('shows "Generar automáticamente" button', () => {
     defaultSetup();
     renderPage();
     expect(screen.getByRole('button', { name: /generar automáticamente/i })).toBeInTheDocument();
   });
 
-  // HOL-5 — Hides "Agregar manual" for non-SYSTEM_ADMIN
+  // CAL-6 — Hides "Agregar manual" for non-SYSTEM_ADMIN
   it('hides "Agregar manual" button for TALENTO_HUMANO', () => {
     defaultSetup('TALENTO_HUMANO');
     renderPage();
     expect(screen.queryByRole('button', { name: /agregar manual/i })).not.toBeInTheDocument();
   });
 
-  // HOL-6 — Shows "Agregar manual" for SYSTEM_ADMIN
+  // CAL-7 — Shows "Agregar manual" for SYSTEM_ADMIN
   it('shows "Agregar manual" button for SYSTEM_ADMIN', () => {
     defaultSetup('SYSTEM_ADMIN');
     renderPage();
     expect(screen.getByRole('button', { name: /agregar manual/i })).toBeInTheDocument();
   });
 
-  // HOL-7 — Shows color-coded legend items
-  it('renders color legend for all 4 holiday types', () => {
-    defaultSetup();
+  // CAL-8 — Empty state when no holidays exist
+  it('shows empty message when no holidays exist', () => {
+    useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role: 'TALENTO_HUMANO' } });
+    useHolidaysQueryMock.mockReturnValue({ data: [], isLoading: false, isError: false });
+    useGenerateHolidaysMutationMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     renderPage();
-    // Legend badges appear at least once (possibly also in table rows)
-    const fijos = screen.getAllByText('FIJOS');
-    const emiliani = screen.getAllByText('EMILIANI');
-    const pascua = screen.getAllByText('PASCUA');
-    const manual = screen.getAllByText('MANUAL');
-    expect(fijos.length).toBeGreaterThanOrEqual(1);
-    expect(emiliani.length).toBeGreaterThanOrEqual(1);
-    expect(pascua.length).toBeGreaterThanOrEqual(1);
-    expect(manual.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/no hay festivos/i)).toBeInTheDocument();
+  });
+
+  // CAL-9 — Error state
+  it('shows error alert when query fails', () => {
+    useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role: 'TALENTO_HUMANO' } });
+    useHolidaysQueryMock.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+    useGenerateHolidaysMutationMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    renderPage();
+    expect(screen.getByText(/no se pudo cargar los festivos/i)).toBeInTheDocument();
   });
 });
