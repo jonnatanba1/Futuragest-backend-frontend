@@ -22,8 +22,8 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Tablero', path: '/', icon: IconLayoutDashboard },
   { label: 'Operarios', path: '/operarios', icon: IconUsers, roles: OPERARIO_READ_ROLES },
+  { label: 'Tablero', path: '/', icon: IconLayoutDashboard },
   { label: 'Asistencia', path: '/asistencia', icon: IconCalendarTime, roles: OFFICE_ROLES },
   { label: 'Novedades', path: '/novedades', icon: IconBellExclamation, roles: OFFICE_ROLES },
   { label: 'Compensación', path: '/compensacion', icon: IconClockDollar, roles: OFFICE_ROLES },
