@@ -82,7 +82,7 @@ describe('OperariosPage', () => {
     setRole('TALENTO_HUMANO');
     const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole('button', { name: /nuevo operario/i })).toBeInTheDocument();
+    // expect(screen.getByRole('button', { name: /nuevo operario/i })).toBeInTheDocument(); // Oculto a pedido del usuario
     expect(screen.getByRole('button', { name: /^importar$/i })).toBeInTheDocument();
     // Action buttons live inside the drawer — open it by clicking the row
     await user.click(screen.getByText('Wilson Palacios'));

@@ -142,7 +142,9 @@ export function OperariosPage() {
             <Button variant="default" onClick={importModal.open}>
               Importar
             </Button>
+            {/* Oculto temporalmente a pedido del usuario (deshabilitado la creación manual)
             <Button onClick={modal.open}>Nuevo operario</Button>
+            */}
           </Group>
         )}
       </Group>
@@ -205,7 +207,8 @@ export function OperariosPage() {
               ? 'Ningún operario coincide con los filtros actuales.'
               : 'Agregue el primer operario para comenzar.'
           }
-          action={canWrite ? <Button onClick={modal.open}>Nuevo operario</Button> : undefined}
+          // Oculto temporalmente a pedido del usuario (deshabilitado la creación manual)
+          // action={canWrite ? <Button onClick={modal.open}>Nuevo operario</Button> : undefined}
         />
       ) : (
         <>
