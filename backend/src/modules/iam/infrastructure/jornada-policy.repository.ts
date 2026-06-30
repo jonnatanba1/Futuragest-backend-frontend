@@ -26,12 +26,17 @@ export class JornadaPolicyRepository implements JornadaPolicyRepositoryPort {
   create(data: CreateJornadaPolicyData): Promise<JornadaPolicyRecord> {
     return this.prisma.jornadaPolicy.create({
       data: {
+        operarioId: data.operarioId,
+        zoneId: data.zoneId,
+        horaInicio: data.horaInicio,
+        horaFin: data.horaFin,
+        diasLaborales: data.diasLaborales,
+        almuerzoInicio: data.almuerzoInicio,
+        almuerzoFin: data.almuerzoFin,
+        toleranciaMin: data.toleranciaMin,
         horasDiarias: data.horasDiarias,
+        horasSemanales: data.horasSemanales,
         vigenteDesde: data.vigenteDesde,
-        horaInicio: '07:00',
-        horaFin: '17:00',
-        horasSemanales: data.horasDiarias.mul(5),
-        diasLaborales: [1, 2, 3, 4, 5],
       },
     }) as Promise<JornadaPolicyRecord>;
   }

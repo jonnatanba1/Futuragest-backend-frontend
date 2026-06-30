@@ -13,13 +13,31 @@ export const JORNADA_POLICY_REPOSITORY_PORT = Symbol('JornadaPolicyRepositoryPor
 
 export interface JornadaPolicyRecord {
   id: string;
+  operarioId: string | null;
+  zoneId: string | null;
+  horaInicio: string;
+  horaFin: string;
+  diasLaborales: number[];
+  almuerzoInicio: string | null;
+  almuerzoFin: string | null;
+  toleranciaMin: number;
   horasDiarias: Decimal;
+  horasSemanales: Decimal;
   vigenteDesde: Date;
   createdAt: Date;
 }
 
 export interface CreateJornadaPolicyData {
+  operarioId: string | null;
+  zoneId: string | null;
+  horaInicio: string;
+  horaFin: string;
+  diasLaborales: number[];
+  almuerzoInicio: string | null;
+  almuerzoFin: string | null;
+  toleranciaMin: number;
   horasDiarias: Decimal;
+  horasSemanales: Decimal;
   vigenteDesde: Date;
 }
 

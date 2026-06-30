@@ -24,7 +24,16 @@ const MIN_HORAS = 0.5;
 const MAX_HORAS = 24;
 
 export interface SetJornadaPolicyInput {
+  operarioId?: string | null;
+  zoneId?: string | null;
+  horaInicio: string;
+  horaFin: string;
+  diasLaborales: number[];
+  almuerzoInicio?: string | null;
+  almuerzoFin?: string | null;
+  toleranciaMin?: number;
   horasDiarias: number;
+  horasSemanales: number;
   vigenteDesde: string; // YYYY-MM-DD Colombia local
 }
 
@@ -66,7 +75,16 @@ export class SetJornadaPolicyUseCase {
 
     // 4. INSERT — append-only, no update path
     return this.policyRepo.create({
+      operarioId: input.operarioId ?? null,
+      zoneId: input.zoneId ?? null,
+      horaInicio: input.horaInicio,
+      horaFin: input.horaFin,
+      diasLaborales: input.diasLaborales,
+      almuerzoInicio: input.almuerzoInicio ?? null,
+      almuerzoFin: input.almuerzoFin ?? null,
+      toleranciaMin: input.toleranciaMin ?? 5,
       horasDiarias: new Decimal(horasDiarias),
+      horasSemanales: new Decimal(input.horasSemanales),
       vigenteDesde: vigenteDesdeDate,
     });
   }

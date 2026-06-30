@@ -14,8 +14,35 @@ export class JornadaPolicyResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
+  @ApiProperty({ nullable: true })
+  operarioId!: string | null;
+
+  @ApiProperty({ nullable: true })
+  zoneId!: string | null;
+
+  @ApiProperty({ example: '07:00' })
+  horaInicio!: string;
+
+  @ApiProperty({ example: '17:00' })
+  horaFin!: string;
+
+  @ApiProperty({ isArray: true, type: Number, example: [1, 2, 3, 4, 5] })
+  diasLaborales!: number[];
+
+  @ApiProperty({ nullable: true })
+  almuerzoInicio!: string | null;
+
+  @ApiProperty({ nullable: true })
+  almuerzoFin!: string | null;
+
+  @ApiProperty({ example: 5 })
+  toleranciaMin!: number;
+
   @ApiProperty({ description: 'Daily work hours. Prisma Decimal serialized as string.', example: '8.00' })
   horasDiarias!: string;
+
+  @ApiProperty({ description: 'Weekly work hours. Prisma Decimal serialized as string.', example: '40.00' })
+  horasSemanales!: string;
 
   @ApiProperty({ description: 'ISO 8601 — effective date (Colombia local midnight stored as UTC)' })
   vigenteDesde!: string;

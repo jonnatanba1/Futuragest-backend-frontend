@@ -35,12 +35,14 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiProperty } from '@nestjs/swagger';
 import {
-  IsNumber as IsNumberValidator,
+  IsNumber,
   Max,
   Min,
-  Matches as MatchesValidator,
+  Matches,
   IsOptional,
   IsEnum,
+  IsString,
+  IsArray,
 } from 'class-validator';
 import type { Request, Response } from 'express';
 import { Roles } from '../../iam/interface/roles.decorator';
@@ -122,14 +124,50 @@ const PAYOUT_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export class SetJornadaPolicyBody {
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  operarioId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  zoneId?: string | null;
+
+  @ApiProperty({ example: '07:00' })
+  @IsString()
+  horaInicio!: string;
+
+  @ApiProperty({ example: '17:00' })
+  @IsString()
+  horaFin!: string;
+
+  @ApiProperty({ isArray: true, type: Number })
+  @IsArray()
+  diasLaborales!: number[];
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  almuerzoInicio?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  almuerzoFin?: string | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  toleranciaMin?: number;
+
   @ApiProperty({ description: 'Daily work hours [0.5, 24]', example: 8 })
-  @IsNumberValidator()
+  @IsNumber()
   @Min(0.5)
   @Max(24)
   horasDiarias!: number;
 
+  @ApiProperty({ description: 'Weekly work hours', example: 40 })
+  @IsNumber()
+  horasSemanales!: number;
+
   @ApiProperty({ description: 'Effective date — YYYY-MM-DD Colombia local', example: '2026-07-01' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'vigenteDesde debe tener el formato YYYY-MM-DD',
   })
   vigenteDesde!: string;
@@ -137,11 +175,11 @@ export class SetJornadaPolicyBody {
 
 export class CloseFortnightBody {
   @ApiProperty({ description: 'Fortnight start — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-01' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener el formato YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener el formato YYYY-MM-DD' })
   desde!: string;
 
   @ApiProperty({ description: 'Fortnight end — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-15' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener el formato YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener el formato YYYY-MM-DD' })
   hasta!: string;
 
   @ApiProperty({
@@ -238,7 +276,16 @@ function serializeBalance(
 function serializePolicy(policy: JornadaPolicyRecord): JornadaPolicyResponseDto {
   return {
     id: policy.id,
+    operarioId: policy.operarioId,
+    zoneId: policy.zoneId,
+    horaInicio: policy.horaInicio,
+    horaFin: policy.horaFin,
+    diasLaborales: policy.diasLaborales,
+    almuerzoInicio: policy.almuerzoInicio,
+    almuerzoFin: policy.almuerzoFin,
+    toleranciaMin: policy.toleranciaMin,
     horasDiarias: policy.horasDiarias.toString(),
+    horasSemanales: policy.horasSemanales.toString(),
     vigenteDesde: policy.vigenteDesde.toISOString(),
     createdAt: policy.createdAt.toISOString(),
   };
@@ -290,7 +337,7 @@ function serializePayout(
 // Body DTO for confirm-payout endpoint
 export class ConfirmPayoutBody {
   @ApiProperty({ description: 'Canonical fortnight identifier e.g. "2026-05-Q1"', example: '2026-05-Q1' })
-  @MatchesValidator(/^\d{4}-\d{2}-Q[12]$/, {
+  @Matches(/^\d{4}-\d{2}-Q[12]$/, {
     message: 'periodKey debe tener el formato YYYY-MM-Q1 o YYYY-MM-Q2',
   })
   periodKey!: string;
@@ -354,10 +401,7 @@ export class CompensacionController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JornadaPolicyResponseDto> {
     try {
-      const policy = await this.setJornadaPolicyUseCase.execute({
-        horasDiarias: body.horasDiarias,
-        vigenteDesde: body.vigenteDesde,
-      });
+      const policy = await this.setJornadaPolicyUseCase.execute(body);
       res.status(HttpStatus.CREATED);
       return serializePolicy(policy);
     } catch (err) {
