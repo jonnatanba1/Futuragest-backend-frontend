@@ -29,7 +29,6 @@ import {
   IconCalendarStats,
   IconClock,
   IconClockHour4,
-  IconFingerprint,
   IconUserOff,
   IconUsers,
   IconUserPlus,
@@ -314,7 +313,6 @@ export function DashboardPage() {
       pendingNovedades: allNovedades.filter((n) => n.status === 'PENDING').length,
       absentCount,
       absentPct: activeCount > 0 ? Math.round((absentCount / activeCount) * 100) : 0,
-      huellaCount: vCounts.BIOMETRIC,
       averageShift: averageShiftHours(periodAttendances),
       lateCount,
       chartData: dayBuckets.map((b) => ({ day: b.label, Completadas: b.completed, Abiertas: b.open })),
@@ -347,7 +345,7 @@ export function DashboardPage() {
   const {
     activeCount, inactiveCount, periodAttendanceCount, todayAttendanceCount,
     completedCount, attendanceDelta, openCount, pendingNovedades,
-    absentCount, absentPct, huellaCount, averageShift, lateCount,
+    absentCount, absentPct, averageShift, lateCount,
     chartData, sparklineData, donutVerifData, zoneChartData, novAgg,
     openList, operarioMap, cargoList,
   } = metrics;
@@ -371,9 +369,6 @@ export function DashboardPage() {
   const attendancesForbidden = attendances.isError && isApiError(attendances.error);
   const operariosForbidden = operariosActive.isError && isApiError(operariosActive.error);
   const novedadesForbidden = novedades.isError && isApiError(novedades.error);
-
-  const huellaPct = periodAttendanceCount > 0
-    ? Math.round((huellaCount / periodAttendanceCount) * 100) : 0;
 
   return (
     <Stack gap="lg">
@@ -542,19 +537,12 @@ export function DashboardPage() {
       </Grid>
 
       {/* ── KPI row 2 (secondary) ────────────────────────── */}
-      <SimpleGrid cols={{ base: 1, sm: 3 }}>
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
         <KpiCard
           label="Jornadas abiertas" value={attendancesForbidden ? null : openCount}
           secondary="Con ingreso, sin salida"
           icon={<IconClockHour4 size={22} />} iconColor="orange"
           accentValue={openCount > 0}
-          isLoading={attendances.isLoading} isError={attendancesForbidden}
-        />
-        <KpiCard
-          label="Verificación con huella" value={attendancesForbidden ? null : huellaCount}
-          secondary={attendancesForbidden || periodAttendanceCount === 0 ? undefined : `${huellaPct}% de los ingresos`}
-          icon={<IconFingerprint size={22} />} iconColor="cyan"
-          accentValue={huellaCount > 0} accentColor="teal.6"
           isLoading={attendances.isLoading} isError={attendancesForbidden}
         />
         <KpiCard

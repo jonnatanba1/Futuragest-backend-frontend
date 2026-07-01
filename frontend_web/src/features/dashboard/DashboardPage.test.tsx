@@ -219,7 +219,6 @@ describe('DashboardPage', () => {
       // "Jornadas abiertas" appears as KPI label and section title — use getAllByText
       expect(screen.getAllByText('Jornadas abiertas').length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText('Novedades pendientes')).toBeInTheDocument();
-      expect(screen.getByText('Verificación con huella')).toBeInTheDocument();
     });
 
     it('shows active operario count', () => {
