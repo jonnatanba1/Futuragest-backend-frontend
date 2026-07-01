@@ -200,7 +200,6 @@ describe('DashboardPage', () => {
       defaultEmptyOk();
       renderPage();
       expect(screen.getByText('Asistencias por día')).toBeInTheDocument();
-      expect(screen.getByText('Verificación de ingresos')).toBeInTheDocument();
       expect(screen.getByText('Asistencias por zona')).toBeInTheDocument();
       expect(screen.getByText('Novedades en el período')).toBeInTheDocument();
       // "Jornadas abiertas" appears as both KPI label and section title — verify both exist
@@ -533,11 +532,11 @@ describe('DashboardPage', () => {
   });
 
   describe('empty chart states', () => {
-    it('renders EmptyState for area, verification and zone charts when the period has no attendances', () => {
+    it('renders EmptyState for area and zone charts when the period has no attendances', () => {
       defaultEmptyOk();
       renderPage();
-      // Area chart + verification donut + zones bar chart.
-      expect(screen.getAllByText('Sin asistencias en el período').length).toBeGreaterThanOrEqual(3);
+      // Area chart + zones bar chart.
+      expect(screen.getAllByText('Sin asistencias en el período').length).toBeGreaterThanOrEqual(2);
     });
 
     it('renders EmptyState for novedades donut when there are none in the period', () => {

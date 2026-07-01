@@ -57,7 +57,6 @@ import {
   percentDelta,
   previousRange,
   rangeForPeriod,
-  verificationCounts,
   zoneCounts,
 } from './dashboard-metrics';
 
@@ -295,7 +294,6 @@ export function DashboardPage() {
 
     const activeCount = activeOperarios.length;
     const allCount = operariosAll.data?.length ?? activeCount;
-    const vCounts = verificationCounts(periodAttendances);
     const dayBuckets = groupByDay(periodAttendances, range);
 
     const activePolicyVal = activeJornadaPolicy(policies.data ?? [], now);
@@ -317,12 +315,6 @@ export function DashboardPage() {
       lateCount,
       chartData: dayBuckets.map((b) => ({ day: b.label, Completadas: b.completed, Abiertas: b.open })),
       sparklineData: dayBuckets.map((b) => b.completed + b.open),
-      donutVerifData: [
-        { name: 'Huella', value: vCounts.BIOMETRIC, color: 'teal.6' },
-        { name: 'PIN', value: vCounts.DEVICE_CREDENTIAL, color: 'yellow.6' },
-        { name: 'Sin verif.', value: vCounts.NONE, color: 'gray.5' },
-        { name: 'Sin dato', value: vCounts.sin_dato, color: 'gray.3' },
-      ].filter((d) => d.value > 0),
       zoneChartData: (() => {
         const zoneMap = new Map((zones.data ?? []).map((z) => [z.id, z.name]));
         return zoneCounts(periodAttendances).map((z) => ({
@@ -346,7 +338,7 @@ export function DashboardPage() {
     activeCount, inactiveCount, periodAttendanceCount, todayAttendanceCount,
     completedCount, attendanceDelta, openCount, pendingNovedades,
     absentCount, absentPct, averageShift, lateCount,
-    chartData, sparklineData, donutVerifData, zoneChartData, novAgg,
+    chartData, sparklineData, zoneChartData, novAgg,
     openList, operarioMap, cargoList,
   } = metrics;
 
@@ -356,7 +348,6 @@ export function DashboardPage() {
     { name: 'Rechazadas', value: novAgg.REJECTED, color: 'red.6' },
   ].filter((d) => d.value > 0);
 
-  const donutVerifTotal = donutVerifData.reduce((s, d) => s + d.value, 0);
   const donutNovedadesTotal = donutNovedadesData.reduce((s, d) => s + d.value, 0);
   const completionPct = periodAttendanceCount > 0
     ? Math.round((completedCount / periodAttendanceCount) * 100)
@@ -440,7 +431,7 @@ export function DashboardPage() {
 
       {/* ── Charts row 1 ──────────────────────────────────── */}
       <Grid gutter="lg">
-        <Grid.Col span={{ base: 12, sm: 12, md: 7 }}>
+        <Grid.Col span={{ base: 12, sm: 12, md: 12 }}>
           <SectionCard title="Asistencias por día" minH={240}>
             {attendances.isLoading ? <Skeleton height={240} radius="md" />
             : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
@@ -464,28 +455,6 @@ export function DashboardPage() {
                   )}
                 </Group>
               </>
-            )}
-          </SectionCard>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, sm: 6, md: 5 }}>
-          <SectionCard title="Verificación de ingresos" minH={240}>
-            {attendances.isLoading ? <Skeleton height={240} radius="md" />
-            : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : donutVerifData.length === 0 ? <EmptyState title="Sin asistencias en el período" />
-            : (
-              <Stack align="center" gap="xs">
-                <DonutChart h={200} data={donutVerifData} withLabelsLine={false}
-                  withLabels={false} withTooltip tooltipDataSource="segment"
-                  valueFormatter={donutFormatter(donutVerifTotal)} mx="auto" />
-                <Group gap="sm" justify="center" wrap="wrap">
-                  {donutVerifData.map((d) => (
-                    <Badge key={d.name} variant="light" color={d.color.split('.')[0]} size="sm">
-                      {d.name}: {d.value}
-                    </Badge>
-                  ))}
-                </Group>
-              </Stack>
             )}
           </SectionCard>
         </Grid.Col>
