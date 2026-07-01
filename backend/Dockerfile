@@ -36,7 +36,7 @@ COPY prisma/ prisma/
 RUN pnpm install --frozen-lockfile --prod
 
 # Generate Prisma client for production
-RUN pnpm dlx prisma generate
+RUN pnpm exec prisma generate
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist dist
@@ -44,4 +44,4 @@ COPY --from=builder /app/dist dist
 EXPOSE 3000
 
 # Run migrations on startup, then start the app
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main"]
