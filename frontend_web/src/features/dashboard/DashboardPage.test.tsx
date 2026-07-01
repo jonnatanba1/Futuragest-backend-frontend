@@ -337,7 +337,7 @@ describe('DashboardPage', () => {
       zonesMock.mockReturnValue(ok([]));
       renderPage();
       expect(
-        screen.getByText(/Horas extra aprobadas en el período: 4\.0 h/),
+        screen.getByText(/Horas extra aprobadas: 4\.0 h/),
       ).toBeInTheDocument();
     });
   });
@@ -546,7 +546,7 @@ describe('DashboardPage', () => {
       renderPage();
       expect(screen.getByText('Sin novedades en el período')).toBeInTheDocument();
       expect(
-        screen.getByText('Horas extra aprobadas en el período: 0 h'),
+        screen.getByText('Horas extra aprobadas: 0 h'),
       ).toBeInTheDocument();
     });
   });
