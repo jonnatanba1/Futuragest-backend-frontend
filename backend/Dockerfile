@@ -38,6 +38,9 @@ RUN pnpm install --frozen-lockfile --prod
 # Generate Prisma client for production
 RUN pnpm exec prisma generate
 
+# Create prisma config for production (plain JS — no tsx needed)
+RUN echo 'module.exports = { schema: "./prisma/schema.prisma", datasource: { url: process.env.DATABASE_URL } };' > prisma.config.js
+
 # Copy compiled output from builder
 COPY --from=builder /app/dist dist
 
