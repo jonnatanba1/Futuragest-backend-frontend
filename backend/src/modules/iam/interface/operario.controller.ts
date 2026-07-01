@@ -44,6 +44,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { UploadedFile as MulterFile } from '../../../types/uploaded-file';
 import { ApiProperty, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { CreatedIdDto, ImportResultResponseDto, OperarioResponseDto } from './response-dtos';
 import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
@@ -200,7 +201,7 @@ export class OperarioController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiOkResponse({ type: ImportResultResponseDto })
   async importOperarios(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
   ): Promise<ImportResultDto> {
     // No file or empty buffer → 400
     if (!file || !file.buffer || file.buffer.length === 0) {

@@ -46,6 +46,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { UploadedFile as MulterFile } from '../../../types/uploaded-file';
 import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse, ApiOperation } from '@nestjs/swagger';
 import {
   AttendanceResponseDto,
@@ -402,7 +403,7 @@ export class AttendanceController {
   @ApiOkResponse({ type: PhotoUploadResponseDto })
   async uploadPhoto(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Query('phase') phase?: string,
   ) {
     // Validate phase query param — must be exactly 'checkin' or 'checkout' (or absent → 'checkin')
