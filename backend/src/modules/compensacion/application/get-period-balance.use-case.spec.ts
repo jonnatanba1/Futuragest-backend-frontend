@@ -42,6 +42,17 @@ function makeCompletedAttendance(date: string, durationHours: number): Attendanc
 function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
   return {
     id: `pol-${dateStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(hours * 5),
     horasDiarias: new Decimal(hours),
     vigenteDesde: new Date(`${dateStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -59,6 +70,7 @@ function makePolicyRepo(timeline: JornadaPolicyRecord[]): jest.Mocked<JornadaPol
     create: jest.fn(),
     findTimeline: jest.fn().mockResolvedValue(timeline),
     findLatestBefore: jest.fn(),
+    delete: jest.fn(),
   };
 }
 

@@ -42,7 +42,10 @@ import {
   ClientRefConflictError,
 } from '../domain/compensacion.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
-import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import {
+  JORNADA_POLICY_REPOSITORY_PORT,
+  type JornadaPolicyRecord
+} from '../domain/ports/jornada-policy-repository.port';
 import type { CompensationPeriodRecord } from '../domain/ports/compensation-period-repository.port';
 import { AuthGuard } from '../../auth/interface/auth.guard';
 import { RolesGuard } from '../../iam/interface/roles.guard';
@@ -81,6 +84,17 @@ function makeBalance(saldo: number): PeriodBalance {
 function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
   return {
     id: `pol-${dateStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(hours * 5),
     horasDiarias: new Decimal(hours),
     vigenteDesde: new Date(`${dateStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -140,6 +154,7 @@ describe('CompensacionController', () => {
         { provide: CLOSE_COMPENSATION_PERIOD_USE_CASE, useValue: { execute: mockClosePeriod } },
         { provide: GET_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockPayout } },
         { provide: CONFIRM_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockConfirmPayout } },
+        { provide: JORNADA_POLICY_REPOSITORY_PORT, useValue: { findLatestBefore: jest.fn(), delete: jest.fn() } },
       ],
     })
       .overrideGuard(AuthGuard)
@@ -219,7 +234,7 @@ describe('CompensacionController', () => {
 
       const res = makeRes();
       const result = await controller.setJornadaPolicy(
-        { horasDiarias: 8, vigenteDesde: '2026-07-01' },
+        { horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' },
         res,
       );
 

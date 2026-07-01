@@ -4,7 +4,8 @@
  * Global (not scoped) — JornadaPolicy is a company-wide setting, not per-zone.
  * Adapter lives in iam/infrastructure/jornada-policy.repository.ts.
  *
- * APPEND-ONLY semantics: only create, no update/delete methods.
+ * APPEND-ONLY semantics for policy values: edits create a new row with updated vigenteDesde.
+ * DELETE is allowed for removing mistaken/invalid entries.
  */
 
 import type { Decimal } from '@prisma/client/runtime/client';
@@ -20,6 +21,8 @@ export interface JornadaPolicyRecord {
   diasLaborales: number[];
   almuerzoInicio: string | null;
   almuerzoFin: string | null;
+  desayunoInicio: string | null;
+  desayunoFin: string | null;
   toleranciaMin: number;
   horasDiarias: Decimal;
   horasSemanales: Decimal;
@@ -35,6 +38,8 @@ export interface CreateJornadaPolicyData {
   diasLaborales: number[];
   almuerzoInicio: string | null;
   almuerzoFin: string | null;
+  desayunoInicio: string | null;
+  desayunoFin: string | null;
   toleranciaMin: number;
   horasDiarias: Decimal;
   horasSemanales: Decimal;
@@ -53,4 +58,7 @@ export interface JornadaPolicyRepositoryPort {
    * Returns null if no policy has vigenteDesde <= date.
    */
   findLatestBefore(date: Date): Promise<JornadaPolicyRecord | null>;
+
+  /** DELETE a policy by ID — for removing mistaken/invalid entries. */
+  delete(id: string): Promise<void>;
 }

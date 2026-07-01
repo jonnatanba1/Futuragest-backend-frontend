@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -16,6 +17,7 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure, useDocumentTitle } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import { IconPencil, IconTrash } from '@tabler/icons-react';
 import React, { useMemo, useState } from 'react';
 import type { JornadaPolicyDto } from '@futuragest/contracts';
 import { ApiError } from '../../lib/api/client';
@@ -24,6 +26,7 @@ import { hasAnyRole, COMPENSACION_WRITE_ROLES } from '../../lib/auth/roles';
 import { TableSkeleton } from '../../components/TableSkeleton';
 import {
   useCreateJornadaPolicyMutation,
+  useArchiveJornadaPolicyMutation,
   useJornadaPoliciesQuery,
 } from '../compensacion/compensacion-queries';
 import { useOperarios, useZones } from '../operarios/operario-queries';
@@ -60,6 +63,8 @@ interface PolicyFormValues {
   diasLaborales: number[];
   almuerzoInicio: string;
   almuerzoFin: string;
+  desayunoInicio: string;
+  desayunoFin: string;
   toleranciaMin: number;
   horasDiarias: number | '';
   horasSemanales: number | '';
@@ -99,6 +104,8 @@ function PolicyModal({
       diasLaborales: editing?.diasLaborales ?? [1, 2, 3, 4, 5],
       almuerzoInicio: editing?.almuerzoInicio ?? '',
       almuerzoFin: editing?.almuerzoFin ?? '',
+      desayunoInicio: editing?.desayunoInicio ?? '',
+      desayunoFin: editing?.desayunoFin ?? '',
       toleranciaMin: editing?.toleranciaMin ?? 5,
       horasDiarias: editing?.horasDiarias ? Number(editing.horasDiarias) : '',
       horasSemanales: editing?.horasSemanales ? Number(editing.horasSemanales) : '',
@@ -123,6 +130,8 @@ function PolicyModal({
         diasLaborales: values.diasLaborales,
         almuerzoInicio: values.almuerzoInicio || null,
         almuerzoFin: values.almuerzoFin || null,
+        desayunoInicio: values.desayunoInicio || null,
+        desayunoFin: values.desayunoFin || null,
         toleranciaMin: values.toleranciaMin,
         horasDiarias: Number(values.horasDiarias),
         horasSemanales: Number(values.horasSemanales),
@@ -189,7 +198,7 @@ function PolicyModal({
             />
           </Group>
 
-          <Group grow>
+                    <Group grow>
             <TextInput
               label="Almuerzo inicio"
               aria-label="Almuerzo inicio"
@@ -203,6 +212,23 @@ function PolicyModal({
               placeholder="Auto"
               key={form.key('almuerzoFin')}
               {...form.getInputProps('almuerzoFin')}
+            />
+          </Group>
+
+          <Group grow>
+            <TextInput
+              label="Desayuno inicio"
+              aria-label="Desayuno inicio"
+              placeholder="Auto"
+              key={form.key('desayunoInicio')}
+              {...form.getInputProps('desayunoInicio')}
+            />
+            <TextInput
+              label="Desayuno fin"
+              aria-label="Desayuno fin"
+              placeholder="Auto"
+              key={form.key('desayunoFin')}
+              {...form.getInputProps('desayunoFin')}
             />
           </Group>
 
@@ -282,8 +308,10 @@ export function ConfigJornadaPage() {
   const policies = useJornadaPoliciesQuery();
   const operarios = useOperarios(true);
   const zones = useZones();
+  const archiveMutation = useArchiveJornadaPolicyMutation();
 
   const [search, setSearch] = useState('');
+  const [editingPolicy, setEditingPolicy] = useState<JornadaPolicyDto | null>(null);
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
 
   const operarioMap = useMemo(() => operarios.data ?? [], [operarios.data]);
@@ -291,9 +319,10 @@ export function ConfigJornadaPage() {
 
   const filtered = useMemo(() => {
     if (!policies.data) return [];
-    if (!search) return policies.data;
+    const sorted = [...policies.data].reverse();
+    if (!search) return sorted;
     const q = search.toLowerCase();
-    return policies.data.filter((p) => {
+    return sorted.filter((p) => {
       const scope = scopeLabel(p, operarioMap, zoneMap).toLowerCase();
       return (
         scope.includes(q) ||
@@ -303,6 +332,33 @@ export function ConfigJornadaPage() {
       );
     });
   }, [policies.data, search, operarioMap, zoneMap]);
+
+  const handleEdit = (policy: JornadaPolicyDto) => {
+    setEditingPolicy(policy);
+    openModal();
+  };
+
+  const handleDelete = async (policy: JornadaPolicyDto) => {
+    const confirmed = window.confirm(
+      `¿Eliminar la política del ${policy.vigenteDesde?.slice(0, 10)}?`,
+    );
+    if (!confirmed) return;
+    try {
+      await archiveMutation.mutateAsync(policy.id);
+      notifications.show({ color: 'teal', message: 'Política eliminada.' });
+    } catch (err) {
+      notifications.show({
+        color: 'red',
+        title: 'Error',
+        message: err instanceof ApiError ? err.message : 'Error al eliminar.',
+      });
+    }
+  };
+
+  const handleCloseModal = () => {
+    setEditingPolicy(null);
+    closeModal();
+  };
 
   return (
     <Stack gap="lg">
@@ -344,11 +400,13 @@ export function ConfigJornadaPage() {
                   <Table.Th>Ámbito</Table.Th>
                   <Table.Th>Horario</Table.Th>
                   <Table.Th>Almuerzo</Table.Th>
+                  <Table.Th>Desayuno</Table.Th>
                   <Table.Th>Días</Table.Th>
                   <Table.Th>Horas/día</Table.Th>
                   <Table.Th>Horas/sem</Table.Th>
                   <Table.Th>Tol.</Table.Th>
                   <Table.Th>Vigente desde</Table.Th>
+                  {canWrite && <Table.Th w={80}>Acciones</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -365,11 +423,37 @@ export function ConfigJornadaPage() {
                     <Table.Td>
                       {policy.almuerzoInicio ? `${policy.almuerzoInicio}–${policy.almuerzoFin}` : 'Auto'}
                     </Table.Td>
+                    <Table.Td>
+                      {policy.desayunoInicio ? `${policy.desayunoInicio}–${policy.desayunoFin}` : 'Auto'}
+                    </Table.Td>
                     <Table.Td>{diasLabel(policy.diasLaborales)}</Table.Td>
                     <Table.Td>{policy.horasDiarias}</Table.Td>
                     <Table.Td>{policy.horasSemanales}</Table.Td>
                     <Table.Td>{policy.toleranciaMin} min</Table.Td>
                     <Table.Td>{policy.vigenteDesde?.slice(0, 10)}</Table.Td>
+                    {canWrite && (
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap">
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            aria-label="Editar política"
+                            onClick={() => handleEdit(policy)}
+                          >
+                            <IconPencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            aria-label="Eliminar política"
+                            loading={archiveMutation.isPending && archiveMutation.variables === policy.id}
+                            onClick={() => handleDelete(policy)}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    )}
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -378,9 +462,13 @@ export function ConfigJornadaPage() {
         </>
       )}
 
-      {/* Create Modal */}
+      {/* Create/Edit Modal */}
       {canWrite && (
-        <PolicyModal opened={modalOpened} onClose={closeModal} />
+        <PolicyModal
+          opened={modalOpened}
+          onClose={handleCloseModal}
+          editing={editingPolicy}
+        />
       )}
     </Stack>
   );

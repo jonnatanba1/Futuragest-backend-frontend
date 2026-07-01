@@ -275,7 +275,11 @@ model JornadaPolicy {
 
   // ── Almuerzo ──
   almuerzoInicio  String?   // null = auto-calculated at shift midpoint
-  almuerzoFin     String?   // null = auto (almuerzoInicio + 30 min)
+  almuerzoFin     String?   // null = auto (almuerzoInicio + 60 min)
+
+  // ── Desayuno ──
+  desayunoInicio  String?   // null = auto-calculated (horaInicio + 2h)
+  desayunoFin     String?   // null = auto (desayunoInicio + 30 min)
 
   // ── Tolerancia ──
   toleranciaMin   Int       @default(5) // late arrival tolerance in minutes

@@ -203,35 +203,41 @@ async function main() {
   const policies = [
     {
       desde: '2024-01-01T00:00:00Z',
-      horasSemanales: 44,
-      horasDiarias: 8.8, // 44 / 5 = 8.8
+      horasSemanales: 41.5,
+      horasDiarias: 8.3, // 8.8 - 0.5 (desayuno)
       horaInicio: '07:00',
       horaFin: '17:00',
       diasLaborales: [1,2,3,4,5],
       almuerzoInicio: null,
       almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
       toleranciaMin: 5,
     },
     {
       desde: '2025-07-16T00:00:00Z',
-      horasSemanales: 37.50,
-      horasDiarias: 7.50, // 37.50 / 5 = 7.50 (6:00-14:00 = 8h gross - 0.5h lunch)
+      horasSemanales: 35.00,
+      horasDiarias: 7.00, // 7.50 - 0.5 (desayuno). (6:00-14:00 = 8h gross - 1h lunch - 0.5h breakfast)
       horaInicio: '06:00',
       horaFin: '14:00',
       diasLaborales: [1,2,3,4,5],
-      almuerzoInicio: null, // auto at shift midpoint (9:45-10:15)
-      almuerzoFin: null,    // auto (almuerzoInicio + 30 min)
+      almuerzoInicio: null, 
+      almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
       toleranciaMin: 5,
     },
     {
       desde: '2026-07-16T00:00:00Z',
-      horasSemanales: 37.50,
-      horasDiarias: 7.50,
+      horasSemanales: 35.00,
+      horasDiarias: 7.00,
       horaInicio: '06:00',
       horaFin: '14:00',
       diasLaborales: [1,2,3,4,5],
       almuerzoInicio: null,
       almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
       toleranciaMin: 5,
     },
   ];
@@ -251,6 +257,8 @@ async function main() {
           diasLaborales: p.diasLaborales,
           almuerzoInicio: p.almuerzoInicio,
           almuerzoFin: p.almuerzoFin,
+          desayunoInicio: p.desayunoInicio,
+          desayunoFin: p.desayunoFin,
           toleranciaMin: p.toleranciaMin,
           vigenteDesde: new Date(p.desde)
         }
@@ -266,12 +274,14 @@ async function main() {
           diasLaborales: p.diasLaborales,
           almuerzoInicio: p.almuerzoInicio,
           almuerzoFin: p.almuerzoFin,
+          desayunoInicio: p.desayunoInicio,
+          desayunoFin: p.desayunoFin,
           toleranciaMin: p.toleranciaMin,
         }
       });
     }
   }
-  console.log('  Jornada policies seeded (6:00-14:00, 7.50h/d, 37.50h/w, lunch auto).');
+  console.log('  Jornada policies seeded (6:00-14:00, 7.00h/d, 35.00h/w, lunch/breakfast auto).');
 
   // -- 6. Upsert Holidays (2025 and 2026) --
   const yearsToSeed = [2025, 2026];

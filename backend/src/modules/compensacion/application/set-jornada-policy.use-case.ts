@@ -31,6 +31,8 @@ export interface SetJornadaPolicyInput {
   diasLaborales: number[];
   almuerzoInicio?: string | null;
   almuerzoFin?: string | null;
+  desayunoInicio?: string | null;
+  desayunoFin?: string | null;
   toleranciaMin?: number;
   horasDiarias: number;
   horasSemanales: number;
@@ -82,6 +84,8 @@ export class SetJornadaPolicyUseCase {
       diasLaborales: input.diasLaborales,
       almuerzoInicio: input.almuerzoInicio ?? null,
       almuerzoFin: input.almuerzoFin ?? null,
+      desayunoInicio: input.desayunoInicio ?? null,
+      desayunoFin: input.desayunoFin ?? null,
       toleranciaMin: input.toleranciaMin ?? 5,
       horasDiarias: new Decimal(horasDiarias),
       horasSemanales: new Decimal(input.horasSemanales),

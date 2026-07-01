@@ -90,9 +90,12 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
     const isSunday = weekday === 0;
     if (weekday === 0) weekday = 7; // ISO Sunday is 7
 
-    // 4. Resolve almuerzo: if null → auto-compute as shift midpoint ±30min
+    // 4. Resolve almuerzo & desayuno: if null → auto-compute
     const almuerzoInicio = policy.almuerzoInicio ?? computeAutoLunchStart(policy.horaInicio, policy.horaFin);
     const almuerzoFin = policy.almuerzoFin ?? computeAutoLunchEnd(policy.horaInicio, policy.horaFin);
+
+    const desayunoInicio = policy.desayunoInicio ?? computeAutoBreakfastStart(policy.horaInicio);
+    const desayunoFin = policy.desayunoFin ?? computeAutoBreakfastEnd(policy.horaInicio);
 
     // 5. Clasificar el turno (v2 — minute-by-minute with schedule + lunch)
     // Ajustar a hora Colombia (UTC-5) restando 5 horas para que getUTCHours() devuelva la hora local
@@ -110,6 +113,8 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       diasLaborales: policy.diasLaborales,
       almuerzoInicio,
       almuerzoFin,
+      desayunoInicio,
+      desayunoFin,
       isoWeekday: weekday,
     });
 
@@ -263,5 +268,25 @@ function computeAutoLunchEnd(horaInicio: string, horaFin: string): string {
   const midpoint = Math.floor((start + adjustedEnd) / 2);
   const lunchEnd = midpoint + 30;
   const normalized = ((lunchEnd % (24 * 60)) + 24 * 60) % (24 * 60);
+  return formatMinutesToTime(normalized);
+}
+
+/**
+ * Auto-compute breakfast start: shift start + 2 hours.
+ */
+function computeAutoBreakfastStart(horaInicio: string): string {
+  const start = parseTimeToMinutes(horaInicio);
+  const breakfastStart = start + 120; // + 2 hours
+  const normalized = ((breakfastStart % (24 * 60)) + 24 * 60) % (24 * 60);
+  return formatMinutesToTime(normalized);
+}
+
+/**
+ * Auto-compute breakfast end: shift start + 2.5 hours (30 mins duration).
+ */
+function computeAutoBreakfastEnd(horaInicio: string): string {
+  const start = parseTimeToMinutes(horaInicio);
+  const breakfastEnd = start + 150; // + 2.5 hours
+  const normalized = ((breakfastEnd % (24 * 60)) + 24 * 60) % (24 * 60);
   return formatMinutesToTime(normalized);
 }

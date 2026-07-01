@@ -7,7 +7,7 @@
  *
  * This test will FAIL (RED) until the seed is updated to include:
  *   - Global JornadaPolicy: 6:00–14:00, almuerzo null (auto), tol=5,
- *     horasDiarias=7.50, horasSemanales=37.50, vigenteDesde=2025-07-16
+ *     horasDiarias=7.00, horasSemanales=35.00, vigenteDesde=2025-07-16
  *   - Same policy with vigenteDesde=2026-07-16
  *   - SurchargeRate: RECARGO_DOMINICAL_FESTIVO 80%, 90%, 100%
  */
@@ -47,11 +47,13 @@ describe('Jornada Seed Verification (T1.6)', () => {
     expect(policy).not.toBeNull();
     expect(policy!.horaInicio).toBe('06:00');
     expect(policy!.horaFin).toBe('14:00');
-    expect(policy!.horasDiarias.toNumber()).toBe(7.50);
-    expect(policy!.horasSemanales.toNumber()).toBe(37.50);
+    expect(policy!.horasDiarias.toNumber()).toBe(7.00);
+    expect(policy!.horasSemanales.toNumber()).toBe(35.00);
     expect(policy!.toleranciaMin).toBe(5);
     expect(policy!.almuerzoInicio).toBeNull();
     expect(policy!.almuerzoFin).toBeNull();
+    expect(policy!.desayunoInicio).toBeNull();
+    expect(policy!.desayunoFin).toBeNull();
     expect(policy!.diasLaborales).toEqual([1, 2, 3, 4, 5]);
   });
 
@@ -69,11 +71,13 @@ describe('Jornada Seed Verification (T1.6)', () => {
     expect(policy).not.toBeNull();
     expect(policy!.horaInicio).toBe('06:00');
     expect(policy!.horaFin).toBe('14:00');
-    expect(policy!.horasDiarias.toNumber()).toBe(7.50);
-    expect(policy!.horasSemanales.toNumber()).toBe(37.50);
+    expect(policy!.horasDiarias.toNumber()).toBe(7.00);
+    expect(policy!.horasSemanales.toNumber()).toBe(35.00);
     expect(policy!.toleranciaMin).toBe(5);
     expect(policy!.almuerzoInicio).toBeNull();
     expect(policy!.almuerzoFin).toBeNull();
+    expect(policy!.desayunoInicio).toBeNull();
+    expect(policy!.desayunoFin).toBeNull();
   });
 
   // ── SEED-03: RECARGO_NOCTURNO 35% ────────────────────────────────────

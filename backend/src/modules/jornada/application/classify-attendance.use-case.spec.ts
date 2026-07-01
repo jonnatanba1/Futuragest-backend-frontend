@@ -39,6 +39,8 @@ describe('ClassifyAttendanceUseCase', () => {
     diasLaborales: [1, 2, 3, 4, 5],
     almuerzoInicio: null,
     almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
     toleranciaMin: 5,
     horasDiarias: new Decimal(8.4),
     horasSemanales: new Decimal(42.0),
@@ -128,10 +130,10 @@ describe('ClassifyAttendanceUseCase', () => {
     // With auto-lunch (midpoint 12:00 ± 30min → 11:30-12:30):
     // 7:00-11:30 = 270 min, 11:30-12:30 lunch skip, 12:30-17:00 = 270 min
     // Total worked: 540 min = 9.0h. Limit: 8.4h.
-    // Ordinary: 8.4h, Extra: 0.6h
+    // Ordinary: 8.4h, Extra: 0.1h (10h - 1h lunch - 0.5h breakfast = 8.5h total)
     expect(upsertData.horasOrdinariasDiurnas.toNumber()).toBe(8.4);
-    expect(upsertData.horasExtraDiurnas.toNumber()).toBe(0.6);
-    expect(upsertData.totalHoras.toNumber()).toBe(9.0);
+    expect(upsertData.horasExtraDiurnas.toNumber()).toBe(0.1);
+    expect(upsertData.totalHoras.toNumber()).toBe(8.5);
     expect(upsertData.esDominical).toBe(false);
     expect(upsertData.esFestivo).toBe(false);
     expect(upsertData.esDiaLaboral).toBe(true);

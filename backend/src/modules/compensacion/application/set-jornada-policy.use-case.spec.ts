@@ -20,6 +20,17 @@ import type { CompensationPeriodLookupPort } from '../domain/ports/compensation-
 function makePolicy(vigenteDesdeStr: string, horasDiarias = 8): JornadaPolicyRecord {
   return {
     id: `pol-${vigenteDesdeStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(horasDiarias * 5),
     horasDiarias: new Decimal(horasDiarias),
     vigenteDesde: new Date(`${vigenteDesdeStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -33,6 +44,7 @@ function makePolicyRepo(
     create: jest.fn().mockResolvedValue(makePolicy('2026-07-01')),
     findTimeline: jest.fn().mockResolvedValue(timeline),
     findLatestBefore: jest.fn().mockResolvedValue(null),
+    delete: jest.fn(),
   };
 }
 
@@ -55,7 +67,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-07-01' });
+    const result = await useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result.horasDiarias.toNumber()).toBe(8);
@@ -70,7 +82,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 7.5, vigenteDesde: '2026-01-01' });
+    const result = await useCase.execute({ horasDiarias: 7.5, horasSemanales: 7.5 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result.horasDiarias.toNumber()).toBe(7.5);
@@ -86,7 +98,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-01' }),
+      useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-01' }),
     ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
 
     expect(policyRepo.create).not.toHaveBeenCalled();
@@ -100,7 +112,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-15' }),
+      useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-15' }),
     ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
   });
 
@@ -112,7 +124,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-16' });
+    const result = await useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-16' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result).toBeDefined();
@@ -128,7 +140,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 9, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 9, horasSemanales: 9 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyDuplicateEffectiveDateError);
 
     expect(policyRepo.create).not.toHaveBeenCalled();
@@ -142,7 +154,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 0, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 0, horasSemanales: 0 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyInvalidHorasError);
   });
 
@@ -152,7 +164,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 24.01, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 24.01, horasSemanales: 24.01 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyInvalidHorasError);
   });
 
@@ -163,7 +175,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
-    const result = await useCase.execute({ horasDiarias: 7.5, vigenteDesde: '2026-07-01' });
+    const result = await useCase.execute({ horasDiarias: 7.5, horasSemanales: 7.5 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' });
 
     expect(result.horasDiarias.toNumber()).toBe(7.5);
   });

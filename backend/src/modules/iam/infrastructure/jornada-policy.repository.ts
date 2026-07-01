@@ -58,4 +58,11 @@ export class JornadaPolicyRepository implements JornadaPolicyRepositoryPort {
       orderBy: { vigenteDesde: 'desc' },
     }) as Promise<JornadaPolicyRecord | null>;
   }
+
+  /** DELETE a policy by ID — for removing mistaken/invalid entries. */
+  async delete(id: string): Promise<void> {
+    await this.prisma.jornadaPolicy.delete({
+      where: { id },
+    });
+  }
 }

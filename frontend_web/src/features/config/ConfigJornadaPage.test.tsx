@@ -11,13 +11,15 @@ import { ConfigJornadaPage } from './ConfigJornadaPage';
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
-const { useJornadaPoliciesQueryMock, useCreateJornadaPolicyMutationMock } = vi.hoisted(() => ({
+const { useJornadaPoliciesQueryMock, useCreateJornadaPolicyMutationMock, useArchiveJornadaPolicyMutationMock } = vi.hoisted(() => ({
   useJornadaPoliciesQueryMock: vi.fn(),
   useCreateJornadaPolicyMutationMock: vi.fn(),
+  useArchiveJornadaPolicyMutationMock: vi.fn(),
 }));
 vi.mock('../compensacion/compensacion-queries', () => ({
   useJornadaPoliciesQuery: useJornadaPoliciesQueryMock,
   useCreateJornadaPolicyMutation: useCreateJornadaPolicyMutationMock,
+  useArchiveJornadaPolicyMutation: useArchiveJornadaPolicyMutationMock,
 }));
 
 const { useOperariosMock, useZonesMock } = vi.hoisted(() => ({
@@ -52,6 +54,8 @@ const BASE_POLICY = {
   diasLaborales: [1, 2, 3, 4, 5],
   almuerzoInicio: '09:45',
   almuerzoFin: '10:15',
+  desayunoInicio: '08:00',
+  desayunoFin: '08:30',
   toleranciaMin: 5,
   horasSemanales: '44.00',
 };
@@ -71,6 +75,7 @@ const ZONES: ZoneResponseDto[] = [
 ];
 
 const mutateMock = vi.fn();
+const archiveMutateMock = vi.fn();
 
 function defaultSetup(role = 'TALENTO_HUMANO') {
   useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role } });
@@ -82,6 +87,10 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
   });
   useCreateJornadaPolicyMutationMock.mockReturnValue({
     mutateAsync: mutateMock,
+    isPending: false,
+  });
+  useArchiveJornadaPolicyMutationMock.mockReturnValue({
+    mutateAsync: archiveMutateMock,
     isPending: false,
   });
   useOperariosMock.mockReturnValue({

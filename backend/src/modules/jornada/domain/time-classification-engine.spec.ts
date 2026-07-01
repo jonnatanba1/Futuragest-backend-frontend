@@ -18,6 +18,8 @@ function makeInput(overrides: Partial<TimeClassificationInput> = {}): TimeClassi
     diasLaborales: [1, 2, 3, 4, 5],
     almuerzoInicio: '12:00',
     almuerzoFin: '13:00',
+    desayunoInicio: '23:00', // no breakfast by default in tests
+    desayunoFin: '23:30',
     isoWeekday: 1, // Monday
   };
   return { ...defaults, ...overrides };
@@ -25,17 +27,21 @@ function makeInput(overrides: Partial<TimeClassificationInput> = {}): TimeClassi
 
 describe('TimeClassificationEngine v2', () => {
   // ──────────────────────────────────────────────────────────────
-  // T2.1 — L1: Standard 6:00–14:00 with lunch → 7.0h ordinary diurnal
+  // T2.1 — L1: Standard 6:00–14:00 with lunch and breakfast → 6.5h ordinary diurnal
   // ──────────────────────────────────────────────────────────────
-  it('L1: standard 6:00–14:00 with 1h lunch → 7h ordinary diurnal', () => {
-    const result = TimeClassificationEngine.classify(makeInput());
+  it('L1: standard 6:00–14:00 with 1h lunch and 30m breakfast → 6.5h ordinary diurnal', () => {
+    const input = makeInput({
+      desayunoInicio: '08:00',
+      desayunoFin: '08:30',
+    });
+    const result = TimeClassificationEngine.classify(input);
 
-    // 8h total, 1h lunch skipped → 7h worked, all within schedule + working day
-    expect(result.horasOrdinariasDiurnas.toNumber()).toBe(7.0);
+    // 8h total, 1h lunch skipped, 0.5h breakfast skipped → 6.5h worked, all within schedule + working day
+    expect(result.horasOrdinariasDiurnas.toString()).toBe('6.5');
     expect(result.horasOrdinariasNocturnas.toNumber()).toBe(0);
     expect(result.horasExtraDiurnas.toNumber()).toBe(0);
     expect(result.horasExtraNocturnas.toNumber()).toBe(0);
-    expect(result.totalHoras.toNumber()).toBe(7.0);
+    expect(result.totalHoras.toString()).toBe('6.5');
     expect(result.esDominical).toBe(false);
     expect(result.esFestivo).toBe(false);
     expect(result.esDiaLaboral).toBe(true);

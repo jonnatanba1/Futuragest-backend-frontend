@@ -9,7 +9,7 @@ import type {
   PeriodBalanceDto,
   PeriodPayoutDto,
 } from '@futuragest/contracts';
-import { compensacionApi, enhancedBalanceApi } from '../../lib/api/client';
+import { compensacionApi, enhancedBalanceApi, jornadaPolicyApi } from '../../lib/api/client';
 
 const FIVE_MIN = 5 * 60 * 1000;
 
@@ -117,6 +117,15 @@ export function useCreateJornadaPolicyMutation() {
   const qc = useQueryClient();
   return useMutation<JornadaPolicyDto, Error, CreateJornadaPolicyRequest>({
     mutationFn: (body) => compensacionApi.createJornadaPolicy(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
+  });
+}
+
+/** Archives (deletes) a jornada policy by ID. On success, invalidates the policies list. */
+export function useArchiveJornadaPolicyMutation() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => jornadaPolicyApi.archive(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
   });
 }

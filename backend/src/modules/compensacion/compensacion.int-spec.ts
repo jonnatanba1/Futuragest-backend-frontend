@@ -146,7 +146,7 @@ describe('Compensacion integration (real Prisma)', () => {
   // ── INT-01: Insert + duplicate vigenteDesde ─────────────────────────────────
 
   it('INT-01a — inserts JornadaPolicy and row exists in DB', async () => {
-    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+    await setJornadaPolicy.execute({ horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     const rows = await prisma.jornadaPolicy.findMany({});
     expect(rows).toHaveLength(1);
@@ -155,11 +155,11 @@ describe('Compensacion integration (real Prisma)', () => {
 
   it('INT-01b — duplicate vigenteDesde → DuplicateEffectiveDateError, no second row', async () => {
     // Insert first
-    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+    await setJornadaPolicy.execute({ horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     // Attempt duplicate
     await expect(
-      setJornadaPolicy.execute({ horasDiarias: 9, vigenteDesde: '2026-01-01' }),
+      setJornadaPolicy.execute({ horasDiarias: 9, horasSemanales: 45, horaInicio: '06:00', horaFin: '15:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' }),
     ).rejects.toThrow(JornadaPolicyDuplicateEffectiveDateError);
 
     const rows = await prisma.jornadaPolicy.findMany({});
@@ -199,7 +199,7 @@ describe('Compensacion integration (real Prisma)', () => {
     });
 
     // Insert JornadaPolicy (8h from 2026-01-01)
-    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+    await setJornadaPolicy.execute({ horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     // Persist 2 Attendance rows: 7h (shortfall -1h) and 9h (surplus +1h)
     const clientRef1 = `int04-att1-${Date.now()}`;
@@ -283,7 +283,7 @@ describe('Compensacion integration (real Prisma)', () => {
     });
 
     // Insert JornadaPolicy (8h from 2026-01-01)
-    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+    await setJornadaPolicy.execute({ horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     const clientRef = `int02-close-${Date.now()}`;
 
@@ -354,7 +354,7 @@ describe('Compensacion integration (real Prisma)', () => {
     });
 
     // Insert a baseline policy so close doesn't fail for missing policy
-    await setJornadaPolicy.execute({ horasDiarias: 8, vigenteDesde: '2026-01-01' });
+    await setJornadaPolicy.execute({ horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     // Close the period 2026-05-01 to 2026-05-15 (creates a CompensationPeriod row)
     await closePeriod.execute({
@@ -368,7 +368,7 @@ describe('Compensacion integration (real Prisma)', () => {
 
     // Now try to insert a JornadaPolicy with vigenteDesde = "2026-05-10" (inside closed period)
     await expect(
-      setJornadaPolicy.execute({ horasDiarias: 7.5, vigenteDesde: '2026-05-10' }),
+      setJornadaPolicy.execute({ horasDiarias: 7.5, horasSemanales: 37.5, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-10' }),
     ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
 
     // DB must have exactly the one original policy (no new row added)

@@ -10,7 +10,18 @@ import type { JornadaPolicyRepositoryPort, JornadaPolicyRecord } from '../domain
 function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
   return {
     id: `pol-${dateStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
     horasDiarias: new Decimal(hours),
+    horasSemanales: new Decimal(hours * 5),
     vigenteDesde: new Date(`${dateStr}T00:00:00Z`),
     createdAt: new Date(),
   };
@@ -25,6 +36,7 @@ describe('GetJornadaPolicyTimelineUseCase', () => {
       create: jest.fn(),
       findTimeline: jest.fn().mockResolvedValue([p1, p2]),
       findLatestBefore: jest.fn(),
+      delete: jest.fn(),
     };
 
     const useCase = new GetJornadaPolicyTimelineUseCase(mockRepo);
@@ -41,6 +53,7 @@ describe('GetJornadaPolicyTimelineUseCase', () => {
       create: jest.fn(),
       findTimeline: jest.fn().mockResolvedValue([]),
       findLatestBefore: jest.fn(),
+      delete: jest.fn(),
     };
 
     const useCase = new GetJornadaPolicyTimelineUseCase(mockRepo);

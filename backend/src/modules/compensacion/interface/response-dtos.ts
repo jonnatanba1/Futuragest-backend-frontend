@@ -35,6 +35,12 @@ export class JornadaPolicyResponseDto {
   @ApiProperty({ nullable: true })
   almuerzoFin!: string | null;
 
+  @ApiProperty({ nullable: true })
+  desayunoInicio!: string | null;
+
+  @ApiProperty({ nullable: true })
+  desayunoFin!: string | null;
+
   @ApiProperty({ example: 5 })
   toleranciaMin!: number;
 

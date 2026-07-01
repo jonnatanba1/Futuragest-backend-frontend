@@ -38,6 +38,17 @@ function makeAttendance(
 function makePolicy(vigenteDesdeStr: string, horasDiarias: number): JornadaPolicyRecord {
   return {
     id: `pol-${vigenteDesdeStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(horasDiarias * 5),
     horasDiarias: new Decimal(horasDiarias),
     vigenteDesde: new Date(`${vigenteDesdeStr}T00:00:00Z`),
     createdAt: new Date(),

@@ -29,6 +29,10 @@ export interface JornadaPolicyDto {
   almuerzoInicio: string | null;
   /** HH:mm — lunch end. null = auto. */
   almuerzoFin: string | null;
+  /** HH:mm — breakfast start. */
+  desayunoInicio: string | null;
+  /** HH:mm — breakfast end. */
+  desayunoFin: string | null;
   /** Late arrival tolerance in minutes. Default 5. */
   toleranciaMin: number;
   /** Daily work hours. Prisma Decimal serialized as string. e.g. "8.00" */
@@ -139,6 +143,8 @@ export interface CreateJornadaPolicyRequest {
   diasLaborales: number[];
   almuerzoInicio?: string | null;
   almuerzoFin?: string | null;
+  desayunoInicio?: string | null;
+  desayunoFin?: string | null;
   toleranciaMin?: number;
   horasDiarias: number;
   horasSemanales: number;
@@ -152,6 +158,8 @@ export interface UpdateJornadaPolicyRequest {
   diasLaborales?: number[];
   almuerzoInicio?: string | null;
   almuerzoFin?: string | null;
+  desayunoInicio?: string | null;
+  desayunoFin?: string | null;
   toleranciaMin?: number;
   horasDiarias?: number;
   horasSemanales?: number;

@@ -16,6 +16,10 @@ export type TimeClassificationInput = {
   almuerzoInicio: string;
   /** Lunch end time (HH:MM). Non-null — already resolved by caller. */
   almuerzoFin: string;
+  /** Breakfast start time (HH:MM). Non-null — already resolved by caller. */
+  desayunoInicio: string;
+  /** Breakfast end time (HH:MM). Non-null — already resolved by caller. */
+  desayunoFin: string;
   /** ISO weekday of the shift date (1=Monday, 7=Sunday) */
   isoWeekday: number;
 };
@@ -84,6 +88,8 @@ export class TimeClassificationEngine {
     const scheduleEnd = parseTime(input.horaFin);
     const lunchStart = parseTime(input.almuerzoInicio);
     const lunchEnd = parseTime(input.almuerzoFin);
+    const breakfastStart = parseTime(input.desayunoInicio);
+    const breakfastEnd = parseTime(input.desayunoFin);
 
     const esDiaLaboral =
       input.diasLaborales.includes(input.isoWeekday) && !input.isHoliday;
@@ -94,6 +100,12 @@ export class TimeClassificationEngine {
       // We use getUTCHours() / getUTCMinutes() because the dates are
       // already adjusted to represent local Colombia time via UTC fields.
       const cursorMinutes = current.getUTCHours() * 60 + current.getUTCMinutes();
+
+      // ── Breakfast skip ──
+      if (isWithinInterval(cursorMinutes, breakfastStart, breakfastEnd)) {
+        current.setUTCMinutes(current.getUTCMinutes() + 1);
+        continue;
+      }
 
       // ── Lunch skip ──
       if (isWithinInterval(cursorMinutes, lunchStart, lunchEnd)) {

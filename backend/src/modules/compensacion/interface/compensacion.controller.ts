@@ -21,6 +21,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   HttpStatus,
   Inject,
@@ -54,6 +55,10 @@ import type { GetPeriodPayoutUseCase, PeriodPayout } from '../application/get-pe
 import type { ConfirmPeriodPayoutUseCase, ConfirmedPayout } from '../application/confirm-period-payout.use-case';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import {
+  JORNADA_POLICY_REPOSITORY_PORT,
+  type JornadaPolicyRepositoryPort,
+} from '../domain/ports/jornada-policy-repository.port';
 import type {
   CompensationPeriodRecord,
   CompensationDisposition,
@@ -151,6 +156,14 @@ export class SetJornadaPolicyBody {
   @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   almuerzoFin?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  desayunoInicio?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  desayunoFin?: string | null;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -283,6 +296,8 @@ function serializePolicy(policy: JornadaPolicyRecord): JornadaPolicyResponseDto 
     diasLaborales: policy.diasLaborales,
     almuerzoInicio: policy.almuerzoInicio,
     almuerzoFin: policy.almuerzoFin,
+    desayunoInicio: policy.desayunoInicio,
+    desayunoFin: policy.desayunoFin,
     toleranciaMin: policy.toleranciaMin,
     horasDiarias: policy.horasDiarias.toString(),
     horasSemanales: policy.horasSemanales.toString(),
@@ -352,6 +367,8 @@ export class CompensacionController {
     private readonly setJornadaPolicyUseCase: Pick<SetJornadaPolicyUseCase, 'execute'>,
     @Inject(GET_JORNADA_POLICY_TIMELINE_USE_CASE)
     private readonly getTimelineUseCase: Pick<GetJornadaPolicyTimelineUseCase, 'execute'>,
+    @Inject(JORNADA_POLICY_REPOSITORY_PORT)
+    private readonly policyRepo: JornadaPolicyRepositoryPort,
     @Inject(CLOSE_COMPENSATION_PERIOD_USE_CASE)
     private readonly closeUseCase: Pick<CloseCompensationPeriodUseCase, 'execute'>,
     @Inject(GET_PERIOD_PAYOUT_USE_CASE)
@@ -417,6 +434,15 @@ export class CompensacionController {
   async getJornadaPolicyTimeline(): Promise<JornadaPolicyResponseDto[]> {
     const timeline = await this.getTimelineUseCase.execute();
     return timeline.map(serializePolicy);
+  }
+
+  // ── DELETE /jornada-policy/:id ──────────────────────────────────────────────
+
+  @Roles(...WRITE_POLICY_ROLES)
+  @Delete('jornada-policy/:id')
+  @ApiOkResponse({ description: 'Elimina una política de jornada' })
+  async deleteJornadaPolicy(@Param('id') id: string): Promise<void> {
+    await this.policyRepo.delete(id);
   }
 
   // ── POST /compensacion/:operarioId/close ─────────────────────────────────
