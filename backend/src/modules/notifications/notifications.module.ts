@@ -2,8 +2,8 @@
  * NotificationsModule — DI wiring for the push notification port and adapters.
  *
  * Adapter selection (env-driven factory, mirrors StorageModule pattern):
- * - FIREBASE_ENABLED==='true' → FcmNotificationAdapter (import-safe skeleton)
- * - default                   → NoOpNotificationAdapter (structured log, no-op)
+ * - FIREBASE_ENABLED==='true' → CompositeNotificationAdapter (FCM + SSE)
+ * - default                   → SseNotificationAdapter (SSE only, always active)
  *
  * This module is SINGLETON-scoped (not request-scoped) because RecipientResolver
  * performs a global DB query (not request-scoped). NestJS allows singleton providers
@@ -26,13 +26,21 @@ import type { AuthRepositoryPort } from '../auth/domain/auth-repository.port';
 import { NOTIFICATION_PORT } from './domain/notification.port';
 import { NoOpNotificationAdapter } from './infrastructure/noop-notification.adapter';
 import { FcmNotificationAdapter } from './infrastructure/fcm-notification.adapter';
+import { SseConnectionRegistry } from './infrastructure/sse-connection-registry';
+import { SseNotificationAdapter } from './infrastructure/sse-notification.adapter';
+import { CompositeNotificationAdapter } from './infrastructure/composite-notification.adapter';
 import { RecipientResolver } from './infrastructure/recipient-resolver';
+import { SseAuthGuard } from './interface/sse-auth.guard';
+import { NotificationsController } from './interface/notifications.controller';
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuthModule],
+  controllers: [NotificationsController],
   providers: [
     RecipientResolver,
     NoOpNotificationAdapter,
+    SseConnectionRegistry,
+    SseAuthGuard,
     {
       provide: FcmNotificationAdapter,
       useFactory: (resolver: RecipientResolver, authRepo: AuthRepositoryPort) =>
@@ -40,17 +48,23 @@ import { RecipientResolver } from './infrastructure/recipient-resolver';
       inject: [RecipientResolver, AUTH_REPOSITORY_PORT],
     },
     {
+      provide: SseNotificationAdapter,
+      useFactory: (registry: SseConnectionRegistry) =>
+        new SseNotificationAdapter(registry),
+      inject: [SseConnectionRegistry],
+    },
+    {
       provide: NOTIFICATION_PORT,
       useFactory: (
-        noOp: NoOpNotificationAdapter,
         fcm: FcmNotificationAdapter,
+        sse: SseNotificationAdapter,
       ) => {
         if (process.env.FIREBASE_ENABLED === 'true') {
-          return fcm;
+          return new CompositeNotificationAdapter(fcm, sse);
         }
-        return noOp;
+        return sse;
       },
-      inject: [NoOpNotificationAdapter, FcmNotificationAdapter],
+      inject: [FcmNotificationAdapter, SseNotificationAdapter],
     },
   ],
   exports: [NOTIFICATION_PORT],

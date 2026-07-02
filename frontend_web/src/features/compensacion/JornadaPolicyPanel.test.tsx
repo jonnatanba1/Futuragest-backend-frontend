@@ -35,6 +35,8 @@ const BASE_POLICY = {
   diasLaborales: [1, 2, 3, 4, 5],
   almuerzoInicio: '09:45',
   almuerzoFin: '10:15',
+  desayunoInicio: null as string | null,
+  desayunoFin: null as string | null,
   toleranciaMin: 5,
   horasSemanales: '44.00',
 };

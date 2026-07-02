@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CompensatoryRestDto, OperarioDto } from '@futuragest/contracts';
-import { CompensatoriosPage } from './CompensatoriosPage';
+import { CompensatoriosPanel } from './CompensatoriosPanel';
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -59,10 +59,10 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
   });
 }
 
-function renderPage() {
+function renderPanel() {
   return render(
     <MantineProvider>
-      <CompensatoriosPage />
+      <CompensatoriosPanel />
     </MantineProvider>,
   );
 }
@@ -71,11 +71,11 @@ afterEach(() => vi.clearAllMocks());
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('CompensatoriosPage', () => {
+describe('CompensatoriosPanel', () => {
   // CR-1 — Renders compensatorio rows with operario names
   it('renders compensatorio rows with operario names joined', () => {
     defaultSetup();
-    renderPage();
+    renderPanel();
     // Names appear in table rows + filter dropdown options — use getAllByText
     const carlos = screen.getAllByText('Carlos Gómez');
     const maria = screen.getAllByText('María López');
@@ -86,7 +86,7 @@ describe('CompensatoriosPage', () => {
   // CR-2 — Shows type (OCCASIONAL/HABITUAL)
   it('shows type badges: OCCASIONAL and HABITUAL', () => {
     defaultSetup();
-    renderPage();
+    renderPanel();
     const occasional = screen.getAllByText('OCCASIONAL');
     const habitual = screen.getAllByText('HABITUAL');
     expect(occasional.length).toBeGreaterThanOrEqual(1);
@@ -96,7 +96,7 @@ describe('CompensatoriosPage', () => {
   // CR-3 — Shows status (PENDING/SCHEDULED/TAKEN)
   it('shows status badges', () => {
     defaultSetup();
-    renderPage();
+    renderPanel();
     expect(screen.getByText('PENDIENTE')).toBeInTheDocument();
     expect(screen.getByText('PROGRAMADO')).toBeInTheDocument();
     expect(screen.getByText('TOMADO')).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('CompensatoriosPage', () => {
   // CR-4 — Shows month column
   it('shows month column', () => {
     defaultSetup();
-    renderPage();
+    renderPanel();
     const june = screen.getAllByText('2026-06');
     const may = screen.getAllByText('2026-05');
     expect(june.length).toBeGreaterThanOrEqual(1);
@@ -115,7 +115,7 @@ describe('CompensatoriosPage', () => {
   // CR-5 — Shows "Programar" button for PENDING compensatories (TALENTO_HUMANO)
   it('shows "Programar" button for PENDING records', () => {
     defaultSetup('TALENTO_HUMANO');
-    renderPage();
+    renderPanel();
     // The PENDING row should have a Programar button
     const buttons = screen.getAllByRole('button', { name: /programar/i });
     expect(buttons.length).toBeGreaterThanOrEqual(1);
@@ -124,7 +124,7 @@ describe('CompensatoriosPage', () => {
   // CR-6 — Hides "Programar" for non-auth roles
   it('hides action buttons for GERENCIA', () => {
     defaultSetup('GERENCIA');
-    renderPage();
+    renderPanel();
     expect(screen.queryByRole('button', { name: /programar/i })).not.toBeInTheDocument();
   });
 
@@ -141,7 +141,7 @@ describe('CompensatoriosPage', () => {
       isPending: false,
     });
     useOperariosMock.mockReturnValue({ data: [], isLoading: false, isError: false });
-    renderPage();
+    renderPanel();
     expect(screen.getByLabelText('Cargando')).toBeInTheDocument();
   });
 });

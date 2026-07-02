@@ -26,9 +26,7 @@ const AdminPage = lazy(() =>
 const CompensacionPage = lazy(() =>
   import('../features/compensacion/CompensacionPage').then((m) => ({ default: m.CompensacionPage })),
 );
-const CompensatoriosPage = lazy(() =>
-  import('../features/compensacion/CompensatoriosPage').then((m) => ({ default: m.CompensatoriosPage })),
-);
+
 const ConfigJornadaPage = lazy(() =>
   import('../features/config/ConfigJornadaPage').then((m) => ({ default: m.ConfigJornadaPage })),
 );
@@ -107,14 +105,7 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
-        <Route
-          path="compensacion/compensatorios"
-          element={
-            <RequireAuth roles={OFFICE_ROLES}>
-              <CompensatoriosPage />
-            </RequireAuth>
-          }
-        />
+
         <Route path="config" element={<ConfigLayout />}>
           <Route
             index

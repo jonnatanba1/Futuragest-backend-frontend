@@ -278,6 +278,7 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
     SCOPE_CONTEXT_HOLDER,
     ScopedSupervisorRepository,
     ScopedOperarioRepository,
+    ScopedZoneRepository,
     ScopedAssignmentRepository,
     OPERARIO_REPOSITORY,
     OPERARIO_STATUS,

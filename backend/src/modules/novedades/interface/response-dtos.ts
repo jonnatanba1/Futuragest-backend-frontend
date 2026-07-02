@@ -67,4 +67,16 @@ export class NovedadResponseDto {
 
   @ApiProperty({ description: 'ISO 8601 timestamp — delta cursor for ?since= queries' })
   updatedAt!: string;
+
+  @ApiPropertyOptional()
+  operarioName?: string;
+
+  @ApiPropertyOptional()
+  operarioDocumento?: string;
+
+  @ApiPropertyOptional()
+  supervisorEmail?: string;
+
+  @ApiPropertyOptional()
+  zoneName?: string;
 }

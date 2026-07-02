@@ -59,6 +59,7 @@ export function NovedadesPage() {
   const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const novedades = useNovedades();
   const attendances = useAttendances();
@@ -129,11 +130,16 @@ export function NovedadesPage() {
 
   const runPending = async () => {
     if (!pending) return;
-    const mutation = pending.action === 'approve' ? approve : reject;
     try {
-      await mutation.mutateAsync(pending.novedad.id);
+      if (pending.action === 'approve') {
+        await approve.mutateAsync(pending.novedad.id);
+      } else {
+        const reason = rejectReason.trim() || undefined;
+        await reject.mutateAsync({ id: pending.novedad.id, reason });
+      }
       const msg = pending.action === 'approve' ? 'Novedad aprobada' : 'Novedad rechazada';
       notifications.show({ color: 'teal', message: msg });
+      setRejectReason('');
     } catch (err) {
       notifications.show({
         color: 'red',
@@ -240,6 +246,11 @@ export function NovedadesPage() {
                     <Badge color={STATUS_COLOR[n.status]} variant="light">
                       {STATUS_LABEL[n.status]}
                     </Badge>
+                    {n.status === 'REJECTED' && n.rejectionReason && (
+                      <Text size="xs" c="dimmed" mt={2}>
+                        {n.rejectionReason}
+                      </Text>
+                    )}
                   </Table.Td>
                   <Table.Td>
                     {n.status !== 'PENDING' ? (
@@ -291,7 +302,7 @@ export function NovedadesPage() {
 
       <Modal
         opened={pending !== null}
-        onClose={() => setPending(null)}
+        onClose={() => { setPending(null); setRejectReason(''); }}
         title={pending?.action === 'approve' ? 'Aprobar novedad' : 'Rechazar novedad'}
         centered
       >
@@ -302,8 +313,16 @@ export function NovedadesPage() {
               <strong>{pending.novedad.horasExtra} h</strong> extra de{' '}
               <strong>{operarioOf(pending.novedad.attendanceId)}</strong>?
             </Text>
+            {pending.action === 'reject' && (
+              <TextInput
+                label="Motivo del rechazo (opcional)"
+                placeholder="Ej: Horas no justificadas"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.currentTarget.value)}
+              />
+            )}
             <Group justify="flex-end">
-              <Button variant="default" onClick={() => setPending(null)}>
+              <Button variant="default" onClick={() => { setPending(null); setRejectReason(''); }}>
                 Cancelar
               </Button>
               <Button

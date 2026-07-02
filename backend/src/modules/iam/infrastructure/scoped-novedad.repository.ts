@@ -106,6 +106,7 @@ export class ScopedNovedadRepository
         approvedByUserId: data.approvedByUserId,
         decidedAt: data.decidedAt,
         decisionVerification: data.decisionVerification,
+        rejectionReason: data.rejectionReason ?? null,
       },
     });
   }

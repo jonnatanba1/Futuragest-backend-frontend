@@ -24,6 +24,7 @@ const NOV = [
     approvedByUserId: null,
     decidedAt: null,
     decisionVerification: null,
+    rejectionReason: null,
     createdAt: '2026-06-03T10:00:00Z',
     updatedAt: '',
   },
@@ -39,6 +40,7 @@ const NOV = [
     approvedByUserId: 'u',
     decidedAt: '2026-06-02T12:00:00Z',
     decisionVerification: 'BIOMETRIC' as const,
+    rejectionReason: null,
     createdAt: '2026-06-02T10:00:00Z',
     updatedAt: '',
   },
@@ -125,7 +127,7 @@ describe('NovedadesPage', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Rechazar' }));
 
-    await waitFor(() => expect(rejectMock).toHaveBeenCalledWith('n-1'));
+    await waitFor(() => expect(rejectMock).toHaveBeenCalledWith({ id: 'n-1', reason: undefined }));
   });
 
   it('shows BIOMETRIC verification badge for the APPROVED row', () => {

@@ -36,6 +36,8 @@ export interface UpdateNovedadStatusData {
   decidedAt: Date | null;
   /** Audit label only — no authorization logic may depend on this field. */
   decisionVerification: VerificationMethod | null;
+  /** Optional reason provided by the líder when rejecting the novedad. */
+  rejectionReason?: string | null;
 }
 
 export interface NovedadRepositoryPort {

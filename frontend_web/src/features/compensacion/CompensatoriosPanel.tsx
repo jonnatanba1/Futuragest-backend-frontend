@@ -6,9 +6,7 @@ import {
   Select,
   Stack,
   Table,
-  Title,
 } from '@mantine/core';
-import { useDocumentTitle } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import React, { useMemo, useState } from 'react';
 import type { CompensatoryStatus, CompensatoryType } from '@futuragest/contracts';
@@ -32,11 +30,9 @@ const STATUS_LABELS: Record<CompensatoryStatus, { label: string; color: string }
   TAKEN: { label: 'TOMADO', color: 'green' },
 };
 
-// ─── CompensatoriosPage ───────────────────────────────────────────────────────
+// ─── CompensatoriosPanel ───────────────────────────────────────────────────────
 
-export function CompensatoriosPage() {
-  useDocumentTitle('FuturaGest · Compensatorios');
-
+export function CompensatoriosPanel() {
   const { user } = useAuth();
   const canWrite = hasAnyRole(user?.role, COMPENSACION_WRITE_ROLES);
 
@@ -89,9 +85,7 @@ export function CompensatoriosPage() {
   };
 
   return (
-    <Stack gap="lg">
-      <Title order={2}>Descansos Compensatorios</Title>
-
+    <Stack gap="lg" data-testid="compensatorios-tab-panel">
       {/* Filters */}
       <Group gap="sm">
         <Select

@@ -21,6 +21,7 @@ import React, { Suspense, useRef } from 'react';
 import { NavLink as RouterNavLink, Outlet, useNavigate } from 'react-router-dom';
 import isotipo from '../../assets/isotipo.png';
 import { useAuth } from '../../lib/auth/auth-context';
+import { useNovedadSse } from '../../hooks/use-novedad-sse';
 import { navItemsForRole } from './nav-config';
 
 function ColorSchemeToggle() {
@@ -83,6 +84,7 @@ export function AppShellLayout() {
   const [opened, { toggle, close }] = useDisclosure();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  useNovedadSse(true);
 
   const items = user ? navItemsForRole(user.role) : [];
   const userInitial = user?.email?.[0]?.toUpperCase() ?? '?';

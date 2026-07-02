@@ -58,6 +58,15 @@ import {
   ImmutableNovedadError,
   InvalidHorasExtraError,
 } from '../domain/novedad.errors';
+import type { Novedad } from '@prisma/client';
+import { NOVEDAD_REPOSITORY_PORT } from '../domain/ports/novedad-repository.port';
+import type { NovedadRepositoryPort } from '../domain/ports/novedad-repository.port';
+import { ATTENDANCE_REPOSITORY_PORT } from '../../asistencia/domain/ports/attendance-repository.port';
+import { ScopedAttendanceRepository } from '../../iam/infrastructure/scoped-attendance.repository';
+import { ScopedOperarioRepository } from '../../iam/infrastructure/scoped-operario.repository';
+import { ScopedSupervisorRepository } from '../../iam/infrastructure/scoped-supervisor.repository';
+import { ScopedZoneRepository } from '../../iam/infrastructure/scoped-zone.repository';
+
 
 // ─── Injection tokens ──────────────────────────────────────────────────────────
 
@@ -127,6 +136,17 @@ export class ApproveRejectBody {
   @IsOptional()
   @IsIn(['BIOMETRIC', 'DEVICE_CREDENTIAL', 'NONE'])
   verification?: 'BIOMETRIC' | 'DEVICE_CREDENTIAL' | 'NONE';
+
+  /**
+   * Optional reason provided by the líder when REJECTING the novedad.
+   * Free-text, captured from a dialog in the Flutter app. Audit only.
+   */
+  @ApiPropertyOptional({
+    description: 'Rejection reason provided by the líder. Audit label only.',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 // ─── Error → HTTP helper ───────────────────────────────────────────────────────
@@ -165,6 +185,11 @@ export class NovedadController {
     private readonly getUseCase: Pick<GetNovedadUseCase, 'execute'>,
     @Inject(LIST_NOVEDADES_USE_CASE)
     private readonly listUseCase: Pick<ListNovedadesUseCase, 'execute'>,
+    @Inject(ATTENDANCE_REPOSITORY_PORT)
+    private readonly attendanceRepo: ScopedAttendanceRepository,
+    private readonly operarioRepo: ScopedOperarioRepository,
+    private readonly supervisorRepo: ScopedSupervisorRepository,
+    private readonly zoneRepo: ScopedZoneRepository,
   ) {}
 
   // ── Create ─────────────────────────────────────────────────────────────────
@@ -186,7 +211,7 @@ export class NovedadController {
         clientRef: body.clientRef,
       });
       res.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
-      return result.record;
+      return this.enrichNovedad(result.record);
     } catch (err) {
       mapDomainError(err);
     }
@@ -207,7 +232,8 @@ export class NovedadController {
     }
 
     const since = query.since ? new Date(query.since) : undefined;
-    return this.listUseCase.execute(since);
+    const records = await this.listUseCase.execute(since);
+    return this.enrichNovedades(records);
   }
 
   // ── Detail ─────────────────────────────────────────────────────────────────
@@ -217,7 +243,8 @@ export class NovedadController {
   @ApiOkResponse({ type: NovedadResponseDto })
   async getNovedad(@Param('id') id: string) {
     try {
-      return await this.getUseCase.execute(id);
+      const record = await this.getUseCase.execute(id);
+      return this.enrichNovedad(record);
     } catch (err) {
       mapDomainError(err);
     }
@@ -231,7 +258,8 @@ export class NovedadController {
   @ApiOkResponse({ type: NovedadResponseDto })
   async approveNovedad(@Param('id') id: string, @Body() body: ApproveRejectBody) {
     try {
-      return await this.approveUseCase.execute(id, body.verification);
+      const record = await this.approveUseCase.execute(id, body.verification);
+      return this.enrichNovedad(record);
     } catch (err) {
       mapDomainError(err);
     }
@@ -245,7 +273,8 @@ export class NovedadController {
   @ApiOkResponse({ type: NovedadResponseDto })
   async rejectNovedad(@Param('id') id: string, @Body() body: ApproveRejectBody) {
     try {
-      return await this.rejectUseCase.execute(id, body.verification);
+      const record = await this.rejectUseCase.execute(id, body.verification, body.reason);
+      return this.enrichNovedad(record);
     } catch (err) {
       mapDomainError(err);
     }
@@ -262,5 +291,64 @@ export class NovedadController {
     } catch (err) {
       mapDomainError(err);
     }
+  }
+
+  private async enrichNovedad(novedad: Novedad): Promise<NovedadResponseDto> {
+    const enriched = await this.enrichNovedades([novedad]);
+    return enriched[0];
+  }
+
+  private async enrichNovedades(novedades: Novedad[]): Promise<NovedadResponseDto[]> {
+    if (novedades.length === 0) return [];
+
+    // 1. Fetch related attendances (scoped)
+    const attendanceIds = Array.from(new Set(novedades.map(n => n.attendanceId)));
+    const attendances = await this.attendanceRepo.findManyScoped({ where: { id: { in: attendanceIds } } });
+    const attendanceMap = new Map(attendances.map(a => [a.id, a]));
+
+    // 2. Fetch related operarios (scoped)
+    const operarioIds = Array.from(new Set(attendances.map(a => a.operarioId)));
+    const operarios = await this.operarioRepo.findManyScoped({ where: { id: { in: operarioIds } } });
+    const operarioMap = new Map(operarios.map(o => [o.id, o]));
+
+    // 3. Fetch related supervisors (scoped)
+    const supervisorIds = Array.from(new Set(novedades.map(n => n.supervisorId)));
+    const supervisors = (await this.supervisorRepo.findManyScoped({
+      where: { id: { in: supervisorIds } },
+      include: { user: { select: { email: true } } },
+    })) as any[];
+    const supervisorMap = new Map<string, any>(supervisors.map(s => [s.id, s]));
+
+    // 4. Fetch related zones (scoped)
+    const zoneIds = Array.from(new Set(novedades.map(n => n.zoneId).filter((z): z is string => !!z)));
+    const zones = await this.zoneRepo.findManyScoped({ where: { id: { in: zoneIds } } });
+    const zoneMap = new Map(zones.map(z => [z.id, z]));
+
+    return novedades.map(n => {
+      const attendance = attendanceMap.get(n.attendanceId);
+      const operario = attendance ? operarioMap.get(attendance.operarioId) : undefined;
+      const supervisor = supervisorMap.get(n.supervisorId);
+      const zone = n.zoneId ? zoneMap.get(n.zoneId) : undefined;
+
+      return {
+        id: n.id,
+        attendanceId: n.attendanceId,
+        supervisorId: n.supervisorId,
+        zoneId: n.zoneId || '',
+        horasExtra: n.horasExtra.toString(),
+        motivo: n.motivo,
+        status: n.status,
+        clientRef: n.clientRef,
+        approvedByUserId: n.approvedByUserId,
+        decidedAt: n.decidedAt?.toISOString() || null,
+        decisionVerification: n.decisionVerification,
+        createdAt: n.createdAt.toISOString(),
+        updatedAt: n.updatedAt.toISOString(),
+        operarioName: operario?.fullName,
+        operarioDocumento: operario?.documento,
+        supervisorEmail: supervisor?.user?.email,
+        zoneName: zone?.name,
+      } as unknown as NovedadResponseDto;
+    });
   }
 }

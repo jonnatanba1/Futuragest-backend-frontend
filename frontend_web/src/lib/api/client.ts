@@ -355,12 +355,13 @@ export const novedadesApi = {
       `/novedades${opts.since ? `?since=${encodeURIComponent(opts.since)}` : ''}`,
     ),
 
-  // approve/reject carry no body — all fields are server-derived from the JWT.
+  // All fields in approve/reject are server-derived from the JWT.
+  // Optional body fields (verification, reason) are audit labels only.
   approveNovedad: (id: string): Promise<NovedadDto> =>
     request<NovedadDto>('PATCH', `/novedades/${id}/approve`),
 
-  rejectNovedad: (id: string): Promise<NovedadDto> =>
-    request<NovedadDto>('PATCH', `/novedades/${id}/reject`),
+  rejectNovedad: (id: string, body?: { reason?: string; verification?: string }): Promise<NovedadDto> =>
+    request<NovedadDto>('PATCH', `/novedades/${id}/reject`, { body }),
 };
 
 // --- JornadaPolicy (full CRUD — PR 5) ---------------------------------------

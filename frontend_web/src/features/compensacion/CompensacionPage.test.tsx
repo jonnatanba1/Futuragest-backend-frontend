@@ -16,6 +16,11 @@ vi.mock('./compensacion-queries', () => ({
   useCreateJornadaPolicyMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock('../config/config-queries', () => ({
+  useCompensatoryRestQuery: () => ({ data: [], isLoading: false, isError: false }),
+  useScheduleCompensatoryMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 vi.mock('../operarios/operario-queries', () => ({
   useOperarios: () => ({ data: [], isLoading: false }),
 }));
@@ -39,6 +44,12 @@ describe('CompensacionPage', () => {
     setRole('TALENTO_HUMANO');
     renderPage();
     expect(screen.getByRole('tab', { name: /balance y cierre/i })).toBeInTheDocument();
+  });
+
+  it('renders the "Descansos compensatorios" tab label', () => {
+    setRole('TALENTO_HUMANO');
+    renderPage();
+    expect(screen.getByRole('tab', { name: /descansos compensatorios/i })).toBeInTheDocument();
   });
 
   it('renders the "Política de jornada" tab label', () => {

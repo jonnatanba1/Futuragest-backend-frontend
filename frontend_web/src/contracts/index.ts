@@ -9,6 +9,7 @@ export * from './shared/supervisor';
 export * from './shared/push-token';
 
 export * from './shared/compensacion';
+export * from './shared/notification-event';
 
 // Generated OpenAPI types (populated by the contracts#generate turbo task in PR5)
 // export * from './generated/api';

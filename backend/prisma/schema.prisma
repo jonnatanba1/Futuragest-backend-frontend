@@ -234,12 +234,15 @@ model Novedad {
   /// Null = web admin decision (no biometrics) or legacy row.
   /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
   decisionVerification VerificationMethod?
+  /// Optional reason provided by the líder when REJECTING the novedad.
+  /// Captured from a dialog in the Flutter app; stored for audit/transparency.
+  rejectionReason  String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   // No @@unique([attendanceId]) — partial unique index added by hand in migration:
   // CREATE UNIQUE INDEX "Novedad_attendanceId_active_key"
-  //   ON "Novedad"("attendanceId")
+  //   ON "Novedad"("attendanceId", "tipoNovedad")
   //   WHERE status IN ('PENDING', 'APPROVED');
   @@index([supervisorId])
   @@index([zoneId])

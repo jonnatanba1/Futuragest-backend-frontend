@@ -33,6 +33,11 @@ export interface NovedadDto {
    * Audit trail only — no authorization gate depends on this value.
    */
   decisionVerification: VerificationMethod | null;
+  /**
+   * Optional reason provided by the líder when REJECTING the novedad.
+   * Captured from a dialog in the Flutter app or web modal. Null when APPROVED or PENDING.
+   */
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,4 +58,9 @@ export interface ApproveRejectNovedadDto {
    * Absent = web admin (no biometrics).
    */
   verification?: VerificationMethod;
+  /**
+   * Optional reason provided by the líder when REJECTING the novedad.
+   * Free-text, captured from a dialog in the Flutter app or web modal.
+   */
+  reason?: string;
 }
