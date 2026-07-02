@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { PrismaModule } from '../../database/prisma.module';
 import { AsistenciaModule } from '../asistencia/asistencia.module';
 import { NovedadesModule } from '../novedades/novedades.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ATTENDANCE_CLASSIFICATION_PORT } from '../asistencia/domain/ports/attendance-classification.port';
 import { LATE_ARRIVAL_NOVEDAD_PORT } from '../asistencia/domain/ports/late-arrival-novedad.port';
 import { COMPENSATORY_REST_PORT } from '../asistencia/domain/ports/compensatory-rest.port';
@@ -30,6 +31,7 @@ import { PrismaCompensatoryRestRepository } from './infrastructure/prisma-compen
     PrismaModule,
     forwardRef(() => AsistenciaModule),
     forwardRef(() => NovedadesModule),
+    NotificationsModule,
   ],
   controllers: [JornadaController, CompensatorioController, HolidaysController, SurchargeRatesController],
   providers: [

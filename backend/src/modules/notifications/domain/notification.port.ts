@@ -13,8 +13,12 @@ export const NOTIFICATION_PORT = Symbol('NOTIFICATION_PORT');
 /** Payload emitted after a genuine novedad creation. */
 export interface NovedadCreatedPayload {
   novedadId: string;
-  /** Decimal string as stored in the DB (e.g. "2.50"). */
+  /** Type of novedad — drives the notification copy + the Flutter deep-link target. */
+  tipoNovedad: 'LLEGADA_TARDE' | 'HORAS_EXTRA';
+  /** Decimal string as stored in the DB (e.g. "2.50"). "0" for LLEGADA_TARDE. */
   horasExtra: string;
+  /** Minutes late from horaInicio. Only set when tipoNovedad === 'LLEGADA_TARDE'. */
+  minutosTarde?: number;
   supervisorId: string;
   zoneId: string;
 }

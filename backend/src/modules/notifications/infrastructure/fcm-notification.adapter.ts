@@ -98,15 +98,26 @@ export class FcmNotificationAdapter implements NotificationPort {
         });
       }
 
-      // Build the multicast message body (tokens are attached per batch below)
+      // Build the multicast message body (tokens are attached per batch below).
+      // Copy is tipoNovedad-driven so LLEGADA_TARDE and HORAS_EXTRA each get their
+      // own title/body. data carries tipoNovedad so the Flutter tap handler can
+      // route to the right screen (LlegadasTardeScreen vs LiderNovedadesScreen).
+      const isLateArrival = payload.tipoNovedad === 'LLEGADA_TARDE';
+      const notification = isLateArrival
+        ? {
+            title: 'Nueva llegada tarde',
+            body: `Se registró una llegada tarde de ${payload.minutosTarde ?? 0} minutos pendiente de revisión.`,
+          }
+        : {
+            title: 'Nueva novedad de horas extra',
+            body: `Se registraron ${payload.horasExtra} horas extra pendientes de aprobación.`,
+          };
       const baseMessage = {
-        notification: {
-          title: 'Nueva novedad de horas extra',
-          body: `Se registraron ${payload.horasExtra} horas extra pendientes de aprobación.`,
-        },
+        notification,
         // FCM data fields must be string values only
         data: {
           novedadId: payload.novedadId,
+          tipoNovedad: payload.tipoNovedad ?? 'HORAS_EXTRA',
           type: 'NOVEDAD_CREATED',
         },
       };

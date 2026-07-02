@@ -151,6 +151,10 @@ describe('CreateNovedadUseCase — notification fire-and-forget', () => {
       expect(call.zoneId).toBe('zone-z1');
       // P2-1: horasExtra is formatted to a fixed 2-decimal string (3 → "3.00")
       expect(call.horasExtra).toBe('3.00');
+      // CreateNovedadUseCase is HORAS_EXTRA-only — the payload must tag it so the
+      // FCM/SSE adapters pick the horas-extra copy and the Flutter deep-link lands
+      // on LiderNovedadesScreen.
+      expect(call.tipoNovedad).toBe('HORAS_EXTRA');
     });
   });
 

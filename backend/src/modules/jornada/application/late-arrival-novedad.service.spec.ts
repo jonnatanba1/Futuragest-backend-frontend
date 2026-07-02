@@ -15,6 +15,7 @@ import { LateArrivalNovedadService } from './late-arrival-novedad.service';
 import type { AttendanceRepositoryPort } from '../../asistencia/domain/ports/attendance-repository.port';
 import type { JornadaPolicyRepositoryPort } from '../domain/ports/jornada-policy-repository.port';
 import type { NovedadRepositoryPort } from '../../novedades/domain/ports/novedad-repository.port';
+import type { NotificationPort, NovedadCreatedPayload } from '../../notifications/domain/notification.port';
 import { Attendance, JornadaPolicy } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/client';
 
@@ -113,6 +114,22 @@ function makeMockNovedadRepo(createImpl?: jest.Mock): NovedadRepositoryPort {
     delete: jest.fn(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
+}
+
+/**
+ * Builds a NotificationPort mock that records every notifyNovedadCreated call
+ * into `calls` so tests can assert on the payload. Resolves void (never throws)
+ * by default; pass `rejection` to simulate a failing port.
+ */
+function makeMockNotificationPort(
+  rejection?: unknown,
+): { port: NotificationPort; calls: NovedadCreatedPayload[] } {
+  const calls: NovedadCreatedPayload[] = [];
+  const fn = jest.fn((payload: NovedadCreatedPayload) => {
+    calls.push(payload);
+    return rejection ? Promise.reject(rejection) : Promise.resolve();
+  });
+  return { port: { notifyNovedadCreated: fn } as unknown as NotificationPort, calls };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -358,6 +375,123 @@ describe('LateArrivalNovedadService', () => {
       ).resolves.toBeUndefined();
 
       expect(novedadCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Notification dispatch (LLEGADA_TARDE push) ──────────────────────────────
+
+  describe('notification dispatch — LLEGADA_TARDE push', () => {
+    function makeLateAttendance(): Attendance {
+      return makeAttendance({
+        checkInCapturedAt: colombiaDate('2026-06-29', 6, 22), // 22 min after 06:00
+      });
+    }
+
+    it('N1 — on genuine create, fires notifyNovedadCreated once with LLEGADA_TARDE payload', async () => {
+      const attendanceRepo = makeMockAttendanceRepo(makeLateAttendance());
+      const policyRepo = makeMockPolicyRepo(makePolicy({ toleranciaMin: 5 }));
+      const novedadCreate = jest
+        .fn()
+        .mockResolvedValue({ id: 'nov-late-1', supervisorId: 'sup-s1', zoneId: 'zone-z1' });
+      const novedadRepo = makeMockNovedadRepo(novedadCreate);
+      const { port, calls } = makeMockNotificationPort();
+
+      const service = new LateArrivalNovedadService(
+        attendanceRepo,
+        policyRepo,
+        novedadRepo,
+        port,
+      );
+      await service.checkAndCreateLateArrivalNovedad('att-a1');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toEqual({
+        novedadId: 'nov-late-1',
+        tipoNovedad: 'LLEGADA_TARDE',
+        horasExtra: '0',
+        minutosTarde: 22,
+        supervisorId: 'sup-s1',
+        zoneId: 'zone-z1',
+      });
+    });
+
+    it('N2 — on P2002 (already exists), does NOT fire notifyNovedadCreated', async () => {
+      const attendanceRepo = makeMockAttendanceRepo(makeLateAttendance());
+      const policyRepo = makeMockPolicyRepo(makePolicy({ toleranciaMin: 5 }));
+      const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
+      const novedadCreate = jest.fn().mockRejectedValue(p2002);
+      const novedadRepo = makeMockNovedadRepo(novedadCreate);
+      const { port, calls } = makeMockNotificationPort();
+
+      const service = new LateArrivalNovedadService(
+        attendanceRepo,
+        policyRepo,
+        novedadRepo,
+        port,
+      );
+      await expect(
+        service.checkAndCreateLateArrivalNovedad('att-a1'),
+      ).resolves.toBeUndefined();
+
+      expect(calls).toHaveLength(0);
+    });
+
+    it('N3 — when not late (within tolerance), does NOT fire notifyNovedadCreated', async () => {
+      const attendanceRepo = makeMockAttendanceRepo(
+        makeAttendance({ checkInCapturedAt: colombiaDate('2026-06-29', 6, 4) }),
+      );
+      const policyRepo = makeMockPolicyRepo(makePolicy({ toleranciaMin: 5 }));
+      const novedadCreate = jest.fn();
+      const novedadRepo = makeMockNovedadRepo(novedadCreate);
+      const { port, calls } = makeMockNotificationPort();
+
+      const service = new LateArrivalNovedadService(
+        attendanceRepo,
+        policyRepo,
+        novedadRepo,
+        port,
+      );
+      await service.checkAndCreateLateArrivalNovedad('att-a1');
+
+      expect(calls).toHaveLength(0);
+    });
+
+    it('N4 — a rejecting notifyNovedadCreated is swallowed (service never throws)', async () => {
+      const attendanceRepo = makeMockAttendanceRepo(makeLateAttendance());
+      const policyRepo = makeMockPolicyRepo(makePolicy({ toleranciaMin: 5 }));
+      const novedadCreate = jest
+        .fn()
+        .mockResolvedValue({ id: 'nov-late-2', supervisorId: 'sup-s1', zoneId: 'zone-z1' });
+      const novedadRepo = makeMockNovedadRepo(novedadCreate);
+      const { port } = makeMockNotificationPort(new Error('FCM down'));
+
+      const service = new LateArrivalNovedadService(
+        attendanceRepo,
+        policyRepo,
+        novedadRepo,
+        port,
+      );
+      // Fire-and-forget invariant: the rejection must not escape the service.
+      await expect(
+        service.checkAndCreateLateArrivalNovedad('att-a1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('N5 — when no NotificationPort is injected, the service still creates the novedad (backward compat)', async () => {
+      const attendanceRepo = makeMockAttendanceRepo(makeLateAttendance());
+      const policyRepo = makeMockPolicyRepo(makePolicy({ toleranciaMin: 5 }));
+      const novedadCreate = jest
+        .fn()
+        .mockResolvedValue({ id: 'nov-late-3', supervisorId: 'sup-s1', zoneId: 'zone-z1' });
+      const novedadRepo = makeMockNovedadRepo(novedadCreate);
+
+      // 3-arg constructor — no notificationPort (mirrors existing A1–A8 tests)
+      const service = new LateArrivalNovedadService(attendanceRepo, policyRepo, novedadRepo);
+      await expect(
+        service.checkAndCreateLateArrivalNovedad('att-a1'),
+      ).resolves.toBeUndefined();
+
+      expect(novedadCreate).toHaveBeenCalledTimes(1);
     });
   });
 });

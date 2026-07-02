@@ -10,10 +10,11 @@
  * directly to satisfy the scope-meta-guard scan.
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ATTENDANCE_REPOSITORY_PORT, type AttendanceRepositoryPort } from '../../asistencia/domain/ports/attendance-repository.port';
 import { JORNADA_POLICY_REPOSITORY_PORT, type JornadaPolicyRepositoryPort } from '../domain/ports/jornada-policy-repository.port';
 import { NOVEDAD_REPOSITORY_PORT, type NovedadRepositoryPort } from '../../novedades/domain/ports/novedad-repository.port';
+import { NOTIFICATION_PORT, type NotificationPort, type NovedadCreatedPayload } from '../../notifications/domain/notification.port';
 
 @Injectable()
 export class LateArrivalNovedadService {
@@ -26,6 +27,14 @@ export class LateArrivalNovedadService {
     private readonly policyRepo: JornadaPolicyRepositoryPort,
     @Inject(NOVEDAD_REPOSITORY_PORT)
     private readonly novedadRepo: NovedadRepositoryPort,
+    /**
+     * Optional: when bound (JornadaModule imports NotificationsModule), a
+     * LLEGADA_TARDE push is fired to LIDER_OPERATIVO on genuine creation.
+     * Omitting preserves backward compat with existing unit tests, mirroring
+     * the CreateNovedadUseCase optional-notificationPort pattern.
+     */
+    @Optional()
+    @Inject(NOTIFICATION_PORT) private readonly notificationPort?: NotificationPort,
   ) {}
 
   /**
@@ -77,7 +86,7 @@ export class LateArrivalNovedadService {
 
     // 7. Create LLEGADA_TARDE novedad — idempotent (P2002 = already exists)
     try {
-      await this.novedadRepo.create({
+      const record = await this.novedadRepo.create({
         attendanceId,
         supervisorId: attendance.supervisorId,
         zoneId: attendance.zoneId,
@@ -90,6 +99,11 @@ export class LateArrivalNovedadService {
         `LLEGADA_TARDE novedad creada: attendance=${attendanceId}, ` +
           `minutosTarde=${minutesTarde}`,
       );
+      // Fire-and-forget push to LIDER_OPERATIVO. Only on the genuine-create path —
+      // the P2002 "already exists" early-return below deliberately does NOT dispatch.
+      // Mirrors CreateNovedadUseCase.dispatchNovedadCreatedNotification: try/catch +
+      // chained .catch so no failure in the dispatch path can escape the service.
+      this.dispatchLateArrivalNotification(record, minutesTarde);
     } catch (err) {
       // P2002 = unique constraint violation (partial unique index on active novedades)
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002') {
@@ -99,6 +113,55 @@ export class LateArrivalNovedadService {
         return;
       }
       throw err;
+    }
+  }
+
+  /**
+   * Fire-and-forget notification dispatch. This method can NEVER throw:
+   * - synchronous throws from the port (or a non-thenable return) are caught here;
+   * - asynchronous rejections are caught via the chained .catch.
+   * Both paths only log — the persisted novedad is unaffected.
+   *
+   * supervisorId/zoneId come from the freshly-created novedad record (authoritative).
+   * horasExtra is "0" (LLEGADA_TARDE carries no overtime) so the HORAS_EXTRA copy path
+   * in the adapters is never hit for this payload. minutosTarde is passed from the
+   * service-level computation so the FCM body can read "X minutos".
+   */
+  private dispatchLateArrivalNotification(
+    record: { id: string; supervisorId: string; zoneId: string },
+    minutosTarde: number,
+  ): void {
+    if (!this.notificationPort) return;
+    const payload: NovedadCreatedPayload = {
+      novedadId: record.id,
+      tipoNovedad: 'LLEGADA_TARDE',
+      horasExtra: '0',
+      minutosTarde,
+      supervisorId: record.supervisorId,
+      zoneId: record.zoneId,
+    };
+    try {
+      const result = this.notificationPort.notifyNovedadCreated(payload);
+      // Promise.resolve guards against ports returning a non-thenable value.
+      void Promise.resolve(result).catch((err: unknown) => {
+        this.logDispatchFailure(record.id, err);
+      });
+    } catch (err) {
+      this.logDispatchFailure(record.id, err);
+    }
+  }
+
+  /**
+   * Last-resort guard: even a throwing Logger must not escape the fire-and-forget path.
+   */
+  private logDispatchFailure(novedadId: string, err: unknown): void {
+    try {
+      this.logger.error(
+        `notifyNovedadCreated (LLEGADA_TARDE) failed for novedad ${novedadId} (non-blocking)`,
+        err as Error,
+      );
+    } catch {
+      // Swallow — logging failure is strictly less important than the service call.
     }
   }
 }

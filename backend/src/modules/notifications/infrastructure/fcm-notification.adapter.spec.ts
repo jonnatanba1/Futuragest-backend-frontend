@@ -56,7 +56,17 @@ import * as fs from 'fs';
 // ---------------------------------------------------------------------------
 const PAYLOAD: NovedadCreatedPayload = {
   novedadId: 'nov-uuid-1',
+  tipoNovedad: 'HORAS_EXTRA',
   horasExtra: '2.50',
+  supervisorId: 'sup-1',
+  zoneId: 'zone-1',
+};
+
+const LATE_PAYLOAD: NovedadCreatedPayload = {
+  novedadId: 'nov-late-1',
+  tipoNovedad: 'LLEGADA_TARDE',
+  horasExtra: '0',
+  minutosTarde: 17,
   supervisorId: 'sup-1',
   zoneId: 'zone-1',
 };
@@ -232,9 +242,28 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     );
     expect(sentMessage.data).toEqual({
       novedadId: 'nov-uuid-1',
+      tipoNovedad: 'HORAS_EXTRA',
       type: 'NOVEDAD_CREATED',
     });
     expect(sentMessage.tokens).toEqual(['token-1', 'token-2']);
+  });
+
+  it('PN-13b — LLEGADA_TARDE payload → late-arrival title/body and tipoNovedad in data', async () => {
+    const adapter = makeAdapter(['token-1']);
+    await adapter.notifyNovedadCreated(LATE_PAYLOAD);
+
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+    const sentMessage = mockSendEachForMulticast.mock.calls[0][0];
+
+    expect(sentMessage.notification.title).toBe('Nueva llegada tarde');
+    expect(sentMessage.notification.body).toBe(
+      'Se registró una llegada tarde de 17 minutos pendiente de revisión.',
+    );
+    expect(sentMessage.data).toEqual({
+      novedadId: 'nov-late-1',
+      tipoNovedad: 'LLEGADA_TARDE',
+      type: 'NOVEDAD_CREATED',
+    });
   });
 
   it('PN-14 — when tokens are empty → sendEachForMulticast is never called', async () => {
