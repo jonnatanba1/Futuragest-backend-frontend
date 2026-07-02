@@ -17,7 +17,9 @@ const NOV = [
     attendanceId: 'att-1',
     supervisorId: 's-1',
     zoneId: 'z-1',
+    tipoNovedad: 'HORAS_EXTRA' as const,
     horasExtra: '2.50',
+    minutosTarde: null,
     motivo: 'Extra shift',
     status: 'PENDING',
     clientRef: null,
@@ -33,7 +35,9 @@ const NOV = [
     attendanceId: 'att-2',
     supervisorId: 's-1',
     zoneId: 'z-1',
-    horasExtra: '1.00',
+    tipoNovedad: 'LLEGADA_TARDE' as const,
+    horasExtra: '0',
+    minutosTarde: 15,
     motivo: null,
     status: 'APPROVED',
     clientRef: null,
@@ -91,7 +95,7 @@ describe('NovedadesPage', () => {
     setRole('SYSTEM_ADMIN');
     renderPage();
     expect(screen.getByText('Wilson Palacios')).toBeInTheDocument();
-    expect(screen.getByText('2.50')).toBeInTheDocument();
+    expect(screen.getByText('2.50 h')).toBeInTheDocument();
     expect(screen.getByText('Pendiente')).toBeInTheDocument();
     expect(screen.getByText('Aprobada')).toBeInTheDocument();
   });
@@ -142,5 +146,12 @@ describe('NovedadesPage', () => {
     // PENDING row has no decision verification — should render '—'
     const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows LLEGADA_TARDE badge and minutosTarde in detalle column', () => {
+    setRole('TALENTO_HUMANO');
+    renderPage();
+    expect(screen.getByText('Llegada Tarde')).toBeInTheDocument();
+    expect(screen.getByText('15 min tarde')).toBeInTheDocument();
   });
 });

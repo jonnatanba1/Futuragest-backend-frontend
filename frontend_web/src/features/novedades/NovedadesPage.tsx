@@ -8,13 +8,14 @@ import {
   Select,
   Stack,
   Table,
+  Tabs,
   Text,
   TextInput,
   Title,
 } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import type { NovedadDto, NovedadStatus } from '@futuragest/contracts';
+import type { NovedadDto, NovedadStatus, TipoNovedad } from '@futuragest/contracts';
 import React, { useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -43,6 +44,16 @@ const STATUS_LABEL: Record<NovedadStatus, string> = {
   REJECTED: 'Rechazada',
 };
 
+const TIPO_COLOR: Record<TipoNovedad, string> = {
+  HORAS_EXTRA: 'blue',
+  LLEGADA_TARDE: 'orange',
+};
+
+const TIPO_LABEL: Record<TipoNovedad, string> = {
+  HORAS_EXTRA: 'Hora Extra',
+  LLEGADA_TARDE: 'Llegada Tarde',
+};
+
 interface PendingAction {
   novedad: NovedadDto;
   action: 'approve' | 'reject';
@@ -57,6 +68,7 @@ export function NovedadesPage() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [filterSupervisorId, setFilterSupervisorId] = useState<string | null>(null);
   const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
+  const [tipoFilter, setTipoFilter] = useState<TipoNovedad | 'all'>('all');
   const [page, setPage] = useState(1);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -108,6 +120,7 @@ export function NovedadesPage() {
     const q = search.trim().toLowerCase();
     return (novedades.data ?? [])
       .filter((n) => (status === 'all' ? true : n.status === status))
+      .filter((n) => (tipoFilter === 'all' ? true : n.tipoNovedad === tipoFilter))
       .filter((n) => {
         if (filterSupervisorId && n.supervisorId !== filterSupervisorId) return false;
         if (filterMunicipioId) {
@@ -122,7 +135,7 @@ export function NovedadesPage() {
         );
       })
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-  }, [novedades.data, status, search, filterSupervisorId, filterMunicipioId, supervisorLabel, supervisorMap, attendanceOperario, operarioName]);
+  }, [novedades.data, status, search, filterSupervisorId, filterMunicipioId, tipoFilter, supervisorLabel, supervisorMap, attendanceOperario, operarioName]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -164,6 +177,14 @@ export function NovedadesPage() {
   return (
     <Stack>
       <Title order={2}>Novedades</Title>
+
+      <Tabs value={tipoFilter} onChange={(v) => { setTipoFilter(v as TipoNovedad | 'all'); setPage(1); }}>
+        <Tabs.List>
+          <Tabs.Tab value="all">Todas</Tabs.Tab>
+          <Tabs.Tab value="HORAS_EXTRA">Horas Extra</Tabs.Tab>
+          <Tabs.Tab value="LLEGADA_TARDE">Llegadas Tarde</Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
 
       <Stack gap="xs">
         <Group wrap="wrap">
@@ -225,9 +246,10 @@ export function NovedadesPage() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Fecha</Table.Th>
+                <Table.Th>Tipo</Table.Th>
                 <Table.Th>Operario</Table.Th>
                 <Table.Th>Supervisor</Table.Th>
-                <Table.Th>Horas extra</Table.Th>
+                <Table.Th>Detalle</Table.Th>
                 <Table.Th>Motivo</Table.Th>
                 <Table.Th>Estado</Table.Th>
                 <Table.Th>Verificación</Table.Th>
@@ -238,9 +260,18 @@ export function NovedadesPage() {
               {pageRows.map((n) => (
                 <Table.Tr key={n.id}>
                   <Table.Td>{formatDateTime(n.createdAt)}</Table.Td>
+                  <Table.Td>
+                    <Badge color={TIPO_COLOR[n.tipoNovedad]} variant="light">
+                      {TIPO_LABEL[n.tipoNovedad]}
+                    </Badge>
+                  </Table.Td>
                   <Table.Td>{operarioOf(n.attendanceId)}</Table.Td>
                   <Table.Td>{supOf(n.supervisorId)}</Table.Td>
-                  <Table.Td>{n.horasExtra}</Table.Td>
+                  <Table.Td>
+                    {n.tipoNovedad === 'LLEGADA_TARDE'
+                      ? `${n.minutosTarde ?? '—'} min tarde`
+                      : `${n.horasExtra} h`}
+                  </Table.Td>
                   <Table.Td>{n.motivo ?? '—'}</Table.Td>
                   <Table.Td>
                     <Badge color={STATUS_COLOR[n.status]} variant="light">
@@ -309,8 +340,10 @@ export function NovedadesPage() {
         {pending && (
           <Stack>
             <Text size="sm">
-              ¿{pending.action === 'approve' ? 'Aprobar' : 'Rechazar'} las{' '}
-              <strong>{pending.novedad.horasExtra} h</strong> extra de{' '}
+              ¿{pending.action === 'approve' ? 'Aprobar' : 'Rechazar'}{' '}
+              {pending.novedad.tipoNovedad === 'LLEGADA_TARDE'
+                ? <>la llegada tarde de <strong>{pending.novedad.minutosTarde} min</strong> de{' '}</>
+                : <>las <strong>{pending.novedad.horasExtra} h</strong> extra de{' '}</>}
               <strong>{operarioOf(pending.novedad.attendanceId)}</strong>?
             </Text>
             {pending.action === 'reject' && (

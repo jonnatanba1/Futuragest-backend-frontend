@@ -348,6 +348,9 @@ export class NovedadController {
         operarioDocumento: operario?.documento,
         supervisorEmail: supervisor?.user?.email,
         zoneName: zone?.name,
+        tipoNovedad: n.tipoNovedad,
+        minutosTarde: n.minutosTarde,
+        rejectionReason: n.rejectionReason,
       } as unknown as NovedadResponseDto;
     });
   }
