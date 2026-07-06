@@ -23,6 +23,7 @@ import type {
   SurchargeRateDto,
   UpdateJornadaPolicyRequest,
   ZoneResponseDto,
+  PslReportRowDto,
 } from '@futuragest/contracts';
 
 export type { SupervisorDto };
@@ -429,4 +430,40 @@ export const enhancedBalanceApi = {
       'GET',
       `/compensacion/${operarioId}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&enhanced=true`,
     ),
+};
+
+export const reportesApi = {
+  getPreview: (desde: string, hasta: string, zoneId?: string): Promise<PslReportRowDto[]> => {
+    const params = new URLSearchParams({ desde, hasta });
+    if (zoneId) params.append('zoneId', zoneId);
+    return request<PslReportRowDto[]>('GET', `/reportes/psl?${params.toString()}`);
+  },
+
+  downloadPsl: async (desde: string, hasta: string, zoneId?: string): Promise<Blob> => {
+    const params = new URLSearchParams({ desde, hasta });
+    if (zoneId) params.append('zoneId', zoneId);
+    const url = `${config.apiBaseUrl}/reportes/psl?${params.toString()}`;
+    
+    const send = async (token: string | null) => {
+      const headers: Record<string, string> = { 'Accept': 'text/csv' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(url, { headers });
+    };
+
+    let token = tokenStore.getAccessToken();
+    let res = await send(token);
+
+    if (res.status === 401) {
+      const fresh = await refresh();
+      if (!fresh) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+      res = await send(fresh);
+    }
+
+    if (!res.ok) {
+      await raise(res);
+    }
+    return res.blob();
+  }
 };

@@ -1,9 +1,7 @@
 import {
   Alert,
   Badge,
-  Button,
   Group,
-  Modal,
   Pagination,
   Select,
   Stack,
@@ -14,20 +12,15 @@ import {
   Title,
 } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
-import type { NovedadDto, NovedadStatus, TipoNovedad } from '@futuragest/contracts';
+import type { NovedadStatus, TipoNovedad } from '@futuragest/contracts';
 import React, { useMemo, useState } from 'react';
-import { ApiError } from '../../lib/api/client';
-import { useAuth } from '../../lib/auth/auth-context';
-import { hasAnyRole, NOVEDAD_APPROVE_ROLES } from '../../lib/auth/roles';
 import { formatDateTime } from '../asistencia/format';
 import { useAttendances } from '../asistencia/attendance-queries';
 import { useMunicipios, useOperarios, useSupervisors, useZones } from '../operarios/operario-queries';
 import { buildSupervisorLabelMap } from '../operarios/supervisor-label';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
-import { VerificationBadge } from '../../components/VerificationBadge';
-import { useApproveNovedad, useNovedades, useRejectNovedad } from './novedad-queries';
+import { useNovedades } from './novedad-queries';
 
 const PAGE_SIZE = 15;
 type StatusFilter = 'all' | NovedadStatus;
@@ -54,15 +47,8 @@ const TIPO_LABEL: Record<TipoNovedad, string> = {
   LLEGADA_TARDE: 'Llegada Tarde',
 };
 
-interface PendingAction {
-  novedad: NovedadDto;
-  action: 'approve' | 'reject';
-}
-
 export function NovedadesPage() {
   useDocumentTitle('FuturaGest · Novedades');
-  const { user } = useAuth();
-  const canApprove = hasAnyRole(user?.role, NOVEDAD_APPROVE_ROLES);
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -70,8 +56,6 @@ export function NovedadesPage() {
   const [filterMunicipioId, setFilterMunicipioId] = useState<string | null>(null);
   const [tipoFilter, setTipoFilter] = useState<TipoNovedad | 'all'>('all');
   const [page, setPage] = useState(1);
-  const [pending, setPending] = useState<PendingAction | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
 
   const novedades = useNovedades();
   const attendances = useAttendances();
@@ -82,8 +66,6 @@ export function NovedadesPage() {
   const supervisors = useSupervisors();
   const zones = useZones();
   const municipios = useMunicipios();
-  const approve = useApproveNovedad();
-  const reject = useRejectNovedad();
 
   const supervisorLabel = useMemo(
     () => buildSupervisorLabelMap(supervisors.data ?? [], zones.data ?? [], municipios.data ?? []),
@@ -141,38 +123,13 @@ export function NovedadesPage() {
   const currentPage = Math.min(page, pageCount);
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const runPending = async () => {
-    if (!pending) return;
-    try {
-      if (pending.action === 'approve') {
-        await approve.mutateAsync(pending.novedad.id);
-      } else {
-        const reason = rejectReason.trim() || undefined;
-        await reject.mutateAsync({ id: pending.novedad.id, reason });
-      }
-      const msg = pending.action === 'approve' ? 'Novedad aprobada' : 'Novedad rechazada';
-      notifications.show({ color: 'teal', message: msg });
-      setRejectReason('');
-    } catch (err) {
-      notifications.show({
-        color: 'red',
-        message: err instanceof ApiError ? err.message : 'La acción falló',
-      });
-    } finally {
-      setPending(null);
-    }
-  };
-
   if (novedades.isError) {
     return (
       <Alert color="red" role="alert">
-        No se pudieron cargar las novedades.{' '}
-        {novedades.error instanceof ApiError ? novedades.error.message : ''}
+        No se pudieron cargar las novedades.
       </Alert>
     );
   }
-
-  const actionInFlight = approve.isPending || reject.isPending;
 
   return (
     <Stack>
@@ -252,8 +209,6 @@ export function NovedadesPage() {
                 <Table.Th>Detalle</Table.Th>
                 <Table.Th>Motivo</Table.Th>
                 <Table.Th>Estado</Table.Th>
-                <Table.Th>Verificación</Table.Th>
-                {canApprove && <Table.Th>Acciones</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -283,41 +238,6 @@ export function NovedadesPage() {
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td>
-                    {n.status !== 'PENDING' ? (
-                      <VerificationBadge method={n.decisionVerification} />
-                    ) : (
-                      <Text size="sm" c="dimmed" component="span">
-                        —
-                      </Text>
-                    )}
-                  </Table.Td>
-                  {canApprove && (
-                    <Table.Td>
-                      {n.status === 'PENDING' && (
-                        <Group gap="xs">
-                          <Button
-                            size="xs"
-                            variant="light"
-                            color="teal"
-                            disabled={actionInFlight}
-                            onClick={() => setPending({ novedad: n, action: 'approve' })}
-                          >
-                            Aprobar
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="subtle"
-                            color="red"
-                            disabled={actionInFlight}
-                            onClick={() => setPending({ novedad: n, action: 'reject' })}
-                          >
-                            Rechazar
-                          </Button>
-                        </Group>
-                      )}
-                    </Table.Td>
-                  )}
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -331,44 +251,6 @@ export function NovedadesPage() {
         </>
       )}
 
-      <Modal
-        opened={pending !== null}
-        onClose={() => { setPending(null); setRejectReason(''); }}
-        title={pending?.action === 'approve' ? 'Aprobar novedad' : 'Rechazar novedad'}
-        centered
-      >
-        {pending && (
-          <Stack>
-            <Text size="sm">
-              ¿{pending.action === 'approve' ? 'Aprobar' : 'Rechazar'}{' '}
-              {pending.novedad.tipoNovedad === 'LLEGADA_TARDE'
-                ? <>la llegada tarde de <strong>{pending.novedad.minutosTarde} min</strong> de{' '}</>
-                : <>las <strong>{pending.novedad.horasExtra} h</strong> extra de{' '}</>}
-              <strong>{operarioOf(pending.novedad.attendanceId)}</strong>?
-            </Text>
-            {pending.action === 'reject' && (
-              <TextInput
-                label="Motivo del rechazo (opcional)"
-                placeholder="Ej: Horas no justificadas"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.currentTarget.value)}
-              />
-            )}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => { setPending(null); setRejectReason(''); }}>
-                Cancelar
-              </Button>
-              <Button
-                color={pending.action === 'approve' ? 'teal' : 'red'}
-                loading={actionInFlight}
-                onClick={runPending}
-              >
-                {pending.action === 'approve' ? 'Aprobar' : 'Rechazar'}
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
     </Stack>
   );
 }
