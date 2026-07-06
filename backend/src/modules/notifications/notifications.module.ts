@@ -20,6 +20,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../database/prisma.module';
+import { PrismaService } from '../../database/prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { AUTH_REPOSITORY_PORT } from '../auth/domain/auth-repository.port';
 import type { AuthRepositoryPort } from '../auth/domain/auth-repository.port';
@@ -43,9 +44,12 @@ import { NotificationsController } from './interface/notifications.controller';
     SseAuthGuard,
     {
       provide: FcmNotificationAdapter,
-      useFactory: (resolver: RecipientResolver, authRepo: AuthRepositoryPort) =>
-        new FcmNotificationAdapter(resolver, authRepo),
-      inject: [RecipientResolver, AUTH_REPOSITORY_PORT],
+      useFactory: (
+        resolver: RecipientResolver,
+        authRepo: AuthRepositoryPort,
+        prisma: PrismaService,
+      ) => new FcmNotificationAdapter(resolver, authRepo, prisma),
+      inject: [RecipientResolver, AUTH_REPOSITORY_PORT, PrismaService],
     },
     {
       provide: SseNotificationAdapter,

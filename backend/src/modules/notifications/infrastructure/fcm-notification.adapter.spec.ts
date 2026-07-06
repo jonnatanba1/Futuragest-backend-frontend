@@ -19,6 +19,7 @@ import { FcmNotificationAdapter } from './fcm-notification.adapter';
 import type { RecipientResolver, PushRecipient } from './recipient-resolver';
 import type { AuthRepositoryPort } from '../../auth/domain/auth-repository.port';
 import type { NovedadCreatedPayload } from '../domain/notification.port';
+import { PrismaService } from '../../../database/prisma.service';
 
 // ---------------------------------------------------------------------------
 // firebase-admin mock — module-level, so the dynamic require() returns this
@@ -105,7 +106,29 @@ function makeAdapterWithRepo(
     getActivePushTokens: jest.fn().mockResolvedValue(recipients),
   } as unknown as RecipientResolver;
 
-  const adapter = new FcmNotificationAdapter(resolver, authRepo as unknown as AuthRepositoryPort);
+  const mockPrisma = {
+    novedad: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'nov-uuid-1',
+        attendance: {
+          operario: {
+            fullName: 'JUAN PEREZ',
+          },
+        },
+        supervisor: {
+          user: {
+            email: 'supervisor-1@futuragest.co',
+          },
+        },
+      }),
+    },
+  } as unknown as PrismaService;
+
+  const adapter = new FcmNotificationAdapter(
+    resolver,
+    authRepo as unknown as AuthRepositoryPort,
+    mockPrisma,
+  );
   return { adapter, authRepo };
 }
 
@@ -133,6 +156,7 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED not set)', () => {
     adapter = new FcmNotificationAdapter(
       undefined as unknown as RecipientResolver,
       undefined as unknown as AuthRepositoryPort,
+      undefined as unknown as PrismaService,
     );
   });
 
@@ -179,6 +203,7 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED not set)', () => {
       const isolatedAdapter = new mod.FcmNotificationAdapter(
         resolver,
         makeAuthRepo() as unknown as AuthRepositoryPort,
+        undefined as unknown as PrismaService,
       );
 
       // (3) Sending with FIREBASE_ENABLED=true resolves (never throws) and warns.
@@ -236,9 +261,9 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
     const sentMessage = mockSendEachForMulticast.mock.calls[0][0];
 
-    expect(sentMessage.notification.title).toBe('Nueva novedad de horas extra');
+    expect(sentMessage.notification.title).toBe('Solicitud de Horas Extra');
     expect(sentMessage.notification.body).toBe(
-      'Se registraron 2.50 horas extra pendientes de aprobación.',
+      'JUAN PEREZ tiene una solicitud de 2.50 horas extra por supervisor-1.',
     );
     expect(sentMessage.data).toEqual({
       novedadId: 'nov-uuid-1',
@@ -255,9 +280,9 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
     expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
     const sentMessage = mockSendEachForMulticast.mock.calls[0][0];
 
-    expect(sentMessage.notification.title).toBe('Nueva llegada tarde');
+    expect(sentMessage.notification.title).toBe('Reporte de Llegada Tarde');
     expect(sentMessage.notification.body).toBe(
-      'Se registró una llegada tarde de 17 minutos pendiente de revisión.',
+      'JUAN PEREZ llegó tarde (17 min). Registrado por supervisor-1.',
     );
     expect(sentMessage.data).toEqual({
       novedadId: 'nov-late-1',

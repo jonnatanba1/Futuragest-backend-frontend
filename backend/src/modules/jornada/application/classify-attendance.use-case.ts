@@ -133,6 +133,14 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       horaInicioAplicada: policy.horaInicio,
       horaFinAplicada: policy.horaFin,
       horasDiariasAplicada: policy.horasDiarias,
+      tramoInicioOrdNocturno: classification.tramoInicioOrdNocturno,
+      tramoFinOrdNocturno: classification.tramoFinOrdNocturno,
+      tramoInicioExtraDiurna: classification.tramoInicioExtraDiurna,
+      tramoFinExtraDiurna: classification.tramoFinExtraDiurna,
+      tramoInicioExtraNocturna: classification.tramoInicioExtraNocturna,
+      tramoFinExtraNocturna: classification.tramoFinExtraNocturna,
+      tramoInicioOrdDiurna: classification.tramoInicioOrdDiurna,
+      tramoFinOrdDiurna: classification.tramoFinOrdDiurna,
     });
 
     // 7. Fire-and-forget: generate CompensatoryRest if Sunday or holiday (REQ-006)

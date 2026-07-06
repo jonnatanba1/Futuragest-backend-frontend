@@ -479,6 +479,16 @@ model AttendanceBreakdown {
   horaInicioAplicada  String
   horaFinAplicada     String
   horasDiariasAplicada Decimal @db.Decimal(4, 2)
+  
+  // ── Tramos horarios por categoría (PSL) ──
+  tramoInicioOrdNocturno    String?
+  tramoFinOrdNocturno       String?
+  tramoInicioExtraDiurna    String?
+  tramoFinExtraDiurna       String?
+  tramoInicioExtraNocturna  String?
+  tramoFinExtraNocturna     String?
+  tramoInicioOrdDiurna      String?
+  tramoFinOrdDiurna         String?
 
   classifiedAt    DateTime @default(now())
   recalculatedAt  DateTime?

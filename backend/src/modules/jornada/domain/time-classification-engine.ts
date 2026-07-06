@@ -33,6 +33,16 @@ export type TimeClassificationResult = {
   esDominical: boolean;
   esFestivo: boolean;
   esDiaLaboral: boolean;
+
+  // ── Tramos horarios (HH:MM) ──
+  tramoInicioOrdDiurna: string | null;
+  tramoFinOrdDiurna: string | null;
+  tramoInicioOrdNocturno: string | null;
+  tramoFinOrdNocturno: string | null;
+  tramoInicioExtraDiurna: string | null;
+  tramoFinExtraDiurna: string | null;
+  tramoInicioExtraNocturna: string | null;
+  tramoFinExtraNocturna: string | null;
 };
 
 /**
@@ -94,6 +104,15 @@ export class TimeClassificationEngine {
     const esDiaLaboral =
       input.diasLaborales.includes(input.isoWeekday) && !input.isHoliday;
 
+    let firstOrdDiurna: Date | null = null;
+    let lastOrdDiurna: Date | null = null;
+    let firstOrdNocturna: Date | null = null;
+    let lastOrdNocturna: Date | null = null;
+    let firstExtraDiurna: Date | null = null;
+    let lastExtraDiurna: Date | null = null;
+    let firstExtraNocturna: Date | null = null;
+    let lastExtraNocturna: Date | null = null;
+
     // Iterate minute by minute
     while (current < end) {
       // Extract the minute-of-day from the current cursor.
@@ -120,18 +139,50 @@ export class TimeClassificationEngine {
       const isOrdinary = withinSchedule && esDiaLaboral && totalOrd < limitOrd;
 
       if (isOrdinary) {
-        if (isDiurno) ordDiurnas += 1;
-        else ordNocturnas += 1;
+        if (isDiurno) {
+          ordDiurnas += 1;
+          if (firstOrdDiurna === null) firstOrdDiurna = new Date(current);
+          lastOrdDiurna = new Date(current);
+        } else {
+          ordNocturnas += 1;
+          if (firstOrdNocturna === null) firstOrdNocturna = new Date(current);
+          lastOrdNocturna = new Date(current);
+        }
         totalOrd += 1;
       } else {
-        if (isDiurno) extraDiurnas += 1;
-        else extraNocturnas += 1;
+        if (isDiurno) {
+          extraDiurnas += 1;
+          if (firstExtraDiurna === null) firstExtraDiurna = new Date(current);
+          lastExtraDiurna = new Date(current);
+        } else {
+          extraNocturnas += 1;
+          if (firstExtraNocturna === null) firstExtraNocturna = new Date(current);
+          lastExtraNocturna = new Date(current);
+        }
       }
 
       current.setUTCMinutes(current.getUTCMinutes() + 1);
     }
 
     const totalMinutes = ordDiurnas + ordNocturnas + extraDiurnas + extraNocturnas;
+
+    const formatTime = (d: Date | null): string | null => {
+      if (!d) return null;
+      const h = String(d.getUTCHours()).padStart(2, '0');
+      const m = String(d.getUTCMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    const formatEndTime = (d: Date | null, start: Date | null): string | null => {
+      if (!d || !start) return null;
+      const nextMin = new Date(d.getTime() + 60000);
+      const h = nextMin.getUTCHours();
+      const m = nextMin.getUTCMinutes();
+      if (h === 0 && m === 0 && nextMin.getUTCDate() !== start.getUTCDate()) {
+        return '23:59';
+      }
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
 
     return {
       horasOrdinariasDiurnas: new Decimal(ordDiurnas).dividedBy(60).toDecimalPlaces(2),
@@ -142,6 +193,14 @@ export class TimeClassificationEngine {
       esDominical: input.isSunday,
       esFestivo: input.isHoliday,
       esDiaLaboral,
+      tramoInicioOrdDiurna: formatTime(firstOrdDiurna),
+      tramoFinOrdDiurna: formatEndTime(lastOrdDiurna, firstOrdDiurna),
+      tramoInicioOrdNocturno: formatTime(firstOrdNocturna),
+      tramoFinOrdNocturno: formatEndTime(lastOrdNocturna, firstOrdNocturna),
+      tramoInicioExtraDiurna: formatTime(firstExtraDiurna),
+      tramoFinExtraDiurna: formatEndTime(lastExtraDiurna, firstExtraDiurna),
+      tramoInicioExtraNocturna: formatTime(firstExtraNocturna),
+      tramoFinExtraNocturna: formatEndTime(lastExtraNocturna, firstExtraNocturna),
     };
   }
 

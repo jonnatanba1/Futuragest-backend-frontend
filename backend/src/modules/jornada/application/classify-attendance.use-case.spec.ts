@@ -137,6 +137,10 @@ describe('ClassifyAttendanceUseCase', () => {
     expect(upsertData.esDominical).toBe(false);
     expect(upsertData.esFestivo).toBe(false);
     expect(upsertData.esDiaLaboral).toBe(true);
+    expect(upsertData.tramoInicioOrdDiurna).toBe('07:00');
+    expect(upsertData.tramoFinOrdDiurna).toBe('16:54');
+    expect(upsertData.tramoInicioExtraDiurna).toBe('16:54');
+    expect(upsertData.tramoFinExtraDiurna).toBe('17:00');
   });
 
   it('should auto-seed holidays if findManyByYear returns empty', async () => {
