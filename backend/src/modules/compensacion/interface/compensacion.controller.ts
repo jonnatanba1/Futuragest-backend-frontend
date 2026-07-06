@@ -34,7 +34,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiProperty } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiProperty, ApiQuery } from '@nestjs/swagger';
 import {
   IsNumber,
   Max,
@@ -427,12 +427,44 @@ export class CompensacionController {
   }
 
   // ── GET /jornada-policy ───────────────────────────────────────────────────
+  //
+  // R1.5 (T5): optional query params filter the timeline:
+  //   ?zoneId=z1     → policies for that zone (equals "z1")
+  //   ?zoneId=        → global-only policies (IS NULL)
+  //   ?operarioId=o1  → policies for that operario
+  //   (no params)     → all policies (backward-compatible, unfiltered)
+  //
+  // Normalization rule (controller is the SOLE place that distinguishes the
+  // empty-string-from-query from absent):
+  //   absent (undefined)    → pass `undefined` (no filter on that field)
+  //   empty string ""        → pass `null`        (global / IS NULL)
+  //   non-empty string       → pass the string    (scoped to that value)
+  // When BOTH fields are absent, call execute() with NO opts (not an empty
+  // object) so the use case uses findTimeline().
 
   @Roles(...READ_ROLES)
   @Get('jornada-policy')
   @ApiOkResponse({ type: JornadaPolicyResponseDto, isArray: true })
-  async getJornadaPolicyTimeline(): Promise<JornadaPolicyResponseDto[]> {
-    const timeline = await this.getTimelineUseCase.execute();
+  @ApiQuery({ name: 'zoneId', required: false, type: String, description: 'Filter by zone. Empty string => global-only (IS NULL).' })
+  @ApiQuery({ name: 'operarioId', required: false, type: String, description: 'Filter by operario.' })
+  async getJornadaPolicyTimeline(
+    @Query('zoneId') zoneId?: string,
+    @Query('operarioId') operarioId?: string,
+  ): Promise<JornadaPolicyResponseDto[]> {
+    // Preserve ABSENT (undefined) vs EMPTY STRING (global) semantics.
+    const hasZoneFilter = zoneId !== undefined;
+    const hasOperarioFilter = operarioId !== undefined;
+
+    if (!hasZoneFilter && !hasOperarioFilter) {
+      const timeline = await this.getTimelineUseCase.execute();
+      return timeline.map(serializePolicy);
+    }
+
+    const opts: { zoneId?: string | null; operarioId?: string | null } = {};
+    if (hasZoneFilter) opts.zoneId = zoneId === '' ? null : zoneId!;
+    if (hasOperarioFilter) opts.operarioId = operarioId === '' ? null : operarioId!;
+
+    const timeline = await this.getTimelineUseCase.execute(opts);
     return timeline.map(serializePolicy);
   }
 
