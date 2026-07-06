@@ -23,6 +23,16 @@ const payoutKey = (operarioId: string, periodKey: string) =>
 
 const policiesKey = ['compensacion', 'policies'] as const;
 
+/**
+ * Query key for the jornada-policy timeline, scoped by zone.
+ * - undefined zoneId ⇒ 'all' sentinel (full timeline, back-compat)
+ * - null / "" zoneId ⇒ '' (global / IS NULL filter)
+ * - non-empty zoneId ⇒ that value
+ * Using a sentinel avoids [.., undefined] collisions across cache entries.
+ */
+const policiesKeyByZone = (zoneId?: string | null) =>
+  ['compensacion', 'policies', zoneId === undefined ? 'all' : zoneId] as const;
+
 // ─── Query hooks ──────────────────────────────────────────────────────────────
 
 /**
@@ -61,11 +71,23 @@ export function usePayoutQuery(
   });
 }
 
-/** Jornada policy timeline (company-wide reference data; cached 5 min). */
-export function useJornadaPoliciesQuery() {
+/**
+ * Jornada policy timeline, optionally scoped by zone.
+ * - `undefined` zoneId ⇒ no filter (full timeline; back-compat with the
+ *   unscoped call site).
+ * - `null` or `""` zoneId ⇒ `{ zoneId: "" }` (global / IS NULL filter).
+ * - non-empty zoneId ⇒ `{ zoneId }` (that zone's timeline).
+ * Cached 5 min; kept broad so the panel can switch filters cheaply.
+ */
+export function useJornadaPoliciesQuery(zoneId?: string | null) {
   return useQuery<JornadaPolicyDto[]>({
-    queryKey: policiesKey,
-    queryFn: compensacionApi.getJornadaPolicies,
+    queryKey: policiesKeyByZone(zoneId),
+    // Wrap in an arrow so TanStack's queryFn context object is NOT passed as
+    // the filter argument to getJornadaPolicies.
+    queryFn: () =>
+      compensacionApi.getJornadaPolicies(
+        zoneId === undefined ? undefined : { zoneId: zoneId ?? '' },
+      ),
     staleTime: FIVE_MIN,
     retry: false,
   });
@@ -117,7 +139,10 @@ export function useCreateJornadaPolicyMutation() {
   const qc = useQueryClient();
   return useMutation<JornadaPolicyDto, Error, CreateJornadaPolicyRequest>({
     mutationFn: (body) => compensacionApi.createJornadaPolicy(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
+    // Broad prefix (exact:false) so every zone-scoped entry refetches, not
+    // just the unscoped one.
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: policiesKey, exact: false }),
   });
 }
 
@@ -126,7 +151,8 @@ export function useArchiveJornadaPolicyMutation() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: (id) => jornadaPolicyApi.archive(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: policiesKey, exact: false }),
   });
 }
 

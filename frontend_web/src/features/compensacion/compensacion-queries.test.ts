@@ -7,6 +7,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  useArchiveJornadaPolicyMutation,
   useBalanceQuery,
   useClosePeriodMutation,
   useConfirmPayoutMutation,
@@ -17,15 +18,23 @@ import {
 
 // ─── Module-level mock ────────────────────────────────────────────────────────
 
-const { getBalanceMock, getPayoutMock, getJornadaPoliciesMock, closePeriodMock, createJornadaPolicyMock, confirmPayoutMock } =
-  vi.hoisted(() => ({
-    getBalanceMock: vi.fn(),
-    getPayoutMock: vi.fn(),
-    getJornadaPoliciesMock: vi.fn(),
-    closePeriodMock: vi.fn(),
-    createJornadaPolicyMock: vi.fn(),
-    confirmPayoutMock: vi.fn(),
-  }));
+const {
+  getBalanceMock,
+  getPayoutMock,
+  getJornadaPoliciesMock,
+  closePeriodMock,
+  createJornadaPolicyMock,
+  confirmPayoutMock,
+  archiveJornadaPolicyMock,
+} = vi.hoisted(() => ({
+  getBalanceMock: vi.fn(),
+  getPayoutMock: vi.fn(),
+  getJornadaPoliciesMock: vi.fn(),
+  closePeriodMock: vi.fn(),
+  createJornadaPolicyMock: vi.fn(),
+  confirmPayoutMock: vi.fn(),
+  archiveJornadaPolicyMock: vi.fn(),
+}));
 
 vi.mock('../../lib/api/client', () => ({
   compensacionApi: {
@@ -35,6 +44,9 @@ vi.mock('../../lib/api/client', () => ({
     closePeriod: closePeriodMock,
     createJornadaPolicy: createJornadaPolicyMock,
     confirmPayout: confirmPayoutMock,
+  },
+  jornadaPolicyApi: {
+    archive: archiveJornadaPolicyMock,
   },
 }));
 
@@ -129,18 +141,53 @@ describe('usePayoutQuery', () => {
   });
 });
 
-// ─── useJornadaPoliciesQuery ──────────────────────────────────────────────────
+// ─── useJornadaPoliciesQuery (T10: zoneId filter) ─────────────────────────────
 
 describe('useJornadaPoliciesQuery', () => {
-  it('returns the policies list', async () => {
-    getJornadaPoliciesMock.mockResolvedValueOnce([
+  beforeEach(() => {
+    getJornadaPoliciesMock.mockResolvedValue([
       { id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' },
     ]);
+  });
 
+  it('returns the policies list when called with no zoneId', async () => {
     const { result } = renderHook(() => useJornadaPoliciesQuery(), { wrapper: makeWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.[0].horasDiarias).toBe('8.00');
+    expect(getJornadaPoliciesMock).toHaveBeenCalledWith(undefined);
+  });
+
+  it('with zoneId="zA" calls getJornadaPolicies({ zoneId:"zA" })', async () => {
+    const { result } = renderHook(() => useJornadaPoliciesQuery('zA'), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getJornadaPoliciesMock).toHaveBeenCalledWith({ zoneId: 'zA' });
+  });
+
+  it('with no zoneId calls getJornadaPolicies with undefined', async () => {
+    const { result } = renderHook(() => useJornadaPoliciesQuery(undefined), {
+      wrapper: makeWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getJornadaPoliciesMock).toHaveBeenCalledWith(undefined);
+  });
+
+  it('with zoneId="" calls getJornadaPolicies({ zoneId:"" }) (global filter)', async () => {
+    const { result } = renderHook(() => useJornadaPoliciesQuery(''), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getJornadaPoliciesMock).toHaveBeenCalledWith({ zoneId: '' });
+  });
+
+  it('with zoneId=null calls getJornadaPolicies({ zoneId:"" }) (same as empty string)', async () => {
+    const { result } = renderHook(() => useJornadaPoliciesQuery(null), {
+      wrapper: makeWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getJornadaPoliciesMock).toHaveBeenCalledWith({ zoneId: '' });
   });
 });
 
@@ -224,5 +271,75 @@ describe('useCreateJornadaPolicyMutation', () => {
         vigenteDesde: '2026-07-01',
       }),
     );
+  });
+
+  it('on success invalidates the [compensacion,policies] prefix with exact:false', async () => {
+    createJornadaPolicyMock.mockResolvedValueOnce({
+      id: 'pol-2',
+      horasDiarias: '7.00',
+      vigenteDesde: '2026-07-01',
+      createdAt: '',
+    });
+    const invalidateSpy = vi
+      .spyOn(QueryClient.prototype, 'invalidateQueries')
+      .mockResolvedValueOnce({} as never);
+
+    const { result } = renderHook(() => useCreateJornadaPolicyMutation(), {
+      wrapper: makeWrapper(),
+    });
+
+    await result.current.mutateAsync({
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1, 2, 3, 4, 5],
+      horasDiarias: 7,
+      horasSemanales: 44,
+      vigenteDesde: '2026-07-01',
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['compensacion', 'policies'],
+        exact: false,
+      }),
+    );
+    invalidateSpy.mockRestore();
+  });
+});
+
+// ─── useArchiveJornadaPolicyMutation (T10: delete wire) ──────────────────────
+
+describe('useArchiveJornadaPolicyMutation', () => {
+  it('exists and calls jornadaPolicyApi.archive with the id', async () => {
+    archiveJornadaPolicyMock.mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useArchiveJornadaPolicyMutation(), {
+      wrapper: makeWrapper(),
+    });
+
+    await result.current.mutateAsync('pol-1');
+
+    expect(archiveJornadaPolicyMock).toHaveBeenCalledWith('pol-1');
+  });
+
+  it('on success invalidates the [compensacion,policies] prefix with exact:false', async () => {
+    archiveJornadaPolicyMock.mockResolvedValueOnce(undefined);
+    const invalidateSpy = vi
+      .spyOn(QueryClient.prototype, 'invalidateQueries')
+      .mockResolvedValueOnce({} as never);
+
+    const { result } = renderHook(() => useArchiveJornadaPolicyMutation(), {
+      wrapper: makeWrapper(),
+    });
+
+    await result.current.mutateAsync('pol-1');
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['compensacion', 'policies'],
+        exact: false,
+      }),
+    );
+    invalidateSpy.mockRestore();
   });
 });
