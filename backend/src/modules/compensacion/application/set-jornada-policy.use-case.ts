@@ -53,9 +53,10 @@ export class SetJornadaPolicyUseCase {
       throw new JornadaPolicyInvalidHorasError(horasDiarias);
     }
 
-    // Parse vigenteDesde as a Date (UTC midnight for comparison)
+    // Parse vigenteDesde as a Date (UTC midnight for comparison and storage).
+    // The date stored in DB is ALWAYS UTC midnight — existsByOperarioZoneVigente
+    // relies on this for the equality check (see JornadaPolicyRepository).
     const vigenteDesdeDate = new Date(`${vigenteDesde}T00:00:00Z`);
-    const vigenteDesdeStr = vigenteDesde; // keep for duplicate check
 
     // 2. Check overlap with already-liquidated CompensationPeriods
     //    PR-A: NullCompensationPeriodLookup always returns null.
@@ -65,14 +66,22 @@ export class SetJornadaPolicyUseCase {
       throw new JornadaPolicyOverlapsLiquidatedPeriodError(vigenteDesde);
     }
 
-    // 3. Check for duplicate vigenteDesde in current timeline (domain check before INSERT)
-    const timeline = await this.policyRepo.findTimeline();
-    const duplicate = timeline.find((p) => {
-      const pDateStr = p.vigenteDesde.toISOString().slice(0, 10);
-      return pDateStr === vigenteDesdeStr;
-    });
-    if (duplicate) {
-      throw new JornadaPolicyDuplicateEffectiveDateError(vigenteDesde);
+    // 3. Scope-aware duplicate check (R1.4): reject when a row already exists
+    //    for the exact (operarioId, zoneId, vigenteDesde) tuple. Replaces the
+    //    legacy global `findTimeline()` + `.find()` check.
+    const scopeOperarioId = input.operarioId ?? null;
+    const scopeZoneId = input.zoneId ?? null;
+    const exists = await this.policyRepo.existsByOperarioZoneVigente(
+      scopeOperarioId,
+      scopeZoneId,
+      vigenteDesdeDate,
+    );
+    if (exists) {
+      throw new JornadaPolicyDuplicateEffectiveDateError({
+        vigenteDesde,
+        operarioId: scopeOperarioId,
+        zoneId: scopeZoneId,
+      });
     }
 
     // 4. INSERT — append-only, no update path
