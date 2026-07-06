@@ -41,14 +41,49 @@ export class JornadaPolicyOverlapsLiquidatedPeriodError extends Error {
   }
 }
 
+/**
+ * Builds the human-readable scope token for a JornadaPolicy duplicate error.
+ *
+ *   - operarioId !== null → "operario {operarioId}"
+ *   - zoneId   !== null   → "zona {zoneId}"
+ *   - neither  (global)    → "ámbito global"
+ *
+ * If BOTH are set, per-operario takes precedence (operario override is the
+ * most specific scope). Pure function — easy to test.
+ */
+export function describeJornadaPolicyScope(
+  operarioId: string | null,
+  zoneId: string | null,
+): string {
+  if (operarioId !== null) return `operario ${operarioId}`;
+  if (zoneId !== null) return `zona ${zoneId}`;
+  return 'ámbito global';
+}
+
+export interface JornadaPolicyDuplicateScope {
+  vigenteDesde: string;
+  operarioId: string | null;
+  zoneId: string | null;
+}
+
 export class JornadaPolicyDuplicateEffectiveDateError extends Error {
   readonly httpStatus = 409 as const;
   readonly code = 'POLICY_DUPLICATE_DATE' as const;
 
-  constructor(vigenteDesde: string) {
+  /**
+   * Backward-compatible: `new JornadaPolicyDuplicateEffectiveDateError('2026-07-01')`
+   * still works (legacy call sites). When scope info is available, prefer the
+   * object form `new JornadaPolicyDuplicateEffectiveDateError({ vigenteDesde, operarioId, zoneId })`
+   * for a contextual message.
+   */
+  constructor(vigenteDesde: string | JornadaPolicyDuplicateScope) {
+    const scope =
+      typeof vigenteDesde === 'string'
+        ? { vigenteDesde, operarioId: null, zoneId: null }
+        : vigenteDesde;
     super(
-      `Ya existe una JornadaPolicy con vigenteDesde "${vigenteDesde}". ` +
-        `Cada fecha de vigencia debe ser única.`,
+      `Ya existe una política vigente desde ${scope.vigenteDesde} para ` +
+        `${describeJornadaPolicyScope(scope.operarioId, scope.zoneId)}.`,
     );
     this.name = 'JornadaPolicyDuplicateEffectiveDateError';
   }
