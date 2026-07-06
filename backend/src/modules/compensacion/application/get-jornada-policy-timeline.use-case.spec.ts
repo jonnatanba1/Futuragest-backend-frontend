@@ -37,6 +37,8 @@ describe('GetJornadaPolicyTimelineUseCase', () => {
       findTimeline: jest.fn().mockResolvedValue([p1, p2]),
       findLatestBefore: jest.fn(),
       delete: jest.fn(),
+      findByScope: jest.fn().mockResolvedValue([]),
+      existsByOperarioZoneVigente: jest.fn().mockResolvedValue(false),
     };
 
     const useCase = new GetJornadaPolicyTimelineUseCase(mockRepo);
@@ -54,6 +56,8 @@ describe('GetJornadaPolicyTimelineUseCase', () => {
       findTimeline: jest.fn().mockResolvedValue([]),
       findLatestBefore: jest.fn(),
       delete: jest.fn(),
+      findByScope: jest.fn().mockResolvedValue([]),
+      existsByOperarioZoneVigente: jest.fn().mockResolvedValue(false),
     };
 
     const useCase = new GetJornadaPolicyTimelineUseCase(mockRepo);

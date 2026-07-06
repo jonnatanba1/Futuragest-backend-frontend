@@ -71,6 +71,8 @@ function makePolicyRepo(timeline: JornadaPolicyRecord[]): jest.Mocked<JornadaPol
     findTimeline: jest.fn().mockResolvedValue(timeline),
     findLatestBefore: jest.fn(),
     delete: jest.fn(),
+    findByScope: jest.fn().mockResolvedValue([]),
+    existsByOperarioZoneVigente: jest.fn().mockResolvedValue(false),
   };
 }
 
