@@ -317,6 +317,32 @@ export const healthApi = {
 
 // --- Compensación de Horas --------------------------------------------------
 
+/** Filter for GET /jornada-policy (scope-aware timeline lookups).
+ *  - `undefined` zoneId/operarioId ⇒ param omitted entirely
+ *  - `null` or `""` zoneId ⇒ `zoneId=` (global / IS NULL filter)
+ *  - non-empty string ⇒ that value as the param
+ */
+export interface JornadaPolicyFilter {
+  zoneId?: string | null;
+  operarioId?: string | null;
+}
+
+/** Build the query string for a JornadaPolicy filter.
+ *  Returns "" when no filter is provided (no query key defined) → back-compat. */
+function toJornadaPolicyQuery(filter?: JornadaPolicyFilter): string {
+  if (!filter) return '';
+  const params = new URLSearchParams();
+  if (filter.zoneId !== undefined) {
+    // null and "" both serialize as `zoneId=` (global IS NULL filter on backend).
+    params.set('zoneId', filter.zoneId ?? '');
+  }
+  if (filter.operarioId !== undefined) {
+    params.set('operarioId', filter.operarioId ?? '');
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const compensacionApi = {
   /** GET /compensacion/:operarioId?desde=...&hasta=... */
   getBalance: (operarioId: string, desde: string, hasta: string): Promise<PeriodBalanceDto> =>
@@ -340,9 +366,9 @@ export const compensacionApi = {
   confirmPayout: (operarioId: string, body: ConfirmPayoutRequest): Promise<PeriodPayoutDto> =>
     request<PeriodPayoutDto>('POST', `/compensacion/${operarioId}/payout/confirm`, { body }),
 
-  /** GET /jornada-policy */
-  getJornadaPolicies: (): Promise<JornadaPolicyDto[]> =>
-    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
+  /** GET /jornada-policy (scope-aware: filter omitted ⇒ full timeline). */
+  getJornadaPolicies: (filter?: JornadaPolicyFilter): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', `/jornada-policy${toJornadaPolicyQuery(filter)}`),
 
   /** POST /jornada-policy */
   createJornadaPolicy: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
@@ -368,8 +394,8 @@ export const novedadesApi = {
 // --- JornadaPolicy (full CRUD — PR 5) ---------------------------------------
 
 export const jornadaPolicyApi = {
-  list: (): Promise<JornadaPolicyDto[]> =>
-    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
+  list: (filter?: JornadaPolicyFilter): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', `/jornada-policy${toJornadaPolicyQuery(filter)}`),
 
   get: (id: string): Promise<JornadaPolicyDto> =>
     request<JornadaPolicyDto>('GET', `/jornada-policy/${id}`),

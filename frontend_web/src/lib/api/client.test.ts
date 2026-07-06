@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, authApi, compensacionApi, setUnauthorizedHandler } from './client';
+import { ApiError, authApi, compensacionApi, jornadaPolicyApi, setUnauthorizedHandler } from './client';
 import type { ConfirmPayoutRequest } from '@futuragest/contracts';
 import { tokenStore } from '../auth/token-store';
 
@@ -177,6 +177,68 @@ describe('compensacionApi', () => {
     expect(result[0].horasDiarias).toBe('8.00');
     const [url] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/jornada-policy$/);
+  });
+
+  describe('getJornadaPolicies filter (T9)', () => {
+    function stubPolicies() {
+      const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify([{ id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' }]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    it('with no filter issues GET /jornada-policy with no query string', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies();
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy$/);
+    });
+
+    it('with zoneId="zA" issues /jornada-policy?zoneId=zA', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: 'zA' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA$/);
+    });
+
+    it('with zoneId="" issues /jornada-policy?zoneId= (global IS NULL filter)', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: '' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=$/);
+    });
+
+    it('with zoneId=null issues /jornada-policy?zoneId= (same as empty string)', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: null });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=$/);
+    });
+
+    it('with operarioId="o1" issues /jornada-policy?operarioId=o1', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?operarioId=o1$/);
+    });
+
+    it('with zoneId="zA" and operarioId="o1" issues /jornada-policy?zoneId=zA&operarioId=o1', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: 'zA', operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA&operarioId=o1$/);
+    });
+
+    it('jornadaPolicyApi.list forwards the filter the same way', async () => {
+      const fetchMock = stubPolicies();
+      await jornadaPolicyApi.list({ zoneId: 'zA', operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA&operarioId=o1$/);
+    });
   });
 
   it('confirmPayout POSTs to /compensacion/:operarioId/payout/confirm with body', async () => {
