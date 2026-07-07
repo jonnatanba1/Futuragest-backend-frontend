@@ -23,6 +23,7 @@ vi.mock('../config/config-queries', () => ({
 
 vi.mock('../operarios/operario-queries', () => ({
   useOperarios: () => ({ data: [], isLoading: false }),
+  useZones: () => ({ data: [], isLoading: false }),
 }));
 
 function setRole(role: string) {
