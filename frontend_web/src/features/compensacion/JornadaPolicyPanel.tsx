@@ -138,7 +138,7 @@ interface CreatePolicyFormProps {
   /** When set, preloads all fields from this row (append-only Edit). */
   editingFrom?: JornadaPolicyDto | null;
   /** Callback so a ref can scrollIntoView + focus the date field. */
-  formRef?: React.RefObject<HTMLFormElement | null>;
+  formRef?: React.RefObject<HTMLFormElement>;
 }
 
 function CreatePolicyForm({ editingFrom, formRef }: CreatePolicyFormProps) {
@@ -167,7 +167,8 @@ function CreatePolicyForm({ editingFrom, formRef }: CreatePolicyFormProps) {
   // Whenever editingFrom changes, preload the form with the row's fields.
   React.useEffect(() => {
     if (editingFrom) {
-      form.setValues(rowToFormValues(editingFrom));
+      const values = rowToFormValues(editingFrom);
+      if (values) form.setValues(values);
       // Focus vigenteDesde (cleared — user must enter a new date).
       const dateEl = formRef?.current?.querySelector<HTMLInputElement>(
         'input[aria-label="Vigente desde"]',

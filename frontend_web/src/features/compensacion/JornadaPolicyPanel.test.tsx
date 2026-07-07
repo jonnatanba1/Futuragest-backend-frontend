@@ -419,7 +419,8 @@ describe('JornadaPolicyPanel · T12 timeline zone filter', () => {
       expect(useJornadaPoliciesQueryMock.mock.calls.length).toBeGreaterThan(initialCalls);
     });
     // Last call should pass the chosen zone as filter
-    expect(useJornadaPoliciesQueryMock.mock.calls.at(-1)[0]).toBe('z-1');
+    const calls = useJornadaPoliciesQueryMock.mock.calls;
+    expect(calls[calls.length - 1][0]).toBe('z-1');
   });
 
   it('choosing "Global" filter passes "" to useJornadaPoliciesQuery', async () => {
@@ -433,7 +434,8 @@ describe('JornadaPolicyPanel · T12 timeline zone filter', () => {
     // Click the first matching option
     await user.click(screen.getAllByText('Global (todas las zonas)')[0]);
     await waitFor(() => {
-      expect(useJornadaPoliciesQueryMock.mock.calls.at(-1)[0]).toBe('');
+      const calls = useJornadaPoliciesQueryMock.mock.calls;
+      expect(calls[calls.length - 1][0]).toBe('');
     });
   });
 
@@ -447,18 +449,23 @@ describe('JornadaPolicyPanel · T12 timeline zone filter', () => {
       expect(screen.getAllByText('Zona Urabá').length).toBeGreaterThanOrEqual(1);
     });
     await user.click(screen.getAllByText('Zona Urabá')[0]);
-    await waitFor(() => expect(useJornadaPoliciesQueryMock.mock.calls.at(-1)[0]).toBe('z-1'));
+    await waitFor(() => {
+      const calls = useJornadaPoliciesQueryMock.mock.calls;
+      expect(calls[calls.length - 1][0]).toBe('z-1');
+    });
     // Clear via the Select clear button (Mantine Select clearable renders a close icon)
     const clearBtn = screen.getByRole('textbox', { name: /filtrar por zona/i }).parentElement?.querySelector('[aria-label="Clear selected item"]') as HTMLElement | null;
     if (clearBtn) {
       await user.click(clearBtn);
       await waitFor(() => {
         // undefined → bare query (no filter)
-        expect(useJornadaPoliciesQueryMock.mock.calls.at(-1)[0]).toBeUndefined();
+        const calls = useJornadaPoliciesQueryMock.mock.calls;
+        expect(calls[calls.length - 1][0]).toBeUndefined();
       });
     } else {
       // Fallback: type empty / reselect by selecting the placeholder
-      expect(useJornadaPoliciesQueryMock.mock.calls.at(-1)[0]).toBe('z-1');
+      const calls = useJornadaPoliciesQueryMock.mock.calls;
+      expect(calls[calls.length - 1][0]).toBe('z-1');
     }
   });
 });
