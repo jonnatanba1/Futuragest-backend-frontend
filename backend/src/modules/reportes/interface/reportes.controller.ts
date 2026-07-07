@@ -10,17 +10,26 @@ import {
 import { ApiOkResponse, ApiProperty } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Roles } from '../../iam/interface/roles.decorator';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { GeneratePslReportUseCase } from '../application/generate-psl-report.use-case';
 import { PslReportRowDto } from '../../../contracts/shared/reportes';
 
 export class PslReportQuery {
   @ApiProperty({ description: 'YYYY-MM-DD Colombia local', example: '2026-07-01' })
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe estar en formato YYYY-MM-DD' })
   desde!: string;
 
   @ApiProperty({ description: 'YYYY-MM-DD Colombia local', example: '2026-07-15' })
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe estar en formato YYYY-MM-DD' })
   hasta!: string;
 
   @ApiProperty({ required: false, description: 'Filtro por zona' })
+  @IsOptional()
+  @IsString()
   zoneId?: string;
 }
 

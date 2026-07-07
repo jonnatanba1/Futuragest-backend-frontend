@@ -18,6 +18,9 @@ RUN pnpm exec prisma generate
 # Copy source code
 COPY . .
 
+# Clear tsbuildinfo to ensure a clean compiler run
+RUN rm -f tsconfig.build.tsbuildinfo
+
 # Build the API
 RUN pnpm run build
 
