@@ -14,9 +14,10 @@ import {
   Title,
   Loader,
   TextInput,
+  Pagination,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/auth-context';
 import { hasAnyRole, COMPENSACION_WRITE_ROLES } from '../../lib/auth/roles';
@@ -256,6 +257,21 @@ export function BalancePanel() {
     );
   }, [operarios.data, search]);
 
+  const [activePage, setActivePage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    setActivePage(1);
+  }, [search, year, month, quincena, operarioId]);
+
+  const paginatedOperarios = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return filteredOperarios.slice(start, end);
+  }, [filteredOperarios, activePage]);
+
+  const totalPages = Math.ceil(filteredOperarios.length / PAGE_SIZE);
+
   const handleOpenCloseModal = (id: string, saldo: string) => {
     setModalOperarioId(id);
     setModalSaldoHoras(saldo);
@@ -447,7 +463,7 @@ export function BalancePanel() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {filteredOperarios.map((op) => (
+            {paginatedOperarios.map((op) => (
               <BalanceRow
                 key={op.id}
                 operario={op}
@@ -460,6 +476,19 @@ export function BalancePanel() {
             ))}
           </Table.Tbody>
         </Table>
+
+        {totalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination
+              value={activePage}
+              onChange={setActivePage}
+              total={totalPages}
+              size="sm"
+              radius="md"
+              withEdges
+            />
+          </Group>
+        )}
       </Stack>
     );
   }
