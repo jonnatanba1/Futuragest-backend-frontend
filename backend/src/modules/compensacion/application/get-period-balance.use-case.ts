@@ -92,6 +92,20 @@ export class GetPeriodBalanceUseCase {
     }
 
     // 5. Delegate math to pure use-case with resolved carryIn
-    return this.calcUseCase.execute({ attendances, policyTimeline, carryIn });
+    const balance = await this.calcUseCase.execute({ attendances, policyTimeline, carryIn });
+
+    // 6. Resolve current period closed status and metadata
+    if (this.periodRepo) {
+      const currentPeriodKey = derivePeriodKey(desde);
+      const exactCurrent = await this.periodRepo.findByOperarioAndPeriod(operarioId, currentPeriodKey);
+      if (exactCurrent !== null) {
+        balance.isClosed = true;
+        balance.disposition = exactCurrent.disposition;
+        balance.paidAt = exactCurrent.paidAt;
+        balance.payoutRef = exactCurrent.payoutRef;
+      }
+    }
+
+    return balance;
   }
 }

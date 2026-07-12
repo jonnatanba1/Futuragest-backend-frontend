@@ -73,9 +73,7 @@ interface BalanceRowProps {
   operario: { id: string; fullName: string; documento: string };
   desde: string;
   hasta: string;
-  periodKey: string;
   canWrite: boolean;
-  canReadPayout: boolean;
   onSelect: () => void;
   onOpenCloseModal: (operarioId: string, saldoHoras: string) => void;
 }
@@ -84,37 +82,32 @@ function BalanceRow({
   operario,
   desde,
   hasta,
-  periodKey,
   canWrite,
-  canReadPayout,
   onSelect,
   onOpenCloseModal,
 }: BalanceRowProps) {
   const balance = useBalanceQuery(operario.id, desde, hasta);
-  const payout = usePayoutQuery(operario.id, periodKey, canReadPayout);
 
   const getStatusBadge = () => {
-    if (payout.isLoading) {
+    if (balance.isLoading) {
       return <Loader size="xs" type="dots" />;
     }
-    if (payout.isError) {
-      const err = payout.error;
-      const status = err instanceof ApiError ? err.status : 0;
-      if (status === 404) {
-        return <Badge color="blue" variant="light">Abierto</Badge>;
-      }
+    if (balance.isError) {
       return <Badge color="gray" variant="light">—</Badge>;
     }
-    if (payout.data) {
-      if (payout.data.paidAt) {
-        return <Badge color="teal" variant="light">Liquidado</Badge>;
+    if (balance.data) {
+      if (balance.data.isClosed) {
+        if (balance.data.paidAt) {
+          return <Badge color="teal" variant="light">Liquidado</Badge>;
+        }
+        return <Badge color="orange" variant="light">Cerrado</Badge>;
       }
-      return <Badge color="orange" variant="light">Cerrado</Badge>;
+      return <Badge color="blue" variant="light">Abierto</Badge>;
     }
     return <Badge color="gray" variant="light">—</Badge>;
   };
 
-  const isClosed = !payout.isLoading && !payout.isError && !!payout.data;
+  const isClosed = !!balance.data?.isClosed;
 
   const renderCells = () => {
     if (balance.isLoading) {
@@ -460,9 +453,7 @@ export function BalancePanel() {
                 operario={op}
                 desde={range.desde}
                 hasta={range.hasta}
-                periodKey={range.periodKey}
                 canWrite={canWrite}
-                canReadPayout={canReadPayout}
                 onSelect={() => setOperarioId(op.id)}
                 onOpenCloseModal={handleOpenCloseModal}
               />

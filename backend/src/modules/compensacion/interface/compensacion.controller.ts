@@ -283,6 +283,10 @@ function serializeBalance(
     carryIn: balance.carryIn.toString(),
     saldoHoras: balance.saldo.toString(),
     breakdown,
+    isClosed: balance.isClosed,
+    disposition: balance.disposition,
+    paidAt: balance.paidAt?.toISOString() ?? null,
+    payoutRef: balance.payoutRef,
   };
 }
 

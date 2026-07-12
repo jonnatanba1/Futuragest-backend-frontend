@@ -51,4 +51,10 @@ export interface PeriodBalance {
   breakdown?: CategoryBreakdown;
   /** Monetary surcharge value from aggregated breakdown. Undefined when not computed. */
   valorRecargos?: Decimal;
+
+  // Closed period metadata resolved on-demand during getBalance read.
+  isClosed?: boolean;
+  disposition?: 'CARRY_OVER' | 'PAYROLL_DEDUCTION' | null;
+  paidAt?: Date | null;
+  payoutRef?: string | null;
 }

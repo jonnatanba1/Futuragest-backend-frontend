@@ -162,6 +162,18 @@ export class PeriodBalanceResponseDto {
 
   @ApiProperty({ type: () => DayBreakdownDto, isArray: true })
   breakdown!: DayBreakdownDto[];
+
+  @ApiProperty({ required: false, type: Boolean })
+  isClosed?: boolean;
+
+  @ApiProperty({ required: false, enum: ['CARRY_OVER', 'PAYROLL_DEDUCTION'], nullable: true })
+  disposition?: 'CARRY_OVER' | 'PAYROLL_DEDUCTION' | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  paidAt?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  payoutRef?: string | null;
 }
 
 // ─── GET /compensacion/:operarioId/payout ─────────────────────────────────────

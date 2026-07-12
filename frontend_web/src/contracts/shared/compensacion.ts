@@ -77,6 +77,10 @@ export interface PeriodBalanceDto {
   /** carryIn + creditosHoras − debitosHoras. Decimal string. */
   saldoHoras: string;
   breakdown: DayBreakdownDto[];
+  isClosed?: boolean;
+  disposition?: CompensationDisposition | null;
+  paidAt?: string | null;
+  payoutRef?: string | null;
 }
 
 /**

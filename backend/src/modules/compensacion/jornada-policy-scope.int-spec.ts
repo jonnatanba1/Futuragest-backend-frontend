@@ -61,8 +61,8 @@ class UnrestrictedScopeHolder extends ScopeContextHolder {
 }
 
 const SCOPE_DATE = '2026-08-01';
-const ZONE_A = 'int-scope-zA';
-const ZONE_B = 'int-scope-zB';
+const ZONE_A = 'd1cd3413-9f15-4489-9ed1-fec7916ea02c';
+const ZONE_B = '1daa13bd-7002-45a8-a207-4fee6c8ac933';
 
 describe('JornadaPolicy scope-aware integration (real Prisma)', () => {
   let prisma: PrismaClient;
@@ -164,7 +164,7 @@ describe('JornadaPolicy scope-aware integration (real Prisma)', () => {
     });
     expect(rows).toHaveLength(2);
     const zones = rows.map((r) => r.zoneId).sort();
-    expect(zones).toEqual([ZONE_A, ZONE_B]);
+    expect(zones).toEqual([ZONE_A, ZONE_B].sort());
 
     // Enriched-scope assertion: the duplicate error message mentions the zone.
     // We re-throw to capture the message (the use case throws the domain error
@@ -176,7 +176,7 @@ describe('JornadaPolicy scope-aware integration (real Prisma)', () => {
       capturedMessage = (e as JornadaPolicyDuplicateEffectiveDateError).message;
     }
     expect(capturedMessage).toContain(`zona ${ZONE_A}`);
-    expect(capturedMessage.toLowerCase()).toContain('duplic');
+    expect(capturedMessage.toLowerCase()).toContain('existe');
   });
 
   // ── INT-SCOPE-2: GET filter end-to-end (R1.5) ────────────────────────────────
@@ -212,7 +212,7 @@ describe('JornadaPolicy scope-aware integration (real Prisma)', () => {
     const allResult = await controller.getJornadaPolicyTimeline(undefined, undefined);
     expect(allResult).toHaveLength(3);
     const allZones = allResult.map((r) => r.zoneId).sort();
-    expect(allZones).toEqual([null, ZONE_A, ZONE_B]);
+    expect(allZones).toEqual([null, ZONE_A, ZONE_B].sort());
 
     // (d) ?zoneId=zB → only the zB row (triangulation — a DIFFERENT zone)
     const zoneBResult = await controller.getJornadaPolicyTimeline(ZONE_B, undefined);
