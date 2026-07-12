@@ -443,13 +443,6 @@ export function BalancePanel() {
 
     return (
       <Stack gap="md" data-testid="balance-tab-panel">
-        <TextInput
-          placeholder="Buscar por nombre o documento..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          w={{ base: '100%', sm: 300 }}
-        />
-
         <Table striped withTableBorder>
           <Table.Thead>
             <Table.Tr>
@@ -499,19 +492,18 @@ export function BalancePanel() {
     <Stack gap="md">
       {/* Filter bar */}
       <Group gap="sm" wrap="wrap">
-        <Select
-          placeholder="Buscar operario"
-          aria-label="Seleccionar operario"
-          data={operarioOptions}
-          value={operarioId}
-          onChange={(v) => {
-            setOperarioId(v);
-            setPeriodClosed(false);
-          }}
-          searchable
-          clearable
-          w={240}
-        />
+        {!operarioId ? (
+          <TextInput
+            placeholder="Buscar por nombre o documento..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            w={280}
+          />
+        ) : (
+          <Button variant="default" onClick={() => setOperarioId(null)}>
+            ← Volver a la lista
+          </Button>
+        )}
 
         <Select
           aria-label="Seleccionar año"
