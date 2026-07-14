@@ -32,6 +32,17 @@ export function useGenerateHolidaysMutation() {
   });
 }
 
+export function useCreateHolidayMutation() {
+  const qc = useQueryClient();
+  return useMutation<HolidayDto, Error, { date: string; name: string }>({
+    mutationFn: (body) => holidayApi.create(body),
+    onSuccess: (_data, _vars, _ctx) => {
+      // Invalidate all holiday queries since we don't know the year
+      qc.invalidateQueries({ queryKey: ['holidays'] });
+    },
+  });
+}
+
 // ─── Surcharge Rates ──────────────────────────────────────────────────────────
 
 export function useSurchargeRatesQuery() {

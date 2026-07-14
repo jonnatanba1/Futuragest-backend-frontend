@@ -33,7 +33,7 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
   async classifyAttendance(attendanceId: string): Promise<void> {
     this.logger.log(`Iniciando clasificación para asistencia: ${attendanceId}`);
 
-    const attendance = await this.attendanceRepo.findById(attendanceId);
+    let attendance = await this.attendanceRepo.findById(attendanceId);
     if (!attendance) {
       this.logger.error(`Asistencia no encontrada: ${attendanceId}`);
       return;
@@ -53,6 +53,17 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
     if (virtualCheckOutEnabled && !attendance.completedAt) {
       // compute virtual checkout from policy.horaFin (overtime pre-auth in PR 4)
       const checkoutVirtual = this.buildCheckoutVirtual(attendance.date, policy.horaFin);
+
+      // Sanity guard (A-11): virtual checkout must produce a valid shift duration.
+      // Mirrors MAX_SHIFT_HOURS in check-out-attendance.use-case.ts.
+      const durationMs = checkoutVirtual.getTime() - attendance.checkInCapturedAt.getTime();
+      if (durationMs <= 0 || durationMs > 20 * 3_600_000) {
+        this.logger.warn(
+          `Virtual checkout produce duración inválida (${durationMs}ms) para ${attendanceId} — saltando`,
+        );
+        return;
+      }
+
       await this.attendanceRepo.update(attendanceId, {
         completedAt: checkoutVirtual,
         checkOutCapturedAt: checkoutVirtual,
@@ -65,8 +76,8 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
         this.logger.warn(`Asistencia no está completada para clasificar: ${attendanceId}`);
         return;
       }
-      // Use reloaded attendance for the rest of the method
-      Object.assign(attendance, reloaded);
+      // Use reloaded attendance for the rest of the method (avoid mutating Prisma object)
+      attendance = reloaded;
     }
 
     if (!attendance.completedAt || !attendance.checkOutCapturedAt) {
@@ -74,7 +85,7 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       return;
     }
 
-    // 3. Resolver festivos del año (auto-seed si no existen)
+    // 3. Resolver festivos del año + siguiente (A-12: overnight cross-year)
     let holidays = await this.holidayRepo.findManyByYear(year);
     if (holidays.length === 0) {
       this.logger.log(`Generando y sembrando festivos para el año ${year}`);
@@ -82,8 +93,13 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       await this.holidayRepo.createMany(generated);
       holidays = await this.holidayRepo.findManyByYear(year);
     }
+    // Also load next year's holidays for overnight shifts crossing Dec 31 → Jan 1
+    const nextYearHolidays = await this.holidayRepo.findManyByYear(year + 1);
 
-    const holidayDates = new Set(holidays.map((h) => h.date));
+    const holidayDates = new Set([
+      ...holidays.map((h) => h.date),
+      ...nextYearHolidays.map((h) => h.date),
+    ]);
     const isHoliday = holidayDates.has(dateStr);
     
     let weekday = new Date(dateStr).getUTCDay();
@@ -116,6 +132,7 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       desayunoInicio,
       desayunoFin,
       isoWeekday: weekday,
+      holidayDates,
     });
 
     // 6. Persistir el desglose
@@ -144,7 +161,9 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
     });
 
     // 7. Fire-and-forget: generate CompensatoryRest if Sunday or holiday (REQ-006)
-    if (this.compensatoryRestPort && (isSunday || isHoliday)) {
+    // A-05/A-12: use engine-computed flags (per-day for overnight shifts)
+    // instead of check-in date flags.
+    if (this.compensatoryRestPort && (classification.esDominical || classification.esFestivo)) {
       this.compensatoryRestPort.generateIfApplicable(attendanceId).catch((err) => {
         this.logger.error(
           `Error en fire-and-forget de descanso compensatorio para asistencia ${attendanceId}`,
@@ -174,10 +193,8 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
       return { autoCompleted: 0, skipped: 0 };
     }
 
-    // Query recent attendances (last 7 days) — MVP scope
-    const recent = await this.attendanceRepo.findMany(
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    );
+    // Query all pending attendances (no time window — A-07 fix)
+    const recent = await this.attendanceRepo.findMany();
 
     const pending = recent.filter((a) => !a.completedAt);
     this.logger.log(`${pending.length} asistencias pendientes encontradas`);
@@ -216,18 +233,23 @@ export class ClassifyAttendanceUseCase implements AttendanceClassificationPort {
   }
 
   /**
-   * Builds a Date for the virtual check-out.
-   * Uses attendance.date + policy.horaFin (HH:MM) as Colombia local time.
+   * Builds a Date for the virtual check-out in proper UTC.
+   * Uses attendance.date + policy.horaFin (HH:MM) as Colombia local time (UTC-5).
+   *
+   * Fix: the engine subtracts 5h from checkOutCapturedAt to get Colombia local
+   * (classify-attendance.use-case.ts:103). If we store horaFin as-is (UTC fields
+   * pretending to be local), the engine double-subtracts 5h — producing a check-out
+   * 5 hours earlier than intended. Adding the offset here ensures the engine
+   * receives the correct local time after its own -5h adjustment.
    *
    * Overtime pre-auth (PR 4) will extend this: policy.horaFin + Σ approved Novedad horasExtra.
    */
   private buildCheckoutVirtual(dateStr: string, horaFin: string): Date {
     const [h, m] = horaFin.split(':').map(Number);
-    // Construct as UTC but representing Colombia local time (UTC-5)
-    // The dates in the system are stored as UTC but represent Colombia time.
-    // We construct a Date that, when read with getUTCHours(), gives the local hour.
     const d = new Date(`${dateStr}T00:00:00.000Z`);
-    d.setUTCHours(h, m, 0, 0);
+    // horaFin is Colombia local (UTC-5). Store as proper UTC so the engine's
+    // -5h adjustment produces the correct local time.
+    d.setUTCHours(h + 5, m, 0, 0);
     return d;
   }
 }

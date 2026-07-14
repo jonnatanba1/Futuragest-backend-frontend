@@ -27,6 +27,7 @@ export interface CreateSupervisorWithUserParams {
   area: Supervisor['area'];
   zoneId: string;
   municipioId: string;
+  displayName?: string;
 }
 
 @Injectable()
@@ -68,7 +69,7 @@ export class ScopedSupervisorRepository extends ScopedRepository<
   findManyWithUser(where?: Prisma.SupervisorWhereInput): Promise<SupervisorWithUser[]> {
     return this.findManyScoped({
       where: where ?? {},
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, displayName: true } } },
     }) as Promise<SupervisorWithUser[]>;
   }
 
@@ -76,7 +77,7 @@ export class ScopedSupervisorRepository extends ScopedRepository<
   findByIdWithUser(id: string): Promise<SupervisorWithUser | null> {
     return this.findFirstScoped({
       where: { id },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, displayName: true } } },
     }) as Promise<SupervisorWithUser | null>;
   }
 
@@ -103,6 +104,7 @@ export class ScopedSupervisorRepository extends ScopedRepository<
             passwordHash: params.passwordHash,
             role: 'SUPERVISOR',
             mustChangePassword: true,
+            displayName: params.displayName,
           },
           select: { id: true },
         });
@@ -129,6 +131,53 @@ export class ScopedSupervisorRepository extends ScopedRepository<
     }
   }
 
+  /**
+   * Update a supervisor's municipal assignment, area, and/or related user display name.
+   * displayName is stored on the User row; municipio/area on the Supervisor row.
+   * Uses a $transaction to ensure atomicity across both models.
+   */
+  async update(
+    id: string,
+    data: { municipioId?: string; area?: Supervisor['area']; displayName?: string },
+  ): Promise<SupervisorWithUser> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Update Supervisor row (only fields that are provided)
+      const supData: Prisma.SupervisorUpdateInput = {};
+      if (data.municipioId !== undefined) supData.municipio = { connect: { id: data.municipioId } };
+      if (data.area !== undefined) supData.area = data.area;
+
+      let supervisor: Supervisor;
+      if (Object.keys(supData).length > 0) {
+        supervisor = await (tx as unknown as PrismaService).supervisor.update({
+          where: { id },
+          data: supData,
+        });
+      } else {
+        supervisor = await (tx as unknown as PrismaService).supervisor.findUniqueOrThrow({
+          where: { id },
+        });
+      }
+
+      // 2. Update User displayName if provided
+      if (data.displayName !== undefined) {
+        await (tx as unknown as PrismaService).user.update({
+          where: { id: supervisor.userId },
+          data: { displayName: data.displayName },
+        });
+      }
+
+      // 3. Return enriched result
+      const enriched = await (tx as unknown as PrismaService).supervisor.findUniqueOrThrow({
+        where: { id },
+        include: { user: { select: { email: true, displayName: true } } },
+      });
+
+      return enriched;
+    });
+
+    return result as unknown as SupervisorWithUser;
+  }
+
   private isPrismaUniqueError(err: unknown): boolean {
     return (
       typeof err === 'object' &&
@@ -140,4 +189,4 @@ export class ScopedSupervisorRepository extends ScopedRepository<
 }
 
 /** Supervisor row with only the user's email joined in. */
-export type SupervisorWithUser = Supervisor & { user: { email: string } };
+export type SupervisorWithUser = Supervisor & { user: { email: string; displayName: string | null } };

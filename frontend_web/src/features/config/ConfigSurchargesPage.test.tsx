@@ -10,11 +10,13 @@ import { ConfigSurchargesPage } from './ConfigSurchargesPage';
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
-const { useSurchargeRatesQueryMock } = vi.hoisted(() => ({
+const { useSurchargeRatesQueryMock, useCreateSurchargeRateMutationMock } = vi.hoisted(() => ({
   useSurchargeRatesQueryMock: vi.fn(),
+  useCreateSurchargeRateMutationMock: vi.fn(),
 }));
 vi.mock('./config-queries', () => ({
   useSurchargeRatesQuery: useSurchargeRatesQueryMock,
+  useCreateSurchargeRateMutation: useCreateSurchargeRateMutationMock,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -38,6 +40,10 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
     data: RATES,
     isLoading: false,
     isError: false,
+  });
+  useCreateSurchargeRateMutationMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
   });
 }
 

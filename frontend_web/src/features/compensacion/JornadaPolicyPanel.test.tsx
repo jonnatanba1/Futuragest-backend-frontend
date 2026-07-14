@@ -61,8 +61,8 @@ const ZONES: ZoneResponseDto[] = [
 ];
 
 const OPERARIOS: OperarioDto[] = [
-  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, createdAt: '', updatedAt: '' },
-  { id: 'op-2', fullName: 'María Pérez', documento: '456', supervisorId: 'sup-1', cargo: 'Recolección', active: true, deactivatedAt: null, createdAt: '', updatedAt: '' },
+  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, areaId: null, areaName: null, createdAt: '', updatedAt: '' },
+  { id: 'op-2', fullName: 'María Pérez', documento: '456', supervisorId: 'sup-1', cargo: 'Recolección', active: true, deactivatedAt: null, areaId: null, areaName: null, createdAt: '', updatedAt: '' },
 ];
 
 const mutateMock = vi.fn();
@@ -524,23 +524,23 @@ describe('JornadaPolicyPanel · T13 append-only Edit', () => {
 // ─── T14 — Validation rules ───────────────────────────────────────────────────
 
 describe('JornadaPolicyPanel · T14 validation rules', () => {
-  it('blocks submit with horaFin <= horaInicio and shows error', async () => {
+  // C-15: Overnight shifts (horaFin <= horaInicio) are now allowed.
+  it('allows overnight shifts (horaFin < horaInicio) without error', async () => {
     defaultSetup();
     mutateMock.mockResolvedValue({ id: 'new-pol' });
     renderPanel();
     const user = userEvent.setup();
     await user.clear(screen.getByLabelText(/hora inicio/i));
-    await user.type(screen.getByLabelText(/hora inicio/i), '14:00');
+    await user.type(screen.getByLabelText(/hora inicio/i), '22:00');
     await user.clear(screen.getByLabelText(/hora fin/i));
-    await user.type(screen.getByLabelText(/hora fin/i), '06:00');
+    await user.type(screen.getByLabelText(/hora fin/i), '02:00');
     await user.type(screen.getByLabelText(/horas diarias/i), '8');
     await user.type(screen.getByLabelText(/vigente desde/i), '2026-07-01');
     await user.click(screen.getByRole('button', { name: /agregar política/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/hora fin debe ser mayor a la hora inicio/i)).toBeInTheDocument();
+      expect(mutateMock).toHaveBeenCalled();
     });
-    expect(mutateMock).not.toHaveBeenCalled();
   });
 
   it('blocks submit when diasLaborales is empty', async () => {

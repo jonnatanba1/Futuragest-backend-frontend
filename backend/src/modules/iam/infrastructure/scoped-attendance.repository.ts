@@ -109,6 +109,10 @@ export class ScopedAttendanceRepository
         completedAt: { not: null },
         date: { gte: desde, lte: hasta },
       },
+      // Include the breakdown relation so CalculatePeriodBalanceUseCase can use
+      // breakdown.totalHoras (net, lunch/breakfast deducted) instead of raw horasReales
+      // for the delta calculation (GAP-1 fix).
+      include: { breakdown: true },
     }) as Promise<AttendanceReaderRecord[]>;
   }
 

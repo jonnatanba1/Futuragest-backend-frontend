@@ -39,6 +39,7 @@ describe('GeneratePslReportUseCase', () => {
     documento: '1040364416',
     supervisorId: 'S1',
     cargo: 'Barrido',
+    areaId: null,
     deactivatedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

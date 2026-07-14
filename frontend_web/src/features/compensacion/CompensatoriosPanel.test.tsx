@@ -37,8 +37,8 @@ const RESTS: CompensatoryRestDto[] = [
 ];
 
 const OPERARIOS: OperarioDto[] = [
-  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, createdAt: '', updatedAt: '' },
-  { id: 'op-2', fullName: 'María López', documento: '456', supervisorId: 'sup-1', cargo: 'Recolección', active: true, deactivatedAt: null, createdAt: '', updatedAt: '' },
+  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, areaId: null, areaName: null, createdAt: '', updatedAt: '' },
+  { id: 'op-2', fullName: 'María López', documento: '456', supervisorId: 'sup-1', cargo: 'Recolección', active: true, deactivatedAt: null, areaId: null, areaName: null, createdAt: '', updatedAt: '' },
 ];
 
 function defaultSetup(role = 'TALENTO_HUMANO') {

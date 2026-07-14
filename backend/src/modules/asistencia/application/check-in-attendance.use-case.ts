@@ -176,11 +176,18 @@ export class CheckInAttendanceUseCase {
         completedAt: null,
       });
 
-      // Fire-and-forget: late arrival detection (PR 3).
-      // Must NOT await — the check-in response must not be delayed.
-      // Must NOT throw — a failure here must never fail the check-in.
+      // Late arrival detection (PR 3).
+      // Await is required because LateArrivalNovedadService is request-scoped
+      // (inherited from ATTENDANCE_REPOSITORY_PORT with ScopeContextHolder).
+      // Fire-and-forget would race against ALS teardown — the scope context
+      // is gone by the time the Promise resolves, silently losing the novedad.
+      // Failures are absorbed — must never fail the check-in.
       if (this.lateArrivalPort) {
-        this.dispatchLateArrivalCheck(record.id);
+        try {
+          await this.lateArrivalPort.checkAndCreateLateArrivalNovedad(record.id);
+        } catch (err) {
+          this.logLateArrivalFailure(record.id, err);
+        }
       }
 
       return { record, created: true };

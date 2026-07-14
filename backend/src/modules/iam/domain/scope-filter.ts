@@ -134,6 +134,16 @@ export const SCOPE_MAPS: Record<string, ScopeMap> = {
     zonePath: (zoneId) => ({ zoneId }),
     supervisorPath: (supervisorId) => ({ supervisorId }),
   },
+
+  /**
+   * Área is scoped by zone only (supervisors don't own áreas).
+   * SUPERVISOR has no direct área scope — deny via impossible predicate.
+   * Same pattern as Municipio.
+   */
+  Area: {
+    zonePath: (zoneId) => ({ zoneId }),
+    supervisorPath: () => ({ id: { in: [] } }), // SUPERVISOR → structurally-impossible deny
+  },
 };
 
 // ---------------------------------------------------------------------------

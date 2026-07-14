@@ -38,6 +38,15 @@ export function useMunicipios() {
   });
 }
 
+export function useAreas() {
+  return useQuery({
+    queryKey: ['areas'],
+    queryFn: orgApi.listAreas,
+    staleTime: FIVE_MIN,
+    retry: false,
+  });
+}
+
 export function useCreateOperario() {
   const qc = useQueryClient();
   return useMutation({

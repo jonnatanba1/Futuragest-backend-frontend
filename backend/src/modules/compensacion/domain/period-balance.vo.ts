@@ -15,6 +15,13 @@ export interface DayBreakdown {
   date: string;
   /** Raw duration = checkOutCapturedAt - checkInCapturedAt (no lunch deduction). */
   horasReales: Decimal;
+  /**
+   * Net hours worked (lunch/breakfast deducted). Populated when the attendance
+   * has been classified by TimeClassificationEngine and a breakdown exists.
+   * When absent, equals horasReales (raw duration).
+   * This is the authoritative figure for delta calculation (GAP-1 fix).
+   */
+  horasTrabajadas?: Decimal;
   /** jornadaDelDia from the applicable JornadaPolicy (resolved by record date). */
   jornadaHoras: Decimal;
   /** horasReales - jornadaHoras (positive = overtime, negative = undertime). */
@@ -49,12 +56,15 @@ export interface PeriodBalance {
   // ── T4.2: Enhanced compensation (REQ-009) ─────────────────────────────────
   /** Aggregated category breakdown. Undefined when breakdownEnabled=false or no data. */
   breakdown?: CategoryBreakdown;
-  /** Monetary surcharge value from aggregated breakdown. Undefined when not computed. */
-  valorRecargos?: Decimal;
 
   // Closed period metadata resolved on-demand during getBalance read.
   isClosed?: boolean;
   disposition?: 'CARRY_OVER' | 'PAYROLL_DEDUCTION' | null;
   paidAt?: Date | null;
   payoutRef?: string | null;
+  /**
+   * When attendance data changed inside this already-closed period,
+   * making the live recomputation diverge from the frozen snapshot.
+   */
+  divergedAt?: Date | null;
 }

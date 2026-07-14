@@ -106,6 +106,24 @@ export class CompensatoryRestService implements CompensatoryRestPort {
         status: 'PENDING',
       });
       this.logger.log(`Descanso compensatorio OCCASIONAL creado para asistencia ${attendanceId}`);
+
+      // A-06 mitigation: re-check count in case a concurrent call pushed us past
+      // the HABITUAL threshold (≥3). Without this, two parallel OCCASIONAL creates
+      // would both read count=1, both create OCCASIONAL, and the third record would
+      // never trigger reclassification. This re-check catches the race.
+      const recheckCount = await this.restRepo.countByOperarioAndMonth(operarioId, month);
+      if (recheckCount >= 3) {
+        this.logger.log(
+          `Re-check detectó race: ${recheckCount} dominicales/festivos en ${month} ` +
+            `para operario ${operarioId} — reclassificando todo a HABITUAL`,
+        );
+        const all = await this.restRepo.findByOperarioAndMonth(operarioId, month);
+        for (const prev of all) {
+          if (prev.type !== 'HABITUAL') {
+            await this.restRepo.updateType(prev.attendanceId, 'HABITUAL');
+          }
+        }
+      }
     } else if (newTotal === 3) {
       // Reclassify ALL previous in this month to HABITUAL
       const previous = await this.restRepo.findByOperarioAndMonth(operarioId, month);

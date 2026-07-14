@@ -22,6 +22,7 @@ import { TableSkeleton } from '../../components/TableSkeleton';
 import { CreateOperarioModal } from './CreateOperarioModal';
 import { ImportOperariosModal } from './ImportOperariosModal';
 import {
+  useAreas,
   useMunicipios,
   useOperarios,
   useSupervisors,
@@ -57,6 +58,7 @@ export function OperariosPage() {
   const supervisors = useSupervisors();
   const zones = useZones();
   const municipios = useMunicipios();
+  const areas = useAreas();
 
   const labelMap = useMemo(
     () => buildSupervisorLabelMap(supervisors.data ?? [], zones.data ?? [], municipios.data ?? []),
@@ -79,6 +81,11 @@ export function OperariosPage() {
   const supervisorOptions = useMemo(
     () => (supervisors.data ?? []).map((s) => ({ value: s.id, label: labelMap.get(s.id) ?? s.id })),
     [supervisors.data, labelMap],
+  );
+
+  const areaOptions = useMemo(
+    () => (areas.data ?? []).map((a) => ({ value: a.id, label: `${a.name} (${a.horaInicio}–${a.horaFin})` })),
+    [areas.data],
   );
 
   const cargoOptions = useMemo(
@@ -262,6 +269,7 @@ export function OperariosPage() {
         opened={modalOpened}
         onClose={modal.close}
         supervisorOptions={supervisorOptions}
+        areaOptions={areaOptions}
       />
       <ImportOperariosModal opened={importOpened} onClose={importModal.close} />
 

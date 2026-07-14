@@ -4,20 +4,22 @@ import {
   Button,
   Card,
   Group,
+  Modal,
   Select,
   SimpleGrid,
   Stack,
   Text,
+  TextInput,
   Title,
   Tooltip,
 } from '@mantine/core';
-import { useDocumentTitle } from '@mantine/hooks';
+import { useDisclosure, useDocumentTitle } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import React, { useState } from 'react';
 import type { HolidayDto, HolidayType } from '@futuragest/contracts';
 import { ApiError } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/auth-context';
-import { useGenerateHolidaysMutation, useHolidaysQuery } from './config-queries';
+import { useCreateHolidayMutation, useGenerateHolidaysMutation, useHolidaysQuery } from './config-queries';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,10 @@ export function ConfigHolidaysPage() {
 
   const holidays = useHolidaysQuery(year);
   const generateMutation = useGenerateHolidaysMutation();
+  const createMutation = useCreateHolidayMutation();
+  const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
+  const [holidayDate, setHolidayDate] = useState('');
+  const [holidayName, setHolidayName] = useState('');
 
   const handleGenerate = async () => {
     try {
@@ -165,6 +171,23 @@ export function ConfigHolidaysPage() {
         color: 'red',
         title: 'Error',
         message: err instanceof ApiError ? err.message : 'Error al generar festivos.',
+      });
+    }
+  };
+
+  const handleCreateHoliday = async () => {
+    if (!holidayDate || !holidayName) return;
+    try {
+      await createMutation.mutateAsync({ date: holidayDate, name: holidayName });
+      notifications.show({ color: 'teal', message: 'Festivo agregado.' });
+      setHolidayDate('');
+      setHolidayName('');
+      closeCreate();
+    } catch (err) {
+      notifications.show({
+        color: 'red',
+        title: 'Error',
+        message: err instanceof ApiError ? err.message : 'Error al agregar festivo.',
       });
     }
   };
@@ -188,7 +211,7 @@ export function ConfigHolidaysPage() {
       <Group justify="space-between" align="center">
         <Title order={2}>Festivos</Title>
         <Group>
-          {isAdmin && <Button variant="outline">Agregar manual</Button>}
+          {isAdmin && <Button variant="outline" onClick={openCreate}>Agregar manual</Button>}
           <Button onClick={handleGenerate} loading={generateMutation.isPending}>
             Generar automáticamente
           </Button>
@@ -243,6 +266,31 @@ export function ConfigHolidaysPage() {
           ))}
         </SimpleGrid>
       )}
+
+      {/* Create holiday modal */}
+      <Modal opened={createOpened} onClose={closeCreate} title="Agregar festivo manual" centered>
+        <Stack gap="md">
+          <TextInput
+            label="Fecha (YYYY-MM-DD)"
+            placeholder="2026-12-25"
+            value={holidayDate}
+            onChange={(e) => setHolidayDate(e.currentTarget.value)}
+          />
+          <TextInput
+            label="Nombre"
+            placeholder="Navidad"
+            value={holidayName}
+            onChange={(e) => setHolidayName(e.currentTarget.value)}
+          />
+          <Button
+            onClick={handleCreateHoliday}
+            loading={createMutation.isPending}
+            disabled={!holidayDate || !holidayName}
+          >
+            Agregar
+          </Button>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

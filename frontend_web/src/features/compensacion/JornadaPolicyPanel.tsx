@@ -95,8 +95,9 @@ export const policyValidators = {
   horaInicio: (v: string) => (!v ? 'Requerido' : null),
   horaFin: (v: string, values: PolicyFormValues) => {
     if (!v) return 'Requerido';
-    if (values.horaInicio && v <= values.horaInicio)
-      return 'La hora fin debe ser mayor a la hora inicio';
+    // C-15: Removed horaFin <= horaInicio check. Overnight shifts
+    // (e.g., 22:00–02:00) are valid and supported by the backend.
+    // String comparison would incorrectly reject them.
     return null;
   },
   diasLaborales: (v: number[]) =>

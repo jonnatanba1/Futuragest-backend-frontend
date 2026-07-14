@@ -59,6 +59,7 @@ function makeAttendance(date: string, durationHours: number): AttendanceReaderRe
   return {
     id: `att-${date}`,
     operarioId: 'O1',
+    zoneId: 'Z1',
     date,
     checkInCapturedAt: checkIn,
     checkOutCapturedAt: checkOut,

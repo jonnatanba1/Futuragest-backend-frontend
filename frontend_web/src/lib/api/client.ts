@@ -1,9 +1,11 @@
 import type {
+  AreaResponseDto,
   AttendanceDto,
   ClosePeriodRequest,
   CompensationPeriodDto,
   CompensatoryRestDto,
   ConfirmPayoutRequest,
+  CreateAreaBody,
   CreateJornadaPolicyRequest,
   CreateOperarioRequest,
   CreateSurchargeRateRequest,
@@ -21,6 +23,7 @@ import type {
   ScheduleCompensatoryRequest,
   SupervisorDto,
   SurchargeRateDto,
+  UpdateAreaBody,
   UpdateJornadaPolicyRequest,
   ZoneResponseDto,
   PslReportRowDto,
@@ -165,7 +168,9 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
 
   if (!res.ok) await raise(res);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 // --- Typed endpoint surface -------------------------------------------------
@@ -242,7 +247,13 @@ export const iamApi = {
     area: string;
     zoneId: string;
     municipioId: string;
+    displayName?: string;
   }): Promise<{ id: string }> => request<{ id: string }>('POST', '/iam/supervisors', { body }),
+
+  updateSupervisor: (
+    id: string,
+    body: { municipioId?: string; area?: string; displayName?: string },
+  ): Promise<SupervisorDto> => request<SupervisorDto>('PATCH', `/iam/supervisors/${id}`, { body }),
 };
 
 export const orgApi = {
@@ -273,11 +284,34 @@ export const orgApi = {
 
   listUsers: (): Promise<UserListItemDto[]> => request<UserListItemDto[]>('GET', '/org/users'),
 
-  provisionUser: (body: { email: string; password: string; role: string }): Promise<{ id: string }> =>
-    request<{ id: string }>('POST', '/org/users', { body }),
+  provisionUser: (body: {
+    email: string;
+    password: string;
+    role: string;
+    displayName?: string;
+  }): Promise<{ id: string }> => request<{ id: string }>('POST', '/org/users', { body }),
+
+  updateUser: (
+    id: string,
+    body: { displayName?: string; role?: string },
+  ): Promise<UserListItemDto> => request<UserListItemDto>('PATCH', `/org/users/${id}`, { body }),
 
   assignCoordinador: (body: { userId: string; zoneId: string }): Promise<void> =>
     request<void>('POST', '/org/coordinadores/assign', { body }),
+
+  // --- Área CRUD (editable-areas-with-schedules) ---
+
+  listAreas: (): Promise<AreaResponseDto[]> =>
+    request<AreaResponseDto[]>('GET', '/org/areas'),
+
+  createArea: (body: CreateAreaBody): Promise<{ id: string }> =>
+    request<{ id: string }>('POST', '/org/areas', { body }),
+
+  updateArea: (id: string, body: UpdateAreaBody): Promise<AreaResponseDto> =>
+    request<AreaResponseDto>('PATCH', `/org/areas/${id}`, { body }),
+
+  deleteArea: (id: string): Promise<void> =>
+    request<void>('DELETE', `/org/areas/${id}`),
 };
 
 /** User row from GET /org/users (admin). Never includes passwordHash. */
@@ -287,6 +321,7 @@ export interface UserListItemDto {
   role: string;
   mustChangePassword: boolean;
   coordinatedZoneId: string | null;
+  displayName?: string;
   createdAt: string;
 }
 
@@ -403,8 +438,8 @@ export const jornadaPolicyApi = {
   create: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
     request<JornadaPolicyDto>('POST', '/jornada-policy', { body }),
 
-  update: (id: string, body: UpdateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
-    request<JornadaPolicyDto>('PATCH', `/jornada-policy/${id}`, { body }),
+  // JornadaPolicy is append-only — edits create a new row with updated vigenteDesde.
+  // There is no PATCH endpoint on the backend.
 
   archive: (id: string): Promise<void> =>
     request<void>('DELETE', `/jornada-policy/${id}`),

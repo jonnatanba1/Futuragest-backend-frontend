@@ -44,6 +44,8 @@ export interface GetPeriodBalanceInput {
   operarioId: string;
   desde: string; // YYYY-MM-DD
   hasta: string; // YYYY-MM-DD
+  /** When true, compute category breakdown from AttendanceBreakdown data (REQ-009). */
+  breakdownEnabled?: boolean;
 }
 
 export class GetPeriodBalanceUseCase {
@@ -57,7 +59,7 @@ export class GetPeriodBalanceUseCase {
   ) {}
 
   async execute(input: GetPeriodBalanceInput): Promise<PeriodBalance> {
-    const { operarioId, desde, hasta } = input;
+    const { operarioId, desde, hasta, breakdownEnabled = false } = input;
 
     // 1. Scoped existence check — null means operario not in scope or nonexistent (fail-closed)
     const operario = await this.operarioReader.findById(operarioId);
@@ -92,7 +94,12 @@ export class GetPeriodBalanceUseCase {
     }
 
     // 5. Delegate math to pure use-case with resolved carryIn
-    const balance = await this.calcUseCase.execute({ attendances, policyTimeline, carryIn });
+    const balance = await this.calcUseCase.execute({
+      attendances,
+      policyTimeline,
+      carryIn,
+      breakdownEnabled,
+    });
 
     // 6. Resolve current period closed status and metadata
     if (this.periodRepo) {
@@ -103,6 +110,15 @@ export class GetPeriodBalanceUseCase {
         balance.disposition = exactCurrent.disposition;
         balance.paidAt = exactCurrent.paidAt;
         balance.payoutRef = exactCurrent.payoutRef;
+        balance.divergedAt = exactCurrent.divergedAt;
+
+        // C-10: When the period is closed, the frozen snapshot is the
+        // authoritative source of truth — not the live recomputation.
+        // Returning live values while isClosed=true creates a confusing
+        // UX where the balance display contradicts the payout panel.
+        balance.creditos = exactCurrent.creditos;
+        balance.debitos = exactCurrent.debitos;
+        balance.saldo = exactCurrent.saldo;
       }
     }
 

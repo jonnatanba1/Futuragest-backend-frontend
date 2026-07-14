@@ -33,6 +33,9 @@ export interface AttendanceBreakdownData {
 export interface AttendanceReaderRecord {
   id: string;
   operarioId: string;
+  /** Zone where this attendance was recorded. Required for scope-aware policy resolution.
+   *  Undefined only in test fixtures; production records always have a zone. */
+  zoneId?: string | null;
   date: string; // YYYY-MM-DD Colombia local
   checkInCapturedAt: Date;
   checkOutCapturedAt: Date | null;

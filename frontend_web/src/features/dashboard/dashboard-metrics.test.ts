@@ -84,6 +84,8 @@ function makeOperario(overrides: Partial<OperarioDto> = {}): OperarioDto {
     cargo: 'Barrido',
     active: true,
     deactivatedAt: null,
+    areaId: null,
+    areaName: null,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,

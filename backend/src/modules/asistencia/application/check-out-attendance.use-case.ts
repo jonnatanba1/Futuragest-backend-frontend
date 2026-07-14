@@ -154,12 +154,18 @@ export class CheckOutAttendanceUseCase {
       }
     }
 
-    // 9. Fase 2 — async shift classification: calculate and persist breakdown
+    // 9. Fase 2 — shift classification: calculate and persist breakdown.
+    //    Await is required because ClassifyAttendanceUseCase is request-scoped
+    //    (inherited from ATTENDANCE_REPOSITORY_PORT with ScopeContextHolder).
+    //    Fire-and-forget would race against ALS teardown — the scope context
+    //    is gone by the time the Promise resolves, silently losing the breakdown.
     //    Failures are absorbed — classification must NEVER fail the check-out.
     if (this.classifier) {
-      this.classifier.classifyAttendance(record.id).catch(() => {
+      try {
+        await this.classifier.classifyAttendance(record.id);
+      } catch {
         // Swallow to protect checkout flow.
-      });
+      }
     }
 
     return { record, idempotent: false };

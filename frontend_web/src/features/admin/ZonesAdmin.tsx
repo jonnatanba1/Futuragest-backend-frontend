@@ -12,11 +12,23 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import type { ZoneResponseDto } from '@futuragest/contracts';
 import React, { useState } from 'react';
+import { AdminDetailDrawer } from './AdminDetailDrawer';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
 import { ApiError } from '../../lib/api/client';
 import { useZones } from '../operarios/operario-queries';
 import { useCreateZone, useDeleteZone, useUpdateZone } from './admin-queries';
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {label}
+      </Text>
+      <Text size="sm">{value}</Text>
+    </div>
+  );
+}
 
 export function ZonesAdmin() {
   const zones = useZones();
@@ -29,6 +41,7 @@ export function ZonesAdmin() {
   );
   const [toDelete, setToDelete] = useState<ZoneResponseDto | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ZoneResponseDto | null>(null);
 
   const form = useForm({
     mode: 'uncontrolled',
@@ -101,28 +114,48 @@ export function ZonesAdmin() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nombre</Table.Th>
-              <Table.Th>Acciones</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {(zones.data ?? []).map((z) => (
-              <Table.Tr key={z.id}>
+              <Table.Tr
+                key={z.id}
+                onClick={() => setSelected(z)}
+                style={{ cursor: 'pointer' }}
+              >
                 <Table.Td>{z.name}</Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <Button size="xs" variant="subtle" onClick={() => openEdit(z)}>
-                      Editar
-                    </Button>
-                    <Button size="xs" variant="subtle" color="red" onClick={() => setToDelete(z)}>
-                      Eliminar
-                    </Button>
-                  </Group>
-                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
         </Table>
       )}
+
+      <AdminDetailDrawer
+        opened={selected !== null}
+        onClose={() => setSelected(null)}
+        title={selected?.name ?? ''}
+      >
+        {selected && (
+          <>
+            <Field label="ID" value={selected.id} />
+            <Field label="Nombre" value={selected.name} />
+            <Field label="Creado el" value={selected.createdAt?.slice(0, 10) ?? '—'} />
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="light" onClick={() => openEdit(selected)}>
+                Editar
+              </Button>
+              <Button
+                variant="light"
+                color="red"
+                onClick={() => setToDelete(selected)}
+              >
+                Eliminar
+              </Button>
+            </Group>
+          </>
+        )}
+      </AdminDetailDrawer>
 
       <Modal
         opened={editor !== null}

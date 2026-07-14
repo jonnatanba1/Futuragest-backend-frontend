@@ -28,6 +28,7 @@ function makeAttendance(
   return {
     id: `att-${date}`,
     operarioId: 'O1',
+    zoneId: 'Z1',
     date,
     checkInCapturedAt: checkIn,
     checkOutCapturedAt: completed ? checkOut : null,
@@ -275,6 +276,7 @@ describe('CalculatePeriodBalanceUseCase', () => {
       return {
         id: `att-${date}`,
         operarioId: 'O1',
+        zoneId: 'Z1',
         date,
         checkInCapturedAt: checkIn,
         checkOutCapturedAt: checkOut,
@@ -389,16 +391,15 @@ describe('CalculatePeriodBalanceUseCase', () => {
       expect(result.breakdown).toBeDefined();
       expect(result.breakdown!.horasOrdinariasDiurnas.toNumber()).toBeCloseTo(7, 2);
       expect(result.breakdown!.horasExtraDiurnas.toNumber()).toBeCloseTo(1, 2);
-      // Core balance: both attendances counted (9h - 8h = +1h credits from first)
+      // Core balance: both attendances counted
+      // First: 9h raw, 8h net (breakdown) vs 8h policy → delta 0
+      // Second: 8h raw, no breakdown → 8h vs 8h policy → delta 0
       expect(result.perDay).toHaveLength(2);
-      // First attendance: 9h raw vs 8h policy → +1h overtime → 1 credit
-      // Second attendance: 8h raw vs 8h policy → delta 0
-      expect(result.creditos.toNumber()).toBe(1);
+      expect(result.creditos.toNumber()).toBe(0);
     });
 
-    it('BREAK-05 — valorRecargos computed from aggregated breakdown when rates and valorHora provided', () => {
+    it('BREAK-05 — surcharge rates can be passed without valorHora (C-13: monetary not used)', () => {
       const policies = [makePolicy('2026-01-01', 8)];
-      // 2h ordinarias nocturnas + 1h extra diurna = matches REQ-009 example
       const attendances = [
         makeAttendanceWithBreakdown('2026-05-01', 7, 10.5, {
           horasOrdinariasDiurnas: 7.5,
@@ -413,7 +414,6 @@ describe('CalculatePeriodBalanceUseCase', () => {
         attendances,
         policyTimeline: policies,
         breakdownEnabled: true,
-        valorHoraOrdinaria: new Decimal(10000),
         surchargeRates: {
           RECARGO_NOCTURNO: new Decimal(35),
           HORA_EXTRA_DIURNA: new Decimal(25),
@@ -422,12 +422,16 @@ describe('CalculatePeriodBalanceUseCase', () => {
         },
       });
 
-      // valorRecargos = 2×10000×0.35 + 1×10000×0.25 = 7000 + 2500 = 9500
-      expect(result.valorRecargos).toBeDefined();
-      expect(result.valorRecargos!.toNumber()).toBeCloseTo(9500, 2);
+      // C-13: valor monetario no se usara — valorRecargos is no longer computed.
+      // The category breakdown is still available for display.
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown!.horasOrdinariasNocturnas.toNumber()).toBeCloseTo(2, 2);
+      expect(result.breakdown!.horasExtraDiurnas.toNumber()).toBeCloseTo(1, 2);
     });
 
-    it('BREAK-06 — breakdown enabled but no breakdown data → breakdown undefined, valorRecargos undefined', () => {
+    // C-13: valor monetario removido — valorRecargos no se usara
+
+    it('BREAK-06 — breakdown enabled but no breakdown data → breakdown undefined', () => {
       const policies = [makePolicy('2026-01-01', 8)];
       const att = makeAttendance('2026-05-01', 7, 8);
 
@@ -435,17 +439,9 @@ describe('CalculatePeriodBalanceUseCase', () => {
         attendances: [att],
         policyTimeline: policies,
         breakdownEnabled: true,
-        valorHoraOrdinaria: new Decimal(10000),
-        surchargeRates: {
-          RECARGO_NOCTURNO: new Decimal(35),
-          HORA_EXTRA_DIURNA: new Decimal(25),
-          HORA_EXTRA_NOCTURNA: new Decimal(75),
-          RECARGO_DOMINICAL_FESTIVO: new Decimal(90),
-        },
       });
 
       expect(result.breakdown).toBeUndefined();
-      expect(result.valorRecargos).toBeUndefined();
       // Legacy perDay is still computed
       expect(result.perDay).toHaveLength(1);
     });
@@ -459,17 +455,9 @@ describe('CalculatePeriodBalanceUseCase', () => {
         attendances: [att],
         policyTimeline: policies,
         breakdownEnabled: false,
-        valorHoraOrdinaria: new Decimal(10000),
-        surchargeRates: {
-          RECARGO_NOCTURNO: new Decimal(35),
-          HORA_EXTRA_DIURNA: new Decimal(25),
-          HORA_EXTRA_NOCTURNA: new Decimal(75),
-          RECARGO_DOMINICAL_FESTIVO: new Decimal(90),
-        },
       });
 
       expect(result.breakdown).toBeUndefined();
-      expect(result.valorRecargos).toBeUndefined();
       expect(result.perDay[0].horasReales.toNumber()).toBe(8.5);
     });
   });

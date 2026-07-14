@@ -120,6 +120,36 @@ describe('CreateSupervisorUseCase — happy path', () => {
       }),
     );
   });
+
+  it('passes optional displayName to createWithUser when provided', async () => {
+    const supervisorRepo = makeSupervisorRepo();
+    const zoneRepo = makeZoneRepo();
+    const municipioRepo = makeMunicipioRepo();
+    const hasher = makeHasher();
+
+    const useCase = new CreateSupervisorUseCase(supervisorRepo, zoneRepo, municipioRepo, hasher);
+    await useCase.execute({ ...baseInput, displayName: 'María Supervisora' });
+
+    expect(supervisorRepo.createWithUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayName: 'María Supervisora',
+      }),
+    );
+  });
+
+  it('does NOT pass displayName when not provided (undefined)', async () => {
+    const supervisorRepo = makeSupervisorRepo();
+    const zoneRepo = makeZoneRepo();
+    const municipioRepo = makeMunicipioRepo();
+    const hasher = makeHasher();
+
+    const useCase = new CreateSupervisorUseCase(supervisorRepo, zoneRepo, municipioRepo, hasher);
+    // No displayName in baseInput
+    await useCase.execute(baseInput);
+
+    const callArg = supervisorRepo.createWithUser.mock.calls[0][0];
+    expect(callArg.displayName).toBeUndefined();
+  });
 });
 
 // ─── Zone validation ──────────────────────────────────────────────────────────

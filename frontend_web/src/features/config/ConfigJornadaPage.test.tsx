@@ -67,7 +67,7 @@ const POLICIES: JornadaPolicyDto[] = [
 ];
 
 const OPERARIOS: OperarioDto[] = [
-  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, createdAt: '', updatedAt: '' },
+  { id: 'op-1', fullName: 'Carlos Gómez', documento: '123', supervisorId: 'sup-1', cargo: 'Barrido', active: true, deactivatedAt: null, areaId: null, areaName: null, createdAt: '', updatedAt: '' },
 ];
 
 const ZONES: ZoneResponseDto[] = [

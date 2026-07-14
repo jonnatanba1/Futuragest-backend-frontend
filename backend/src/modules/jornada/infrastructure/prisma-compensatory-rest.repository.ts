@@ -103,6 +103,7 @@ export class PrismaCompensatoryRestRepository implements CompensatoryRestReposit
       data: {
         status: data.status as any,
         scheduledDate: data.scheduledDate,
+        notes: data.notes ?? undefined,
       },
       select: {
         id: true,

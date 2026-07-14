@@ -10,13 +10,15 @@ import { ConfigHolidaysPage } from './ConfigHolidaysPage';
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
-const { useHolidaysQueryMock, useGenerateHolidaysMutationMock } = vi.hoisted(() => ({
+const { useHolidaysQueryMock, useGenerateHolidaysMutationMock, useCreateHolidayMutationMock } = vi.hoisted(() => ({
   useHolidaysQueryMock: vi.fn(),
   useGenerateHolidaysMutationMock: vi.fn(),
+  useCreateHolidayMutationMock: vi.fn(),
 }));
 vi.mock('./config-queries', () => ({
   useHolidaysQuery: useHolidaysQueryMock,
   useGenerateHolidaysMutation: useGenerateHolidaysMutationMock,
+  useCreateHolidayMutation: useCreateHolidayMutationMock,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -41,6 +43,10 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
     isError: false,
   });
   useGenerateHolidaysMutationMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
+  useCreateHolidayMutationMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
   });

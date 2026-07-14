@@ -66,10 +66,13 @@ export class DayBreakdownDto {
   @ApiProperty({ description: 'Raw hours worked (no lunch deduction). Decimal string.', example: '8.50' })
   horasReales!: string;
 
+  @ApiProperty({ description: 'Net hours worked (lunch/breakfast deducted). Present when attendance has been classified.', required: false, example: '7.50' })
+  horasTrabajadas?: string;
+
   @ApiProperty({ description: 'JornadaPolicy hours for this day. Decimal string.', example: '8.00' })
   jornadaHoras!: string;
 
-  @ApiProperty({ description: 'horasReales - jornadaHoras. Decimal string.', example: '0.50' })
+  @ApiProperty({ description: 'hours worked (net when available, else raw) - jornadaHoras. Decimal string.', example: '0.50' })
   delta!: string;
 }
 
@@ -136,6 +139,25 @@ export class CompensationPeriodResponseDto {
   createdAt!: string;
 }
 
+// ─── Category breakdown (REQ-009) ──────────────────────────────────────────
+
+export class CategoryBreakdownDto {
+  @ApiProperty({ description: 'Ordinary diurnal hours. Decimal string.', example: '40.00' })
+  horasOrdinariasDiurnas!: string;
+
+  @ApiProperty({ description: 'Ordinary nocturnal hours. Decimal string.', example: '5.00' })
+  horasOrdinariasNocturnas!: string;
+
+  @ApiProperty({ description: 'Extra diurnal hours. Decimal string.', example: '2.50' })
+  horasExtraDiurnas!: string;
+
+  @ApiProperty({ description: 'Extra nocturnal hours. Decimal string.', example: '0.00' })
+  horasExtraNocturnas!: string;
+
+  @ApiProperty({ description: 'Sunday + holiday hours. Decimal string.', example: '8.00' })
+  horasDominicalesFestivas!: string;
+}
+
 // ─── GET /compensacion/:operarioId ────────────────────────────────────────────
 
 export class PeriodBalanceResponseDto {
@@ -174,6 +196,12 @@ export class PeriodBalanceResponseDto {
 
   @ApiProperty({ required: false, nullable: true })
   payoutRef?: string | null;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp — set when attendance data changes inside this closed period.', required: false, nullable: true })
+  divergedAt?: string | null;
+
+  @ApiProperty({ description: 'Aggregated category breakdown from AttendanceBreakdown data. Only when enhanced=true.', required: false })
+  categoryBreakdown?: CategoryBreakdownDto;
 }
 
 // ─── GET /compensacion/:operarioId/payout ─────────────────────────────────────

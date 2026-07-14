@@ -5,9 +5,11 @@ import {
   Card,
   Grid,
   Group,
+  SegmentedControl,
   Select,
   Stack,
   Table,
+  TextInput,
   Title,
   Text,
 } from '@mantine/core';
@@ -16,9 +18,11 @@ import React, { useState, useMemo } from 'react';
 import { reportesApi } from '../../lib/api/client';
 import { useZones } from '../operarios/operario-queries';
 import { usePslReportPreview } from './reportes-queries';
-import { IconFileSpreadsheet, IconDownload } from '@tabler/icons-react';
+import { IconFileSpreadsheet, IconDownload, IconCalendar } from '@tabler/icons-react';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
+
+type PeriodMode = 'quincena' | 'custom';
 
 function getRecentFortnights() {
   const options = [];
@@ -65,14 +69,28 @@ function getRecentFortnights() {
 export function ReportesPage() {
   const fortnightOptions = useMemo(() => getRecentFortnights(), []);
   
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('quincena');
   const [selectedFortnight, setSelectedFortnight] = useState<string>(fortnightOptions[0].value);
+  const [customDesde, setCustomDesde] = useState('');
+  const [customHasta, setCustomHasta] = useState('');
   const [zoneId, setZoneId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const [desde, hasta] = useMemo(() => {
-    if (!selectedFortnight) return ['', ''];
-    return selectedFortnight.split('|');
-  }, [selectedFortnight]);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { desde, hasta } = useMemo(() => {
+    if (periodMode === 'quincena') {
+      if (!selectedFortnight) return { desde: '', hasta: '' };
+      const [d, h] = selectedFortnight.split('|');
+      return { desde: d, hasta: h };
+    }
+    return { desde: customDesde, hasta: customHasta };
+  }, [periodMode, selectedFortnight, customDesde, customHasta]);
+
+  const isValid = useMemo(() => {
+    if (!desde || !hasta) return false;
+    return desde <= hasta;
+  }, [desde, hasta]);
 
   const { data: zones } = useZones();
   const { data: previewRows, isLoading, isError, error } = usePslReportPreview(desde, hasta, zoneId);
@@ -82,7 +100,7 @@ export function ReportesPage() {
   }, [zones]);
 
   const handleExport = async () => {
-    if (!desde || !hasta) return;
+    if (!desde || !hasta || !isValid) return;
     try {
       setExporting(true);
       const blob = await reportesApi.downloadPsl(desde, hasta, zoneId || undefined);
@@ -128,45 +146,86 @@ export function ReportesPage() {
     );
   };
 
+  const excelSerialToDate = (serial: number): string => {
+    const base = Date.UTC(1899, 11, 30);
+    const date = new Date(base + serial * 86400000);
+    return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   return (
     <Stack gap="lg">
       <Title order={2}>Reportes de Nómina</Title>
 
       <Card withBorder radius="md" p="md" bg="var(--mantine-color-body)">
-        <Grid align="flex-end">
-          <Grid.Col span={{ base: 12, md: 5 }}>
-            <Select
-              label="Período Quincenal"
-              placeholder="Seleccione la quincena"
-              data={fortnightOptions}
-              value={selectedFortnight}
-              onChange={(val) => val && setSelectedFortnight(val)}
-              allowDeselect={false}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 4 }}>
-            <Select
-              label="Zona"
-              placeholder="Todas las zonas"
-              data={zoneOptions}
-              value={zoneId}
-              onChange={setZoneId}
-              clearable
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <Button
-              fullWidth
-              leftSection={<IconDownload size={18} />}
-              onClick={handleExport}
-              disabled={isLoading || isError || !previewRows || previewRows.length === 0}
-              loading={exporting}
-              color="teal"
-            >
-              Exportar Plano PSL
-            </Button>
-          </Grid.Col>
-        </Grid>
+        <Stack gap="md">
+          <SegmentedControl
+            value={periodMode}
+            onChange={(v) => setPeriodMode(v as PeriodMode)}
+            data={[
+              { label: 'Quincena', value: 'quincena' },
+              { label: 'Rango personalizado', value: 'custom' },
+            ]}
+          />
+
+          <Grid align="flex-end">
+            {periodMode === 'quincena' ? (
+              <Grid.Col span={{ base: 12, md: 5 }}>
+                <Select
+                  label="Período Quincenal"
+                  placeholder="Seleccione la quincena"
+                  data={fortnightOptions}
+                  value={selectedFortnight}
+                  onChange={(val) => val && setSelectedFortnight(val)}
+                  allowDeselect={false}
+                />
+              </Grid.Col>
+            ) : (
+              <>
+                <Grid.Col span={{ base: 6, md: 2 }}>
+                  <TextInput
+                    type="date"
+                    label="Desde"
+                    value={customDesde}
+                    onChange={(e) => setCustomDesde(e.currentTarget.value)}
+                    max={customHasta || today}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 6, md: 2 }}>
+                  <TextInput
+                    type="date"
+                    label="Hasta"
+                    value={customHasta}
+                    onChange={(e) => setCustomHasta(e.currentTarget.value)}
+                    min={customDesde || undefined}
+                    max={today}
+                  />
+                </Grid.Col>
+              </>
+            )}
+            <Grid.Col span={{ base: 12, md: periodMode === 'quincena' ? 4 : 5 }}>
+              <Select
+                label="Zona"
+                placeholder="Todas las zonas"
+                data={zoneOptions}
+                value={zoneId}
+                onChange={setZoneId}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 3 }}>
+              <Button
+                fullWidth
+                leftSection={<IconDownload size={18} />}
+                onClick={handleExport}
+                disabled={isLoading || isError || !previewRows || previewRows.length === 0 || !isValid}
+                loading={exporting}
+                color="teal"
+              >
+                Exportar Plano PSL
+              </Button>
+            </Grid.Col>
+          </Grid>
+        </Stack>
       </Card>
 
       <Card withBorder radius="md" p="md">
@@ -215,7 +274,7 @@ export function ReportesPage() {
                     <Table.Td>{row.anio}</Table.Td>
                     <Table.Td>{row.periodo}</Table.Td>
                     <Table.Td style={{ fontFamily: 'monospace' }}>{row.horasOrdinaria}</Table.Td>
-                    <Table.Td>{row.diaLaborado}</Table.Td>
+                    <Table.Td>{excelSerialToDate(row.diaLaborado)}</Table.Td>
                     <Table.Td style={{ fontFamily: 'monospace' }}>{row.horaInicio}</Table.Td>
                     <Table.Td style={{ fontFamily: 'monospace' }}>{row.horaFinal}</Table.Td>
                   </Table.Tr>

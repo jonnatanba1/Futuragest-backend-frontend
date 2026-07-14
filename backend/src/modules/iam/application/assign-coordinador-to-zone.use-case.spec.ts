@@ -34,6 +34,11 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     updateMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id', name: 'Muni', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
     deleteMunicipio: jest.fn().mockResolvedValue(undefined),
     findUsers: jest.fn().mockResolvedValue([]),
+    updateUser: jest.fn().mockResolvedValue({ id: 'u', email: 'u@t.co', role: 'COORDINADOR', mustChangePassword: false, coordinatedZoneId: null, displayName: null, createdAt: new Date() }),
+    findAreas: jest.fn().mockResolvedValue([]),
+    createArea: jest.fn().mockResolvedValue({ id: 'area-id' }),
+    updateArea: jest.fn().mockResolvedValue({ id: 'area-id', name: 'Area', horaInicio: '08:00', horaFin: '16:00', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
+    deleteArea: jest.fn().mockResolvedValue(undefined),
   };
 }
 

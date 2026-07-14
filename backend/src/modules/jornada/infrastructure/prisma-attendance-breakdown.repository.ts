@@ -44,6 +44,9 @@ export class PrismaAttendanceBreakdownRepository implements AttendanceBreakdownR
   async findByAttendanceId(attendanceId: string): Promise<AttendanceBreakdown | null> {
     return this.prisma.attendanceBreakdown.findUnique({
       where: { attendanceId },
+      // Include the attendance relation so CompensatoryRestService can read
+      // operarioId and date from the breakdown's parent attendance record.
+      include: { attendance: true },
     });
   }
 }

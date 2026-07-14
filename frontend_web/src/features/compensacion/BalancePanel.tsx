@@ -188,7 +188,16 @@ function BalanceRow({
         </Stack>
       </Table.Td>
       {renderCells()}
-      <Table.Td>{getStatusBadge()}</Table.Td>
+      <Table.Td>
+        <Group gap="xs">
+          {getStatusBadge()}
+          {balance.data?.divergedAt && (
+            <Badge color="red" variant="light" size="sm" title="Los datos de asistencia cambiaron desde que este período fue cerrado. El snapshot puede no coincidir con los datos actuales.">
+              ⚠ Diverge
+            </Badge>
+          )}
+        </Group>
+      </Table.Td>
       <Table.Td>
         <Group gap="xs" wrap="nowrap">
           <Button size="xs" variant="subtle" onClick={onSelect}>
@@ -235,9 +244,6 @@ export function BalancePanel() {
   const [modalSaldoHoras, setModalSaldoHoras] = useState<string>('0.00');
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
 
-  // Track whether the current period has been closed in this session
-  const [periodClosed, setPeriodClosed] = useState(false);
-
   const operarios = useOperarios(true);
 
   const operarioOptions = useMemo(
@@ -283,6 +289,9 @@ export function BalancePanel() {
 
   const balance = useBalanceQuery(operarioId, range.desde, range.hasta);
   const enhancedBalance = useEnhancedBalanceQuery(operarioId, range.desde, range.hasta);
+
+  // C-19: Derive periodClosed from live balance data instead of local state.
+  const periodClosed = balance.data?.isClosed ?? false;
 
   // ─── Render helpers ───────────────────────────────────────────────────────
 
@@ -511,7 +520,6 @@ export function BalancePanel() {
           value={year}
           onChange={(v) => {
             setYear(v ?? year);
-            setPeriodClosed(false);
           }}
           w={100}
           allowDeselect={false}
@@ -523,7 +531,6 @@ export function BalancePanel() {
           value={month}
           onChange={(v) => {
             setMonth(v ?? month);
-            setPeriodClosed(false);
           }}
           w={140}
           allowDeselect={false}
@@ -537,7 +544,6 @@ export function BalancePanel() {
           value={quincena}
           onChange={(v) => {
             setQuincena(v as Quincena);
-            setPeriodClosed(false);
           }}
         />
       </Group>
@@ -559,7 +565,7 @@ export function BalancePanel() {
           periodKey={range.periodKey}
           saldoHoras={modalSaldoHoras}
           onSuccess={() => {
-            setPeriodClosed(true);
+            // Balance refetch will pick up isClosed=true automatically
           }}
         />
       )}

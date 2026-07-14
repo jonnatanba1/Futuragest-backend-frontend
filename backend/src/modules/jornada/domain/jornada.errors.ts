@@ -14,6 +14,11 @@ export class NoPolicyForDateError extends Error {
   }
 }
 
+/**
+ * @deprecated Not currently thrown in production. Surcharge rate resolution
+ * uses fallback-to-zero in SurchargeResolver instead of throwing.
+ * Keep for future use if strict enforcement is needed.
+ */
 export class SurchargeRatesNotConfiguredError extends Error {
   readonly httpStatus = 422 as const;
 

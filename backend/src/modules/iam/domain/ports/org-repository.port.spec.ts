@@ -10,7 +10,7 @@
  */
 
 import type { OrgRepositoryPort } from './org-repository.port';
-import type { Zone, Municipio } from '@prisma/client';
+import type { Zone, Municipio, Area } from '@prisma/client';
 
 // A minimal stub that satisfies the interface shape — proves the interface
 // declares the required methods with compatible signatures.
@@ -57,6 +57,34 @@ class StubOrgRepository implements OrgRepositoryPort {
 
   findUsers(): Promise<Awaited<ReturnType<OrgRepositoryPort['findUsers']>>> {
     return Promise.resolve([]);
+  }
+
+  updateUser(_id: string, _data: Parameters<OrgRepositoryPort['updateUser']>[1]): Promise<Awaited<ReturnType<OrgRepositoryPort['updateUser']>>> {
+    return Promise.resolve({
+      id: 'stub-id',
+      email: 'stub@test.co',
+      role: 'LIDER_OPERATIVO',
+      mustChangePassword: false,
+      coordinatedZoneId: null,
+      displayName: null,
+      createdAt: new Date(),
+    });
+  }
+
+  findAreas(): Promise<Area[]> {
+    return Promise.resolve([]);
+  }
+
+  createArea(_params: Parameters<OrgRepositoryPort['createArea']>[0]): Promise<{ id: string }> {
+    return Promise.resolve({ id: 'stub-area-id' });
+  }
+
+  updateArea(_id: string, _params: Parameters<OrgRepositoryPort['updateArea']>[1]): Promise<Area> {
+    return Promise.resolve({ id: 'stub-area-id', name: 'stub', horaInicio: '08:00', horaFin: '16:00', zoneId: 'stub-zone-id', createdAt: new Date(), updatedAt: new Date() });
+  }
+
+  deleteArea(_id: string): Promise<void> {
+    return Promise.resolve();
   }
 }
 

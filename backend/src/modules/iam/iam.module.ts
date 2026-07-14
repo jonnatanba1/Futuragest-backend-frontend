@@ -43,14 +43,17 @@ import { ScopedOperarioRepository } from './infrastructure/scoped-operario.repos
 import { ScopedAssignmentRepository } from './infrastructure/scoped-assignment.repository';
 import { ScopedZoneRepository } from './infrastructure/scoped-zone.repository';
 import { ScopedMunicipioRepository } from './infrastructure/scoped-municipio.repository';
+import { ScopedAreaRepository } from './infrastructure/scoped-area.repository';
 import { PrismaOrgRepository } from './infrastructure/prisma-org.repository';
 import { AssignCoordinadorToZoneUseCase } from './application/assign-coordinador-to-zone.use-case';
 import { ProvisionManagementUserUseCase } from './application/provision-management-user.use-case';
+import { UpdateUserUseCase } from './application/update-user.use-case';
 import { CreateOperarioUseCase } from './application/create-operario.use-case';
 import { DeactivateOperarioUseCase } from './application/deactivate-operario.use-case';
 import { ReactivateOperarioUseCase } from './application/reactivate-operario.use-case';
 import { BulkImportOperariosUseCase } from './application/bulk-import-operarios.use-case';
 import { CreateSupervisorUseCase } from './application/create-supervisor.use-case';
+import { UpdateSupervisorUseCase } from './application/update-supervisor.use-case';
 import { ReassignOperarioUseCase } from './application/reassign-operario.use-case';
 import { ORG_REPOSITORY_PORT } from './domain/ports/org-repository.port';
 import type { OrgRepositoryPort } from './domain/ports/org-repository.port';
@@ -58,7 +61,7 @@ import { OPERARIO_REPOSITORY } from './domain/ports/operario.repository.port';
 import type { OperarioRepositoryPort } from './domain/ports/operario.repository.port';
 import { OPERARIO_STATUS } from './domain/ports/operario-status.port';
 import { IamController } from './interface/iam.controller';
-import { OrgController, ORG_REPO, ASSIGN_COORDINADOR_USE_CASE, PROVISION_MANAGEMENT_USER_USE_CASE } from './interface/org.controller';
+import { OrgController, ORG_REPO, ASSIGN_COORDINADOR_USE_CASE, PROVISION_MANAGEMENT_USER_USE_CASE, UPDATE_USER_USE_CASE } from './interface/org.controller';
 import {
   OperarioController,
   CREATE_OPERARIO_USE_CASE,
@@ -66,6 +69,7 @@ import {
   REACTIVATE_OPERARIO_USE_CASE,
   BULK_IMPORT_OPERARIOS_USE_CASE,
   CREATE_SUPERVISOR_USE_CASE,
+  UPDATE_SUPERVISOR_USE_CASE,
   REASSIGN_OPERARIO_USE_CASE,
 } from './interface/operario.controller';
 import { RolesGuard } from './interface/roles.guard';
@@ -150,6 +154,13 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
         new ScopedMunicipioRepository(prisma, holder),
       inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
     },
+    {
+      provide: ScopedAreaRepository,
+      scope: Scope.REQUEST,
+      useFactory: (prisma: PrismaService, holder: ScopeContextHolder) =>
+        new ScopedAreaRepository(prisma, holder),
+      inject: [PrismaService, SCOPE_CONTEXT_HOLDER],
+    },
 
     // ── PrismaOrgRepository — request-scoped (depends on scoped repos) ─────
     {
@@ -159,8 +170,9 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
         prisma: PrismaService,
         zoneRepo: ScopedZoneRepository,
         municipioRepo: ScopedMunicipioRepository,
-      ) => new PrismaOrgRepository(prisma, zoneRepo, municipioRepo),
-      inject: [PrismaService, ScopedZoneRepository, ScopedMunicipioRepository],
+        areaRepo: ScopedAreaRepository,
+      ) => new PrismaOrgRepository(prisma, zoneRepo, municipioRepo, areaRepo),
+      inject: [PrismaService, ScopedZoneRepository, ScopedMunicipioRepository, ScopedAreaRepository],
     },
 
     // ── Alias ORG_REPO → ORG_REPOSITORY_PORT (OrgController uses ORG_REPO) ─
@@ -193,6 +205,17 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
         scopeHolder: ScopeContextHolder,
       ) => new ProvisionManagementUserUseCase(orgRepo, hasher, scopeHolder),
       inject: [ORG_REPOSITORY_PORT, PASSWORD_HASHER_PORT, SCOPE_CONTEXT_HOLDER],
+    },
+
+    // ── UpdateUserUseCase — REQUEST-SCOPED ──────────────────────────────────
+    {
+      provide: UPDATE_USER_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (
+        orgRepo: OrgRepositoryPort,
+        scopeHolder: ScopeContextHolder,
+      ) => new UpdateUserUseCase(orgRepo, scopeHolder),
+      inject: [ORG_REPOSITORY_PORT, SCOPE_CONTEXT_HOLDER],
     },
 
     // ── OPERARIO_REPOSITORY alias → ScopedOperarioRepository (already provided) ──
@@ -269,6 +292,17 @@ class LazyRequestScopeContextHolder extends ScopeContextHolder {
         hasher: PasswordHasherPort,
       ) => new CreateSupervisorUseCase(supervisorRepo, zoneRepo, municipioRepo, hasher),
       inject: [ScopedSupervisorRepository, ScopedZoneRepository, ScopedMunicipioRepository, PASSWORD_HASHER_PORT],
+    },
+
+    // ── UpdateSupervisorUseCase — REQUEST-SCOPED ────────────────────────────
+    {
+      provide: UPDATE_SUPERVISOR_USE_CASE,
+      scope: Scope.REQUEST,
+      useFactory: (
+        supervisorRepo: ScopedSupervisorRepository,
+        municipioRepo: ScopedMunicipioRepository,
+      ) => new UpdateSupervisorUseCase(supervisorRepo, municipioRepo),
+      inject: [ScopedSupervisorRepository, ScopedMunicipioRepository],
     },
 
     // ── Guards ─────────────────────────────────────────────────────────────

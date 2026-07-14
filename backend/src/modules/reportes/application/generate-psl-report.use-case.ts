@@ -69,28 +69,32 @@ export class GeneratePslReportUseCase {
         // 1. Ordinarias Nocturnas
         {
           horas: bd.horasOrdinariasNocturnas,
-          concepto: isSundayOrHoliday ? '009' : '010', // 009: Recargo Festivo Nocturno, 010: Recargo Nocturno
+          concepto: isSundayOrHoliday ? '009' : '010',
+          tipoHora: 'N',
           inicio: bd.tramoInicioOrdNocturno,
           fin: bd.tramoFinOrdNocturno,
         },
         // 2. Extra Diurnas
         {
           horas: bd.horasExtraDiurnas,
-          concepto: isSundayOrHoliday ? '011' : '015', // 011: Extra Festiva Diurna, 015: Extra Diurna
+          concepto: isSundayOrHoliday ? '011' : '015',
+          tipoHora: 'D',
           inicio: bd.tramoInicioExtraDiurna,
           fin: bd.tramoFinExtraDiurna,
         },
         // 3. Extra Nocturnas
         {
           horas: bd.horasExtraNocturnas,
-          concepto: isSundayOrHoliday ? '012' : '016', // 012: Extra Festiva Nocturna, 016: Extra Nocturna
+          concepto: isSundayOrHoliday ? '012' : '016',
+          tipoHora: 'N',
           inicio: bd.tramoInicioExtraNocturna,
           fin: bd.tramoFinExtraNocturna,
         },
         // 4. Ordinarias Diurnas (Only reported on Sunday/Holiday as Recargo Dominical)
         {
           horas: bd.horasOrdinariasDiurnas,
-          concepto: isSundayOrHoliday ? '014' : '', // 014: Recargo Dominical/Festivo Laborado
+          concepto: isSundayOrHoliday ? '014' : '',
+          tipoHora: 'D',
           inicio: bd.tramoInicioOrdDiurna,
           fin: bd.tramoFinOrdDiurna,
         },
@@ -118,7 +122,7 @@ export class GeneratePslReportUseCase {
             anio: parseInt(slice.dateStr.slice(0, 4), 10),
             periodo: derivePslPeriodNumber(slice.dateStr),
             horasOrdinaria: decimalHoursToHMM(slice.horas),
-            tipoHora: 'D',
+            tipoHora: cat.tipoHora,
             diaLaborado: dateToExcelSerial(slice.dateStr),
             tipoMvto: 'NORMA',
             horaInicio: slice.horaInicio,

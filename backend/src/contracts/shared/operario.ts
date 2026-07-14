@@ -10,6 +10,10 @@ export interface OperarioDto {
   fullName: string;
   documento: string;
   supervisorId: string;
+  /** Optional FK to Area — null if not assigned to an área */
+  areaId: string | null;
+  /** Área name resolved via Prisma include — null if not assigned */
+  areaName: string | null;
   /** Free-text job position (e.g. "Barrido", "Recolección"). Empty string when not set. */
   cargo: string;
   /** Derived: deactivatedAt === null */
@@ -26,6 +30,7 @@ export interface CreateOperarioRequest {
   documento: string;
   supervisorId: string;
   cargo: string;
+  areaId?: string;
 }
 
 export interface OperarioImportRow {

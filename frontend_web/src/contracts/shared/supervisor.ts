@@ -18,6 +18,8 @@ export interface SupervisorDto {
   area: string;
   /** Email of the supervisor's user account. */
   email: string;
+  /** Optional human-readable display name. Falls back to email when null. */
+  displayName?: string;
   /** ISO 8601 timestamp */
   createdAt: string;
 }

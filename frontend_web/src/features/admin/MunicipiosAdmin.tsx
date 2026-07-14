@@ -13,11 +13,23 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import type { MunicipioResponseDto } from '@futuragest/contracts';
 import React, { useMemo, useState } from 'react';
+import { AdminDetailDrawer } from './AdminDetailDrawer';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/TableSkeleton';
 import { ApiError } from '../../lib/api/client';
 import { useMunicipios, useZones } from '../operarios/operario-queries';
 import { useCreateMunicipio, useDeleteMunicipio, useUpdateMunicipio } from './admin-queries';
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {label}
+      </Text>
+      <Text size="sm">{value}</Text>
+    </div>
+  );
+}
 
 export function MunicipiosAdmin() {
   const municipios = useMunicipios();
@@ -32,6 +44,7 @@ export function MunicipiosAdmin() {
   } | null>(null);
   const [toDelete, setToDelete] = useState<MunicipioResponseDto | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<MunicipioResponseDto | null>(null);
 
   const zoneName = useMemo(
     () => new Map((zones.data ?? []).map((z) => [z.id, z.name])),
@@ -118,29 +131,50 @@ export function MunicipiosAdmin() {
             <Table.Tr>
               <Table.Th>Nombre</Table.Th>
               <Table.Th>Zona</Table.Th>
-              <Table.Th>Acciones</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {(municipios.data ?? []).map((m) => (
-              <Table.Tr key={m.id}>
+              <Table.Tr
+                key={m.id}
+                onClick={() => setSelected(m)}
+                style={{ cursor: 'pointer' }}
+              >
                 <Table.Td>{m.name}</Table.Td>
                 <Table.Td>{zoneName.get(m.zoneId) ?? m.zoneId}</Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <Button size="xs" variant="subtle" onClick={() => openEdit(m)}>
-                      Editar
-                    </Button>
-                    <Button size="xs" variant="subtle" color="red" onClick={() => setToDelete(m)}>
-                      Eliminar
-                    </Button>
-                  </Group>
-                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
         </Table>
       )}
+
+      <AdminDetailDrawer
+        opened={selected !== null}
+        onClose={() => setSelected(null)}
+        title={selected?.name ?? ''}
+      >
+        {selected && (
+          <>
+            <Field label="ID" value={selected.id} />
+            <Field label="Nombre" value={selected.name} />
+            <Field label="Zona" value={zoneName.get(selected.zoneId) ?? selected.zoneId} />
+            <Field label="Creado el" value={selected.createdAt?.slice(0, 10) ?? '—'} />
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="light" onClick={() => openEdit(selected)}>
+                Editar
+              </Button>
+              <Button
+                variant="light"
+                color="red"
+                onClick={() => setToDelete(selected)}
+              >
+                Eliminar
+              </Button>
+            </Group>
+          </>
+        )}
+      </AdminDetailDrawer>
 
       <Modal
         opened={editor !== null}

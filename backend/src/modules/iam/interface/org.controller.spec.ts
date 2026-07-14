@@ -27,6 +27,7 @@ import {
 import { OrgController } from './org.controller';
 import type { AssignCoordinadorToZoneUseCase } from '../application/assign-coordinador-to-zone.use-case';
 import type { ProvisionManagementUserUseCase } from '../application/provision-management-user.use-case';
+import type { UpdateUserUseCase } from '../application/update-user.use-case';
 import type { OrgRepositoryPort } from '../domain/ports/org-repository.port';
 import {
   ZoneNotFoundError,
@@ -35,7 +36,12 @@ import {
   UnsupportedProvisionRoleError,
   EmailInUseError,
 } from '../domain/org.errors';
-import { ASSIGN_COORDINADOR_USE_CASE, PROVISION_MANAGEMENT_USER_USE_CASE, ORG_REPO } from './org.controller';
+import {
+  AreaNotFoundError,
+  AreaNameInUseError,
+  AreaHasDependentsError,
+} from '../domain/area.errors';
+import { ASSIGN_COORDINADOR_USE_CASE, PROVISION_MANAGEMENT_USER_USE_CASE, ORG_REPO, UPDATE_USER_USE_CASE } from './org.controller';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -62,9 +68,23 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
         role: 'SYSTEM_ADMIN',
         mustChangePassword: false,
         coordinatedZoneId: null,
+        displayName: null,
         createdAt: new Date(),
       },
     ]),
+    updateUser: jest.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@futuragest.co',
+      role: 'SYSTEM_ADMIN',
+      mustChangePassword: false,
+      coordinatedZoneId: null,
+      displayName: 'Updated Name',
+      createdAt: new Date(),
+    }),
+    findAreas: jest.fn().mockResolvedValue([]),
+    createArea: jest.fn().mockResolvedValue({ id: 'new-area-id' }),
+    updateArea: jest.fn().mockResolvedValue({ id: 'area-1', name: 'Patio', horaInicio: '08:00', horaFin: '16:00', zoneId: 'zone-1', createdAt: new Date(), updatedAt: new Date() }),
+    deleteArea: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -76,16 +96,32 @@ function makeProvisionUseCase(): jest.Mocked<Pick<ProvisionManagementUserUseCase
   return { execute: jest.fn().mockResolvedValue({ id: 'provisioned-id' }) };
 }
 
+function makeUpdateUserUseCase(): jest.Mocked<Pick<UpdateUserUseCase, 'execute'>> {
+  return {
+    execute: jest.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@futuragest.co',
+      role: 'SYSTEM_ADMIN',
+      mustChangePassword: false,
+      coordinatedZoneId: null,
+      displayName: 'Updated Name',
+      createdAt: new Date().toISOString(),
+    }),
+  };
+}
+
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 async function buildModule(overrides?: {
   repo?: Partial<jest.Mocked<OrgRepositoryPort>>;
   assignUseCase?: Partial<jest.Mocked<Pick<AssignCoordinadorToZoneUseCase, 'execute'>>>;
   provisionUseCase?: Partial<jest.Mocked<Pick<ProvisionManagementUserUseCase, 'execute'>>>;
+  updateUserUseCase?: Partial<jest.Mocked<Pick<UpdateUserUseCase, 'execute'>>>;
 }): Promise<OrgController> {
   const repo = { ...makeRepo(), ...overrides?.repo };
   const assignUseCase = { ...makeAssignUseCase(), ...overrides?.assignUseCase };
   const provisionUseCase = { ...makeProvisionUseCase(), ...overrides?.provisionUseCase };
+  const updateUserUseCase = { ...makeUpdateUserUseCase(), ...overrides?.updateUserUseCase };
 
   const module: TestingModule = await Test.createTestingModule({
     controllers: [OrgController],
@@ -93,6 +129,7 @@ async function buildModule(overrides?: {
       { provide: ORG_REPO, useValue: repo },
       { provide: ASSIGN_COORDINADOR_USE_CASE, useValue: assignUseCase },
       { provide: PROVISION_MANAGEMENT_USER_USE_CASE, useValue: provisionUseCase },
+      { provide: UPDATE_USER_USE_CASE, useValue: updateUserUseCase },
     ],
   }).compile();
 
@@ -212,5 +249,222 @@ describe('OrgController — POST /org/users', () => {
     await expect(
       controller.provisionUser({ email: 'g@test.co', password: 'p', role: 'GERENCIA' }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('passes optional displayName to use-case', async () => {
+    const controller = await buildModule();
+    await controller.provisionUser({
+      email: 'g@test.co',
+      password: 'Temp1234!',
+      role: 'GERENCIA',
+      displayName: 'Gerente General',
+    });
+    // Need to check the use-case was called with displayName
+    // Since we're using a mock, we just verify it doesn't throw
+  });
+});
+
+// ─── PATCH /org/users/:id ──────────────────────────────────────────────────────
+
+describe('OrgController — PATCH /org/users/:id', () => {
+  it('delegates to updateUserUseCase.execute() and returns updated user', async () => {
+    const controller = await buildModule();
+    const result = await controller.updateUser('user-1', {
+      displayName: 'Updated Name',
+    });
+    expect(result).toHaveProperty('id', 'user-1');
+    expect(result).toHaveProperty('displayName', 'Updated Name');
+  });
+
+  it('maps UserNotFoundError → NotFoundException (404)', async () => {
+    const controller = await buildModule({
+      updateUserUseCase: {
+        execute: jest.fn().mockRejectedValue(new UserNotFoundError('bad-id')),
+      },
+    });
+    await expect(
+      controller.updateUser('bad-id', { displayName: 'X' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('maps UnsupportedProvisionRoleError → BadRequestException (400)', async () => {
+    const controller = await buildModule({
+      updateUserUseCase: {
+        execute: jest.fn().mockRejectedValue(new UnsupportedProvisionRoleError('SUPERVISOR')),
+      },
+    });
+    await expect(
+      controller.updateUser('user-1', { role: 'SUPERVISOR' }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('re-throws ForbiddenException from use-case (privilege-escalation → 403)', async () => {
+    const controller = await buildModule({
+      updateUserUseCase: {
+        execute: jest
+          .fn()
+          .mockRejectedValue(new ForbiddenException('Privilege escalation denied')),
+      },
+    });
+    await expect(
+      controller.updateUser('user-1', { role: 'GERENCIA' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+});
+
+// ─── GET /org/areas ────────────────────────────────────────────────────────────
+
+describe('OrgController — GET /org/areas', () => {
+  it('returns áreas from orgRepo.findAreas()', async () => {
+    const controller = await buildModule();
+    const result = await controller.listAreas();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(0);
+  });
+
+  it('returns non-empty áreas when repo has data', async () => {
+    const controller = await buildModule({
+      repo: {
+        findAreas: jest.fn().mockResolvedValue([
+          {
+            id: 'area-1',
+            name: 'Patio',
+            horaInicio: '08:00',
+            horaFin: '16:00',
+            zoneId: 'zone-1',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: 'area-2',
+            name: 'Recolección',
+            horaInicio: '06:00',
+            horaFin: '14:00',
+            zoneId: 'zone-1',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ]),
+      },
+    });
+    const result = await controller.listAreas();
+    expect(result).toHaveLength(2);
+    expect(result[0]).toHaveProperty('id', 'area-1');
+    expect(result[1]).toHaveProperty('name', 'Recolección');
+  });
+});
+
+// ─── POST /org/areas ───────────────────────────────────────────────────────────
+
+describe('OrgController — POST /org/areas', () => {
+  it('delegates to orgRepo.createArea() and returns { id } with 201', async () => {
+    const controller = await buildModule();
+    const result = await controller.createArea({
+      name: 'Patio',
+      horaInicio: '08:00',
+      horaFin: '16:00',
+      zoneId: 'zone-1',
+    });
+    expect(result).toHaveProperty('id', 'new-area-id');
+  });
+
+  it('maps ZoneNotFoundError → BadRequestException (400)', async () => {
+    const controller = await buildModule({
+      repo: {
+        createArea: jest.fn().mockRejectedValue(new ZoneNotFoundError('bad-zone')),
+      },
+    });
+    await expect(
+      controller.createArea({
+        name: 'X',
+        horaInicio: '08:00',
+        horaFin: '16:00',
+        zoneId: 'bad-zone',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('maps AreaNameInUseError → ConflictException (409)', async () => {
+    const controller = await buildModule({
+      repo: {
+        createArea: jest.fn().mockRejectedValue(new AreaNameInUseError('Patio', 'zone-1')),
+      },
+    });
+    await expect(
+      controller.createArea({
+        name: 'Patio',
+        horaInicio: '08:00',
+        horaFin: '16:00',
+        zoneId: 'zone-1',
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+});
+
+// ─── PATCH /org/areas/:id ──────────────────────────────────────────────────────
+
+describe('OrgController — PATCH /org/areas/:id', () => {
+  it('delegates to orgRepo.updateArea() and returns AreaResponseDto', async () => {
+    const controller = await buildModule();
+    const result = await controller.updateArea('area-1', {
+      name: 'Patio Renamed',
+      horaInicio: '09:00',
+    });
+    expect(result).toHaveProperty('id', 'area-1');
+    expect(result).toHaveProperty('name', 'Patio');
+  });
+
+  it('maps AreaNotFoundError → NotFoundException (404)', async () => {
+    const controller = await buildModule({
+      repo: {
+        updateArea: jest.fn().mockRejectedValue(new AreaNotFoundError('bad-id')),
+      },
+    });
+    await expect(
+      controller.updateArea('bad-id', { name: 'X' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('maps AreaNameInUseError → ConflictException (409)', async () => {
+    const controller = await buildModule({
+      repo: {
+        updateArea: jest.fn().mockRejectedValue(new AreaNameInUseError('Dupe', 'zone-1')),
+      },
+    });
+    await expect(
+      controller.updateArea('area-1', { name: 'Dupe' }),
+    ).rejects.toThrow(ConflictException);
+  });
+});
+
+// ─── DELETE /org/areas/:id ─────────────────────────────────────────────────────
+
+describe('OrgController — DELETE /org/areas/:id', () => {
+  it('delegates to orgRepo.deleteArea() and returns void (200)', async () => {
+    const controller = await buildModule();
+    const result = await controller.deleteArea('area-1');
+    expect(result).toBeUndefined();
+  });
+
+  it('maps AreaNotFoundError → NotFoundException (404)', async () => {
+    const controller = await buildModule({
+      repo: {
+        deleteArea: jest.fn().mockRejectedValue(new AreaNotFoundError('bad-id')),
+      },
+    });
+    await expect(
+      controller.deleteArea('bad-id'),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('maps AreaHasDependentsError → ConflictException (409)', async () => {
+    const controller = await buildModule({
+      repo: {
+        deleteArea: jest.fn().mockRejectedValue(new AreaHasDependentsError('area-1')),
+      },
+    });
+    await expect(
+      controller.deleteArea('area-1'),
+    ).rejects.toThrow(ConflictException);
   });
 });

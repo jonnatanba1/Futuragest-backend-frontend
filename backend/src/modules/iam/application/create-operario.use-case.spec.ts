@@ -54,6 +54,27 @@ describe('CreateOperarioUseCase', () => {
       });
       expect(result).toHaveProperty('id', 'op-1');
     });
+
+    it('passes areaId to repo.create when provided', async () => {
+      const port = makePort();
+      const useCase = new CreateOperarioUseCase(port);
+
+      await useCase.execute({
+        fullName: 'Test Worker',
+        documento: '12345678',
+        supervisorId: 'sup-1',
+        cargo: 'Barrido',
+        areaId: 'area-1',
+      });
+
+      expect(port.create).toHaveBeenCalledWith({
+        fullName: 'Test Worker',
+        documento: '12345678',
+        supervisorId: 'sup-1',
+        cargo: 'Barrido',
+        areaId: 'area-1',
+      });
+    });
   });
 
   describe('OP-39 — duplicate documento → DuplicateDocumentoError', () => {

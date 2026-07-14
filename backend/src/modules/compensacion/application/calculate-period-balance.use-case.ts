@@ -27,7 +27,7 @@ import type { AttendanceReaderRecord } from '../domain/ports/attendance-reader.p
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
 import type { PeriodBalance, DayBreakdown, CategoryBreakdown } from '../domain/period-balance.vo';
 import { NoPolicyForDateError } from '../domain/compensacion.errors';
-import { calculateSurchargeValue, type SurchargeRates } from '../domain/surcharge-value-calculator';
+import type { SurchargeRates } from '../domain/surcharge-value-calculator';
 
 export interface CalculatePeriodBalanceInput {
   /** Only records with completedAt != null will be processed (caller may pass all). */
@@ -41,11 +41,7 @@ export interface CalculatePeriodBalanceInput {
   /** When true, aggregate breakdown categories from AttendanceBreakdown data.
    *  Gate: COMPENSATION_BREAKDOWN_ENABLED env var. Default: false. */
   breakdownEnabled?: boolean;
-  /** Worker's ordinary hourly wage (monetary). Required when breakdownEnabled=true
-   *  to compute valorRecargos. */
-  valorHoraOrdinaria?: Decimal;
-  /** The four base surcharge percentage rates. Required when breakdownEnabled=true
-   *  to compute valorRecargos. */
+  /** The four base surcharge percentage rates. Used for category breakdown display. */
   surchargeRates?: SurchargeRates;
 }
 
@@ -62,29 +58,43 @@ const ROUNDING = Decimal.ROUND_HALF_UP;
  */
 const MAX_VALID_DURATION_MS = 20 * MS_PER_HOUR;
 
-/** Resolve the applicable JornadaPolicy for a given date string (YYYY-MM-DD). */
-function resolvePolicyForDate(
-  dateStr: string,
+/** Resolve the applicable JornadaPolicy for a given attendance record. */
+function resolvePolicyForRecord(
+  att: AttendanceReaderRecord,
   timeline: JornadaPolicyRecord[],
 ): JornadaPolicyRecord {
-  // Compare as date strings — YYYY-MM-DD sorts lexicographically correctly.
-  // We need vigenteDesde (stored as Date) <= attendance.date (string).
-  // Convert vigenteDesde to 'YYYY-MM-DD' for comparison.
-  const attendanceDateStr = dateStr;
+  const attendanceDateStr = att.date;
+  const operarioId = att.operarioId;
+  const zoneId = att.zoneId ?? null;
 
-  // Sort descending to find the most-recent policy with vigenteDesde <= date
-  const sorted = [...timeline].sort(
-    (a, b) => b.vigenteDesde.getTime() - a.vigenteDesde.getTime(),
-  );
+  // C-01: 3-level scope precedence — operario override > zone > global.
+  // Try each scope tier in order; within each tier, pick the most recent
+  // policy with vigenteDesde <= attendance date.
+  const scopes = [
+    // Tier 1: operario-level override
+    (p: JornadaPolicyRecord) => p.operarioId === operarioId,
+    // Tier 2: zone-level (no operario override)
+    (p: JornadaPolicyRecord) => p.operarioId === null && p.zoneId === zoneId,
+    // Tier 3: global fallback
+    (p: JornadaPolicyRecord) => p.operarioId === null && p.zoneId === null,
+  ];
 
-  for (const policy of sorted) {
-    const policyDateStr = policy.vigenteDesde.toISOString().slice(0, 10);
-    if (policyDateStr <= attendanceDateStr) {
-      return policy;
+  for (const scopeFilter of scopes) {
+    const scoped = timeline.filter(scopeFilter);
+    if (scoped.length === 0) continue;
+
+    const sorted = [...scoped].sort(
+      (a, b) => b.vigenteDesde.getTime() - a.vigenteDesde.getTime(),
+    );
+    for (const policy of sorted) {
+      const policyDateStr = policy.vigenteDesde.toISOString().slice(0, 10);
+      if (policyDateStr <= attendanceDateStr) {
+        return policy;
+      }
     }
   }
 
-  throw new NoPolicyForDateError(dateStr);
+  throw new NoPolicyForDateError(attendanceDateStr);
 }
 
 export class CalculatePeriodBalanceUseCase {
@@ -99,7 +109,6 @@ export class CalculatePeriodBalanceUseCase {
       policyTimeline,
       carryIn = ZERO,
       breakdownEnabled = false,
-      valorHoraOrdinaria,
       surchargeRates,
     } = input;
 
@@ -113,7 +122,8 @@ export class CalculatePeriodBalanceUseCase {
     let aggOrdNocturnas = ZERO;
     let aggExtraDiurnas = ZERO;
     let aggExtraNocturnas = ZERO;
-    let aggDomFestivas = ZERO;
+    let aggDominicales = ZERO;
+    let aggFestivas = ZERO;
 
     for (const att of attendances) {
       // Exclude incomplete records (completedAt null OR checkOutCapturedAt null)
@@ -132,12 +142,20 @@ export class CalculatePeriodBalanceUseCase {
       const horasRealesRaw = new Decimal(durationMs).div(MS_PER_HOUR);
       const horasReales = horasRealesRaw.toDecimalPlaces(2, ROUNDING);
 
-      // 2. jornadaDelDia — resolved by attendance date (REQ-CALC-05)
-      const policy = resolvePolicyForDate(att.date, policyTimeline);
+      // GAP-1: When the attendance has been classified by the engine,
+      // use breakdown.totalHoras (net, lunch/breakfast deducted) as the
+      // authoritative worked hours for delta calculation. horasReales
+      // (raw duration) is preserved in perDay for traceability only.
+      const horasTrabajadas = att.breakdown
+        ? att.breakdown.totalHoras.toDecimalPlaces(2, ROUNDING)
+        : horasReales;
+
+      // 2. jornadaDelDia — resolved by attendance record with scope precedence
+      const policy = resolvePolicyForRecord(att, policyTimeline);
       const jornadaHoras = policy.horasDiarias;
 
       // 3. delta, rounded HALF_UP per day before accumulation
-      const deltaRaw = horasReales.minus(jornadaHoras);
+      const deltaRaw = horasTrabajadas.minus(jornadaHoras);
       const delta = deltaRaw.toDecimalPlaces(2, ROUNDING);
 
       // 4. accumulate
@@ -147,7 +165,7 @@ export class CalculatePeriodBalanceUseCase {
         debitos = debitos.plus(delta.negated());
       }
 
-      perDay.push({ date: att.date, horasReales, jornadaHoras, delta });
+      perDay.push({ date: att.date, horasReales, horasTrabajadas, jornadaHoras, delta });
 
       // ── T4.2: Aggregate breakdown categories ──────────────────────────
       if (breakdownEnabled && att.breakdown) {
@@ -157,8 +175,11 @@ export class CalculatePeriodBalanceUseCase {
         aggOrdNocturnas = aggOrdNocturnas.plus(b.horasOrdinariasNocturnas);
         aggExtraDiurnas = aggExtraDiurnas.plus(b.horasExtraDiurnas);
         aggExtraNocturnas = aggExtraNocturnas.plus(b.horasExtraNocturnas);
-        if (b.esDominical || b.esFestivo) {
-          aggDomFestivas = aggDomFestivas.plus(b.totalHoras);
+        if (b.esDominical) {
+          aggDominicales = aggDominicales.plus(b.totalHoras);
+        }
+        if (b.esFestivo) {
+          aggFestivas = aggFestivas.plus(b.totalHoras);
         }
       }
     }
@@ -180,26 +201,9 @@ export class CalculatePeriodBalanceUseCase {
         horasOrdinariasNocturnas: aggOrdNocturnas.toDecimalPlaces(2, ROUNDING),
         horasExtraDiurnas: aggExtraDiurnas.toDecimalPlaces(2, ROUNDING),
         horasExtraNocturnas: aggExtraNocturnas.toDecimalPlaces(2, ROUNDING),
-        horasDominicalesFestivas: aggDomFestivas.toDecimalPlaces(2, ROUNDING),
+        horasDominicalesFestivas: aggDominicales.plus(aggFestivas).toDecimalPlaces(2, ROUNDING),
       };
       result.breakdown = breakdown;
-
-      // Compute valorRecargos if surcharge rates and hourly rate are available
-      if (valorHoraOrdinaria && surchargeRates) {
-        const surchargeDetail = calculateSurchargeValue(
-          {
-            horasOrdinariasNocturnas: aggOrdNocturnas,
-            horasExtraDiurnas: aggExtraDiurnas,
-            horasExtraNocturnas: aggExtraNocturnas,
-            totalHoras: aggOrdDiurnas.plus(aggOrdNocturnas).plus(aggExtraDiurnas).plus(aggExtraNocturnas),
-            esDominical: aggDomFestivas.greaterThan(ZERO),
-            esFestivo: aggDomFestivas.greaterThan(ZERO),
-          },
-          valorHoraOrdinaria,
-          surchargeRates,
-        );
-        result.valorRecargos = surchargeDetail.total;
-      }
     }
 
     return result;

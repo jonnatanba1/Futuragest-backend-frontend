@@ -83,6 +83,7 @@ import {
   JornadaPolicyResponseDto,
   CompensationPeriodResponseDto,
   DayBreakdownDto,
+  CategoryBreakdownDto,
   PeriodPayoutResponseDto,
 } from './response-dtos';
 
@@ -270,9 +271,20 @@ function serializeBalance(
   const breakdown: DayBreakdownDto[] = balance.perDay.map((day) => ({
     date: day.date,
     horasReales: day.horasReales.toString(),
+    horasTrabajadas: day.horasTrabajadas?.toString(),
     jornadaHoras: day.jornadaHoras.toString(),
     delta: day.delta.toString(),
   }));
+
+  const categoryBreakdown: CategoryBreakdownDto | undefined = balance.breakdown
+    ? {
+        horasOrdinariasDiurnas: balance.breakdown.horasOrdinariasDiurnas.toString(),
+        horasOrdinariasNocturnas: balance.breakdown.horasOrdinariasNocturnas.toString(),
+        horasExtraDiurnas: balance.breakdown.horasExtraDiurnas.toString(),
+        horasExtraNocturnas: balance.breakdown.horasExtraNocturnas.toString(),
+        horasDominicalesFestivas: balance.breakdown.horasDominicalesFestivas.toString(),
+      }
+    : undefined;
 
   return {
     operarioId,
@@ -287,6 +299,8 @@ function serializeBalance(
     disposition: balance.disposition,
     paidAt: balance.paidAt?.toISOString() ?? null,
     payoutRef: balance.payoutRef,
+    divergedAt: balance.divergedAt?.toISOString() ?? null,
+    categoryBreakdown,
   };
 }
 
@@ -391,6 +405,7 @@ export class CompensacionController {
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
     @Res({ passthrough: true }) res: Response,
+    @Query('enhanced') enhanced?: string,
   ): Promise<PeriodBalanceResponseDto> {
     // Validate date query params
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -403,8 +418,10 @@ export class CompensacionController {
       throw new BadRequestException('"desde" no puede ser posterior a "hasta"');
     }
 
+    const breakdownEnabled = enhanced === 'true';
+
     try {
-      const balance = await this.getBalanceUseCase.execute({ operarioId, desde, hasta });
+      const balance = await this.getBalanceUseCase.execute({ operarioId, desde, hasta, breakdownEnabled });
       res.status(HttpStatus.OK);
       return serializeBalance(operarioId, desde, hasta, balance);
     } catch (err) {

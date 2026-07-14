@@ -66,25 +66,39 @@ export class LateArrivalNovedadService {
       return;
     }
 
-    // 3. Convert checkInCapturedAt to Colombia local time (UTC-5).
+    // 3. Check if the attendance date is a working day per the policy.
+    //    Non-working days (e.g., Sundays for a Mon-Fri schedule, holidays)
+    //    should NOT generate late-arrival novedades — the operario wasn't
+    //    expected to work that day at all. (A-04 fix)
+    const dateObj = new Date(attendance.date + 'T00:00:00.000Z');
+    const isoWeekday = dateObj.getUTCDay() === 0 ? 7 : dateObj.getUTCDay();
+    if (!policy.diasLaborales.includes(isoWeekday)) {
+      this.logger.debug(
+        `LateArrivalNovedadService: attendance ${attendanceId} date ${attendance.date} ` +
+          `is not a working day (weekday=${isoWeekday}, diasLaborales=${policy.diasLaborales}) — skipping`,
+      );
+      return;
+    }
+
+    // 4. Convert checkInCapturedAt to Colombia local time (UTC-5).
     //    The system stores UTC epochs; shifting by -5h makes getUTCHours() return Colombia hour.
     const checkInLocal = new Date(attendance.checkInCapturedAt.getTime() - 5 * 60 * 60 * 1000);
     const checkInMinutes = checkInLocal.getUTCHours() * 60 + checkInLocal.getUTCMinutes();
 
-    // 4. Parse policy.horaInicio to minutes from midnight
+    // 5. Parse policy.horaInicio to minutes from midnight
     const [hInicio, mInicio] = policy.horaInicio.split(':').map(Number);
     const policyStartMinutes = hInicio * 60 + mInicio;
     const policyStartWithTolerance = policyStartMinutes + policy.toleranciaMin;
 
-    // 5. Compare: checkIn <= horaInicio + tolerance → not late
+    // 6. Compare: checkIn <= horaInicio + tolerance → not late
     if (checkInMinutes <= policyStartWithTolerance) {
       return;
     }
 
-    // 6. Calculate minutesTarde: difference from horaInicio (without tolerance)
+    // 7. Calculate minutesTarde: difference from horaInicio (without tolerance)
     const minutesTarde = checkInMinutes - policyStartMinutes;
 
-    // 7. Create LLEGADA_TARDE novedad — idempotent (P2002 = already exists)
+    // 8. Create LLEGADA_TARDE novedad — idempotent (P2002 = already exists)
     try {
       const record = await this.novedadRepo.create({
         attendanceId,

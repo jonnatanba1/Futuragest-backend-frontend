@@ -81,6 +81,8 @@ export interface PeriodBalanceDto {
   disposition?: CompensationDisposition | null;
   paidAt?: string | null;
   payoutRef?: string | null;
+  /** ISO 8601 — set when attendance data changed inside this closed period. */
+  divergedAt?: string | null;
 }
 
 /**

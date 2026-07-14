@@ -33,6 +33,9 @@ export class SupervisorResponseDto {
   @ApiProperty({ format: 'email' })
   email!: string;
 
+  @ApiProperty({ nullable: true, description: 'Optional human-readable display name' })
+  displayName?: string;
+
   @ApiProperty({ description: 'ISO 8601 timestamp' })
   createdAt!: string;
 }
@@ -51,6 +54,12 @@ export class OperarioResponseDto {
 
   @ApiProperty({ format: 'uuid' })
   supervisorId!: string;
+
+  @ApiProperty({ format: 'uuid', nullable: true, description: 'Optional área assignment' })
+  areaId!: string | null;
+
+  @ApiProperty({ nullable: true, description: 'Área name (resolved via include)' })
+  areaName!: string | null;
 
   @ApiProperty({ description: 'Free-text job position (e.g. "Barrido", "Recolección")' })
   cargo!: string;
@@ -154,6 +163,9 @@ export class UserResponseDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Zone coordinated (COORDINADOR only)' })
   coordinatedZoneId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Optional human-readable display name' })
+  displayName!: string | null;
 
   @ApiProperty({ description: 'ISO 8601 timestamp' })
   createdAt!: string;

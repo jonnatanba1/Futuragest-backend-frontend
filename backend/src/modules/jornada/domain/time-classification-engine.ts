@@ -5,7 +5,7 @@ export type TimeClassificationInput = {
   checkOut: Date;
   isSunday: boolean;
   isHoliday: boolean;
-  jornadaHorasDiarias: Decimal; // Límite de horas diarias según política (ej. 8.0)
+  jornadaHorasDiarias: Decimal;
   /** Schedule start time (HH:MM) in local time */
   horaInicio: string;
   /** Schedule end time (HH:MM) in local time */
@@ -22,6 +22,13 @@ export type TimeClassificationInput = {
   desayunoFin: string;
   /** ISO weekday of the shift date (1=Monday, 7=Sunday) */
   isoWeekday: number;
+  /**
+   * Set of holiday dates (YYYY-MM-DD) for per-day flag computation.
+   * When provided, the engine recomputes isSunday/isHoliday/esDiaLaboral
+   * each time the cursor crosses midnight — fixing overnight shift
+   * misclassification (A-05 / A-12).
+   */
+  holidayDates?: Set<string>;
 };
 
 export type TimeClassificationResult = {
@@ -101,8 +108,16 @@ export class TimeClassificationEngine {
     const breakfastStart = parseTime(input.desayunoInicio);
     const breakfastEnd = parseTime(input.desayunoFin);
 
-    const esDiaLaboral =
-      input.diasLaborales.includes(input.isoWeekday) && !input.isHoliday;
+    // A-05 / A-12: Per-day flag tracking for overnight shifts.
+    // When holidayDates is provided, recompute isSunday, isHoliday, and
+    // esDiaLaboral each time the cursor crosses midnight. Otherwise,
+    // use the fixed check-in-day flags (backward compat).
+    const holidayDates = input.holidayDates;
+    let sawSunday = input.isSunday;
+    let sawHoliday = input.isHoliday;
+    let sawDiaLaboral = input.diasLaborales.includes(input.isoWeekday) && !input.isHoliday;
+    let esDiaLaboral = sawDiaLaboral;
+    let lastDateStr = '';
 
     let firstOrdDiurna: Date | null = null;
     let lastOrdDiurna: Date | null = null;
@@ -115,6 +130,25 @@ export class TimeClassificationEngine {
 
     // Iterate minute by minute
     while (current < end) {
+      // ── Per-day flag recomputation ──
+      if (holidayDates) {
+        const y = current.getUTCFullYear();
+        const mo = String(current.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(current.getUTCDate()).padStart(2, '0');
+        const cursorDateStr = `${y}-${mo}-${d}`;
+        if (cursorDateStr !== lastDateStr) {
+          lastDateStr = cursorDateStr;
+          const cursorWeekday = current.getUTCDay();
+          const isSunday = cursorWeekday === 0;
+          const adjustedWeekday = isSunday ? 7 : cursorWeekday;
+          const isHoliday = holidayDates.has(cursorDateStr);
+          sawSunday = sawSunday || isSunday;
+          sawHoliday = sawHoliday || isHoliday;
+          esDiaLaboral = input.diasLaborales.includes(adjustedWeekday) && !isHoliday;
+          if (esDiaLaboral) sawDiaLaboral = true;
+        }
+      }
+
       // Extract the minute-of-day from the current cursor.
       // We use getUTCHours() / getUTCMinutes() because the dates are
       // already adjusted to represent local Colombia time via UTC fields.
@@ -190,9 +224,9 @@ export class TimeClassificationEngine {
       horasExtraDiurnas: new Decimal(extraDiurnas).dividedBy(60).toDecimalPlaces(2),
       horasExtraNocturnas: new Decimal(extraNocturnas).dividedBy(60).toDecimalPlaces(2),
       totalHoras: new Decimal(totalMinutes).dividedBy(60).toDecimalPlaces(2),
-      esDominical: input.isSunday,
-      esFestivo: input.isHoliday,
-      esDiaLaboral,
+      esDominical: holidayDates ? sawSunday : input.isSunday,
+      esFestivo: holidayDates ? sawHoliday : input.isHoliday,
+      esDiaLaboral: holidayDates ? sawDiaLaboral : esDiaLaboral,
       tramoInicioOrdDiurna: formatTime(firstOrdDiurna),
       tramoFinOrdDiurna: formatEndTime(lastOrdDiurna, firstOrdDiurna),
       tramoInicioOrdNocturno: formatTime(firstOrdNocturna),
