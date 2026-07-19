@@ -1,3 +1,6 @@
 [submodule "frontend_flutter"]
 	path = frontend_flutter
 	url = https://github.com/jonnatanba1/futuragest-frontend-flutter.git
+[submodule "frontend_web"]
+	path = frontend_web
+	url = https://github.com/jonnatanba1/futuragest-web.git
