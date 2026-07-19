@@ -1,0 +1,171 @@
+/* ── Dashboard bento layout ─────────────────────────────────────────────────
+   12-column bento grid with named areas (self-documenting layout).
+   Hero spans 2 rows. Cargo gets its own full row (operational priority). */
+
+.fg-bento {
+  display: grid;
+  gap: var(--mantine-spacing-lg);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    'hero hero hero hero t1 t1 t2 t2 t3 t3 t4 t4'
+    'hero hero hero hero nov nov nov nov nov nov nov nov'
+    'day  day  day  day  day  day  day  zone zone zone zone zone'
+    'cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo'
+    'open open open open open open open open open open open open';
+}
+
+.fg-bento-hero { grid-area: hero; }
+.fg-bento-t1 { grid-area: t1; }
+.fg-bento-t2 { grid-area: t2; }
+.fg-bento-t3 { grid-area: t3; }
+.fg-bento-t4 { grid-area: t4; }
+.fg-bento-nov { grid-area: nov; }
+.fg-bento-day { grid-area: day; }
+.fg-bento-zone { grid-area: zone; }
+.fg-bento-cargo { grid-area: cargo; }
+.fg-bento-open { grid-area: open; }
+
+/* Collapse to a single flow below the lg breakpoint (75em). */
+@media (max-width: 74.99em) {
+  .fg-bento {
+    grid-template-areas:
+      'hero hero hero hero hero hero hero hero hero hero hero hero'
+      't1   t1   t1   t1   t1   t1   t2   t2   t2   t2   t2   t2'
+      't3   t3   t3   t3   t3   t3   t4   t4   t4   t4   t4   t4'
+      'nov  nov  nov  nov  nov  nov  nov  nov  nov  nov  nov  nov'
+      'day  day  day  day  day  day  day  day  day  day  day  day'
+      'zone zone zone zone zone zone zone zone zone zone zone zone'
+      'cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo'
+      'open open open open open open open open open open open open';
+  }
+}
+
+/* Below sm, tiles go full width so numbers never squeeze. */
+@media (max-width: 47.99em) {
+  .fg-bento {
+    gap: var(--mantine-spacing-md);
+    grid-template-areas:
+      'hero hero hero hero hero hero hero hero hero hero hero hero'
+      't1   t1   t1   t1   t1   t1   t1   t1   t1   t1   t1   t1'
+      't2   t2   t2   t2   t2   t2   t2   t2   t2   t2   t2   t2'
+      't3   t3   t3   t3   t3   t3   t3   t3   t3   t3   t3   t3'
+      't4   t4   t4   t4   t4   t4   t4   t4   t4   t4   t4   t4'
+      'nov  nov  nov  nov  nov  nov  nov  nov  nov  nov  nov  nov'
+      'day  day  day  day  day  day  day  day  day  day  day  day'
+      'zone zone zone zone zone zone zone zone zone zone zone zone'
+      'cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo cargo'
+      'open open open open open open open open open open open open';
+  }
+}
+
+/* ── Hero card: "Asistencia de hoy" ─────────────────────────────────────── */
+
+.fg-hero {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background: linear-gradient(
+    140deg,
+    var(--mantine-color-brand-9) 0%,
+    var(--mantine-color-brand-8) 45%,
+    var(--mantine-color-brand-6) 100%
+  );
+  color: var(--mantine-color-white);
+}
+
+/* Decorative glow — clipped by the card radius, pointer-events free. */
+.fg-hero::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -40%;
+  inset-inline-end: -15%;
+  inline-size: 60%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgb(255 255 255 / 0.14),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.fg-hero-dim {
+  color: rgb(255 255 255 / 0.78);
+}
+
+.fg-hero-divider {
+  border: none;
+  border-block-start: 1px solid rgb(255 255 255 / 0.18);
+  margin-block: var(--mantine-spacing-md);
+}
+
+/* ── KPI tiles ──────────────────────────────────────────────────────────── */
+
+.fg-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fg-tile-clickable {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fg-tile-clickable {
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .fg-tile-clickable:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--mantine-shadow-md);
+  }
+}
+
+/* ── Section card header stat ───────────────────────────────────────────── */
+
+.fg-section-stat {
+  text-align: end;
+  min-inline-size: 0;
+}
+
+/* ── Cargo: operational workforce breakdown ─────────────────────────────── */
+
+.fg-cargo-total-badge {
+  background: var(--mantine-color-teal-light);
+  color: var(--mantine-color-teal-light-color);
+  border-radius: var(--mantine-radius-xl);
+  padding: 2px 12px;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.fg-cargo-row {
+  padding-block: var(--mantine-spacing-xs);
+}
+
+.fg-cargo-row + .fg-cargo-row {
+  border-block-start: 1px solid var(--mantine-color-default-border);
+}
+
+/* ── Open attendance list items ─────────────────────────────────────────── */
+
+.fg-open-item {
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-md);
+}
+
+.fg-open-item + .fg-open-item {
+  border-block-start: 1px solid var(--mantine-color-default-border);
+}
+
+/* ── Novedades: approved hours highlight ────────────────────────────────── */
+
+.fg-approved-hours {
+  background: var(--mantine-color-teal-light);
+  color: var(--mantine-color-teal-light-color);
+  border-radius: var(--mantine-radius-md);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  text-align: center;
+}

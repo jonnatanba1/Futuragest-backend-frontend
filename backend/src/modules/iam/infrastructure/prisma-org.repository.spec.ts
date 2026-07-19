@@ -20,10 +20,16 @@ import {
   UserNotFoundError,
   EmailInUseError,
 } from '../domain/org.errors';
+import {
+  AreaNotFoundError,
+  AreaNameInUseError,
+  AreaHasDependentsError,
+} from '../domain/area.errors';
 import { PrismaOrgRepository } from './prisma-org.repository';
 import type { ScopedZoneRepository } from './scoped-zone.repository';
 import type { ScopedMunicipioRepository } from './scoped-municipio.repository';
-import type { Zone, Municipio } from '@prisma/client';
+import type { ScopedAreaRepository } from './scoped-area.repository';
+import type { Zone, Municipio, Area } from '@prisma/client';
 import type { PrismaService } from '../../../database/prisma.service';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
@@ -53,10 +59,11 @@ function makePrisma(overrides: Partial<FakePrisma> = {}): FakePrisma {
   return prisma;
 }
 
-function makeZoneRepo(zones: Zone[] = []): jest.Mocked<Pick<ScopedZoneRepository, 'findMany' | 'findById'>> {
+function makeZoneRepo(zones: Zone[] = []): jest.Mocked<Pick<ScopedZoneRepository, 'findMany' | 'findById' | 'findByIdForWrite'>> {
   return {
     findMany: jest.fn().mockResolvedValue(zones),
     findById: jest.fn().mockResolvedValue(null),
+    findByIdForWrite: jest.fn().mockResolvedValue(null),
   };
 }
 
@@ -64,6 +71,20 @@ function makeMunicipioRepo(
   municipios: Municipio[] = [],
 ): jest.Mocked<Pick<ScopedMunicipioRepository, 'findMany'>> {
   return { findMany: jest.fn().mockResolvedValue(municipios) };
+}
+
+function makeAreaRepo(
+  areas: Area[] = [],
+): jest.Mocked<Pick<ScopedAreaRepository, 'findMany' | 'findById' | 'findByIdForWrite' | 'create' | 'update' | 'checkDependents' | 'delete'>> {
+  return {
+    findMany: jest.fn().mockResolvedValue(areas),
+    findById: jest.fn().mockResolvedValue(null),
+    findByIdForWrite: jest.fn().mockResolvedValue(null),
+    create: jest.fn(),
+    update: jest.fn(),
+    checkDependents: jest.fn().mockResolvedValue({}),
+    delete: jest.fn(),
+  };
 }
 
 const ZONE_ID = 'zone-uraba-uuid';
@@ -79,6 +100,7 @@ describe('PrismaOrgRepository — createManagementUser', () => {
       prisma as unknown as PrismaService,
       makeZoneRepo() as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.createManagementUser({
@@ -106,6 +128,7 @@ describe('PrismaOrgRepository — createManagementUser', () => {
       prisma as unknown as PrismaService,
       makeZoneRepo() as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.createManagementUser({
@@ -125,6 +148,7 @@ describe('PrismaOrgRepository — createManagementUser', () => {
       prisma as unknown as PrismaService,
       makeZoneRepo() as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     const result = await repo.createManagementUser({
@@ -144,6 +168,7 @@ describe('PrismaOrgRepository — createManagementUser', () => {
       prisma as unknown as PrismaService,
       makeZoneRepo() as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await expect(
@@ -164,6 +189,7 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await expect(
@@ -183,6 +209,7 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await expect(
@@ -205,6 +232,7 @@ describe('PrismaOrgRepository — assignCoordinador validation', () => {
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await expect(
@@ -242,6 +270,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -279,6 +308,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -312,6 +342,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -355,6 +386,7 @@ describe('PrismaOrgRepository — assignCoordinador $transaction clear-then-set'
       prisma as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     await repo.assignCoordinador({ userId: USER_ID, zoneId: ZONE_ID });
@@ -386,6 +418,7 @@ describe('PrismaOrgRepository — findZones and findMunicipios delegation', () =
       makePrisma() as unknown as PrismaService,
       zoneRepo as unknown as ScopedZoneRepository,
       makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     const result = await repo.findZones();
@@ -403,11 +436,272 @@ describe('PrismaOrgRepository — findZones and findMunicipios delegation', () =
       makePrisma() as unknown as PrismaService,
       makeZoneRepo() as unknown as ScopedZoneRepository,
       municipioRepo as unknown as ScopedMunicipioRepository,
+      makeAreaRepo() as unknown as ScopedAreaRepository,
     );
 
     const result = await repo.findMunicipios();
 
     expect(municipioRepo.findMany).toHaveBeenCalledTimes(1);
     expect(result).toEqual(fakeMunicipios);
+  });
+});
+
+// ─── Area CRUD ───────────────────────────────────────────────────────────────
+
+const AREA_ID = 'area-patio-uuid';
+const AREA_ZONE_ID = 'zone-uraba-uuid';
+
+function makeArea(overrides: Partial<Area> = {}): Area {
+  return {
+    id: AREA_ID,
+    name: 'Patio Central',
+    horaInicio: '08:00',
+    horaFin: '16:00',
+    zoneId: AREA_ZONE_ID,
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    ...overrides,
+  };
+}
+
+// ── findAreas ──
+
+describe('PrismaOrgRepository — findAreas delegation', () => {
+  it('findAreas delegates to ScopedAreaRepository.findMany', async () => {
+    const fakeAreas: Area[] = [makeArea()];
+    const areaRepo = makeAreaRepo(fakeAreas);
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    const result = await repo.findAreas();
+
+    expect(areaRepo.findMany).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(fakeAreas);
+  });
+});
+
+// ── createArea ──
+
+describe('PrismaOrgRepository — createArea', () => {
+  it('creates área and returns { id } when zone exists and name is unique', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.create.mockResolvedValue(makeArea({ id: 'new-area-id' }));
+
+    const zoneRepo = makeZoneRepo();
+    zoneRepo.findByIdForWrite.mockResolvedValue({ id: AREA_ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    const result = await repo.createArea({
+      name: 'Patio Central',
+      horaInicio: '08:00',
+      horaFin: '16:00',
+      zoneId: AREA_ZONE_ID,
+    });
+
+    expect(areaRepo.create).toHaveBeenCalledWith({
+      name: 'Patio Central',
+      horaInicio: '08:00',
+      horaFin: '16:00',
+      zoneId: AREA_ZONE_ID,
+    });
+    expect(result).toEqual({ id: 'new-area-id' });
+  });
+
+  it('throws ZoneNotFoundError when zone does not exist', async () => {
+    const areaRepo = makeAreaRepo();
+    // findByIdForWrite resolves null → zone not found (we check zone existence via zoneRepo in full impl)
+    // Actually, in the area pattern, the zone existence check goes through zoneRepo.findByIdForWrite
+    const zoneRepo = makeZoneRepo();
+    (zoneRepo as any).findByIdForWrite = jest.fn().mockResolvedValue(null);
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.createArea({
+        name: 'Test',
+        horaInicio: '08:00',
+        horaFin: '16:00',
+        zoneId: 'nonexistent-zone',
+      }),
+    ).rejects.toThrow(ZoneNotFoundError);
+
+    expect(areaRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('throws AreaNameInUseError when Prisma throws P2002 (unique constraint on zoneId+name)', async () => {
+    const areaRepo = makeAreaRepo();
+    const zoneRepo = makeZoneRepo();
+    zoneRepo.findByIdForWrite.mockResolvedValue({ id: AREA_ZONE_ID, name: 'Zona Urabá', createdAt: new Date(), updatedAt: new Date() });
+    const p2002 = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+    areaRepo.create.mockRejectedValue(p2002);
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.createArea({
+        name: 'Duplicate',
+        horaInicio: '08:00',
+        horaFin: '16:00',
+        zoneId: AREA_ZONE_ID,
+      }),
+    ).rejects.toThrow(AreaNameInUseError);
+  });
+});
+
+// ── updateArea ──
+
+describe('PrismaOrgRepository — updateArea', () => {
+  it('updates área and returns updated entity', async () => {
+    const areaRepo = makeAreaRepo();
+    const existing = makeArea();
+    const updated = makeArea({ name: 'Updated Name' });
+    areaRepo.findByIdForWrite.mockResolvedValue(existing);
+    areaRepo.update.mockResolvedValue(updated);
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    const result = await repo.updateArea(AREA_ID, { name: 'Updated Name' });
+
+    expect(areaRepo.update).toHaveBeenCalledWith(AREA_ID, { name: 'Updated Name' });
+    expect(result).toEqual(updated);
+  });
+
+  it('throws AreaNotFoundError when área does not exist', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(null); // not found
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.updateArea(AREA_ID, { name: 'New Name' }),
+    ).rejects.toThrow(AreaNotFoundError);
+
+    expect(areaRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('throws AreaNameInUseError when P2002 on update (duplicate name in zone)', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(makeArea());
+    const p2002 = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+    areaRepo.update.mockRejectedValue(p2002);
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.updateArea(AREA_ID, { name: 'Taken' }),
+    ).rejects.toThrow(AreaNameInUseError);
+  });
+
+  it('validates new zone exists when zoneId is being changed', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(makeArea());
+    const zoneRepo = makeZoneRepo();
+    (zoneRepo as any).findByIdForWrite = jest.fn().mockResolvedValue(null); // new zone doesn't exist
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      zoneRepo as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.updateArea(AREA_ID, { zoneId: 'nonexistent-zone' }),
+    ).rejects.toThrow(ZoneNotFoundError);
+
+    expect(areaRepo.update).not.toHaveBeenCalled();
+  });
+});
+
+// ── deleteArea ──
+
+describe('PrismaOrgRepository — deleteArea', () => {
+  it('deletes área when no dependents exist', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(makeArea());
+    areaRepo.checkDependents.mockResolvedValue({ operarios: 0 });
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await repo.deleteArea(AREA_ID);
+
+    expect(areaRepo.delete).toHaveBeenCalledWith(AREA_ID);
+  });
+
+  it('throws AreaNotFoundError when área does not exist', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(null);
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.deleteArea(AREA_ID),
+    ).rejects.toThrow(AreaNotFoundError);
+
+    expect(areaRepo.delete).not.toHaveBeenCalled();
+  });
+
+  it('throws AreaHasDependentsError when dependents exist', async () => {
+    const areaRepo = makeAreaRepo();
+    areaRepo.findByIdForWrite.mockResolvedValue(makeArea());
+    areaRepo.checkDependents.mockResolvedValue({ operarios: 3 });
+
+    const repo = new PrismaOrgRepository(
+      makePrisma() as unknown as PrismaService,
+      makeZoneRepo() as unknown as ScopedZoneRepository,
+      makeMunicipioRepo() as unknown as ScopedMunicipioRepository,
+      areaRepo as unknown as ScopedAreaRepository,
+    );
+
+    await expect(
+      repo.deleteArea(AREA_ID),
+    ).rejects.toThrow(AreaHasDependentsError);
+
+    expect(areaRepo.delete).not.toHaveBeenCalled();
   });
 });

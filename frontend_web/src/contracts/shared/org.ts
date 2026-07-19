@@ -48,4 +48,36 @@ export interface ProvisionUserDto {
   email: string;
   password: string;
   role: string;
+  /** Optional human-readable display name. Falls back to email when null. */
+  displayName?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Área (editable-areas-with-schedules)
+// ---------------------------------------------------------------------------
+
+/** Área returned by GET /org/areas and PATCH /org/areas/:id */
+export interface AreaResponseDto {
+  id: string;
+  name: string;
+  horaInicio: string; // HH:MM
+  horaFin: string; // HH:MM
+  zoneId: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
+/** Body for POST /org/areas */
+export interface CreateAreaBody {
+  name: string;
+  horaInicio: string; // HH:MM
+  horaFin: string; // HH:MM
+  zoneId: string;
+}
+
+/** Body for PATCH /org/areas/:id (all fields optional) */
+export interface UpdateAreaBody {
+  name?: string;
+  horaInicio?: string; // HH:MM
+  horaFin?: string; // HH:MM
 }

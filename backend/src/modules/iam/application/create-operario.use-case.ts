@@ -24,6 +24,7 @@ export interface CreateOperarioInput {
   documento: string;
   supervisorId: string;
   cargo: string;
+  areaId?: string;
 }
 
 export interface CreateOperarioOutput {
@@ -40,6 +41,7 @@ export class CreateOperarioUseCase {
         documento: input.documento,
         supervisorId: input.supervisorId,
         cargo: input.cargo,
+        areaId: input.areaId,
       });
       return { id: operario.id };
     } catch (err: unknown) {

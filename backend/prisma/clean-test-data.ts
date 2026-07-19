@@ -12,12 +12,18 @@ import { createPrismaClient } from '../src/database/prisma-client';
 const prisma = createPrismaClient();
 
 async function main() {
-  // Novedad references Attendance via FK — must delete child before parent.
+  // Clear all transactional and period tables in FK-safe order
   const delNov = await prisma.novedad.deleteMany({});
+  const delCompRest = await prisma.compensatoryRest.deleteMany({});
+  const delBreak = await prisma.attendanceBreakdown.deleteMany({});
   const delAtt = await prisma.attendance.deleteMany({});
+  const delPeriod = await prisma.compensationPeriod.deleteMany({});
 
-  console.log(`Deleted novedades:   ${delNov.count}`);
-  console.log(`Deleted attendance:  ${delAtt.count}`);
+  console.log(`Deleted novedades:           ${delNov.count}`);
+  console.log(`Deleted compensatory rests:  ${delCompRest.count}`);
+  console.log(`Deleted breakdowns:          ${delBreak.count}`);
+  console.log(`Deleted attendance:          ${delAtt.count}`);
+  console.log(`Deleted compensation periods:${delPeriod.count}`);
 
   const [oper, sup, mun, usr] = await Promise.all([
     prisma.operario.count(),

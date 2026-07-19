@@ -7,13 +7,14 @@
  * Naming convention: methods reflect business intent, not Prisma operations.
  */
 
-import type { Zone, Municipio, Role } from '@prisma/client';
+import type { Zone, Municipio, Area, Role } from '@prisma/client';
 
 /** Parameters for creating a new management user. */
 export interface CreateManagementUserParams {
   email: string;
   passwordHash: string;
   role: Role;
+  displayName?: string;
 }
 
 /** Parameters for assigning a coordinador to a zone. */
@@ -29,6 +30,7 @@ export interface UserListItem {
   role: Role;
   mustChangePassword: boolean;
   coordinatedZoneId: string | null;
+  displayName: string | null;
   createdAt: Date;
 }
 
@@ -116,6 +118,42 @@ export interface OrgRepositoryPort {
 
   /** Lists all users (admin view). Projection NEVER includes passwordHash. */
   findUsers(): Promise<UserListItem[]>;
+
+  /**
+   * Updates a user's displayName and/or role.
+   * Throws UserNotFoundError if the user does not exist.
+   */
+  updateUser(id: string, data: { displayName?: string; role?: Role }): Promise<UserListItem>;
+
+  // ─── Área CRUD ─────────────────────────────────────────────────────────────
+
+  /**
+   * Returns all áreas visible to the current principal (scope applied by
+   * ScopedAreaRepository, not by this port directly).
+   */
+  findAreas(): Promise<Area[]>;
+
+  /**
+   * Creates a new área in the given zone.
+   * Throws ZoneNotFoundError if zoneId does not exist.
+   * Throws AreaNameInUseError if (zoneId, name) already exists.
+   */
+  createArea(params: { name: string; horaInicio: string; horaFin: string; zoneId: string }): Promise<{ id: string }>;
+
+  /**
+   * Updates an área's name, schedule, and/or zone.
+   * Throws AreaNotFoundError if the área does not exist.
+   * Throws ZoneNotFoundError if the new zoneId does not exist.
+   * Throws AreaNameInUseError if the resulting (zoneId, name) pair is already taken.
+   */
+  updateArea(id: string, params: { name?: string; horaInicio?: string; horaFin?: string; zoneId?: string }): Promise<Area>;
+
+  /**
+   * Deletes an área.
+   * Throws AreaNotFoundError if the área does not exist.
+   * Throws AreaHasDependentsError if the área has associated operarios or other dependents.
+   */
+  deleteArea(id: string): Promise<void>;
 }
 
 /** Injection token for OrgRepositoryPort. */

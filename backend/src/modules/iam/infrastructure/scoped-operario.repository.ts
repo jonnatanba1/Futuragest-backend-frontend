@@ -25,6 +25,12 @@ export class ScopedOperarioRepository
 {
   protected readonly model = 'Operario';
 
+  /** Allow including area (lookup relation, not a scoped read) on operario queries. */
+  protected override get scopedRelations(): string[] {
+    const all = super.scopedRelations;
+    return all.filter((r) => r !== 'area');
+  }
+
   constructor(
     private readonly prismaService: PrismaService,
     scopeHolder: ScopeContextHolder,
@@ -35,11 +41,17 @@ export class ScopedOperarioRepository
   // ─── Read methods (existing) ───────────────────────────────────────────────
 
   findMany(where?: Prisma.OperarioWhereInput): Promise<Operario[]> {
-    return this.findManyScoped({ where: where ?? {} });
+    return this.findManyScoped({
+      where: where ?? {},
+      include: { area: { select: { id: true, name: true } } },
+    });
   }
 
   findById(id: string): Promise<Operario | null> {
-    return this.findFirstScoped({ where: { id } });
+    return this.findFirstScoped({
+      where: { id },
+      include: { area: { select: { id: true, name: true } } },
+    });
   }
 
   // ─── Write methods (T-11) ─────────────────────────────────────────────────
@@ -53,6 +65,7 @@ export class ScopedOperarioRepository
     documento: string;
     supervisorId: string;
     cargo: string;
+    areaId?: string;
   }): Promise<Operario> {
     return this.prismaService.operario.create({
       data: {
@@ -60,6 +73,7 @@ export class ScopedOperarioRepository
         documento: data.documento,
         supervisorId: data.supervisorId,
         cargo: data.cargo,
+        areaId: data.areaId ?? null,
         deactivatedAt: null,
       },
     });
@@ -104,7 +118,7 @@ export class ScopedOperarioRepository
    * Returns the count of successfully inserted rows.
    */
   async bulkCreate(
-    rows: Array<{ fullName: string; documento: string; supervisorId: string; cargo: string }>,
+    rows: Array<{ fullName: string; documento: string; supervisorId: string; cargo: string; areaId?: string }>,
   ): Promise<number> {
     if (rows.length === 0) return 0;
     const results = await this.prismaService.$transaction(
@@ -115,6 +129,7 @@ export class ScopedOperarioRepository
             documento: r.documento,
             supervisorId: r.supervisorId,
             cargo: r.cargo,
+            areaId: r.areaId ?? null,
             deactivatedAt: null,
           },
         }),

@@ -23,7 +23,7 @@ export class RejectNovedadUseCase {
     private readonly scopeHolder: ScopeContextHolder,
   ) {}
 
-  async execute(novedadId: string, verification?: VerificationMethod): Promise<Novedad> {
+  async execute(novedadId: string, verification?: VerificationMethod, reason?: string): Promise<Novedad> {
     // 1. Find novedad in scope
     const novedad = await this.novedadRepo.findByIdScoped(novedadId);
     if (!novedad) {
@@ -43,6 +43,7 @@ export class RejectNovedadUseCase {
       approvedByUserId: ctx.userId,
       decidedAt: new Date(),
       decisionVerification: verification ?? null,
+      rejectionReason: reason ?? null,
     });
   }
 }

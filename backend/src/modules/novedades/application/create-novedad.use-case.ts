@@ -154,6 +154,7 @@ export class CreateNovedadUseCase {
     try {
       const result = this.notificationPort.notifyNovedadCreated({
         novedadId: record.id,
+        tipoNovedad: 'HORAS_EXTRA',
         horasExtra: Number(record.horasExtra).toFixed(2),
         supervisorId: record.supervisorId,
         zoneId: record.zoneId,

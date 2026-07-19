@@ -17,6 +17,7 @@ describe('NoOpNotificationAdapter', () => {
   it('PN-9 — notifyNovedadCreated resolves without throwing', async () => {
     const payload: NovedadCreatedPayload = {
       novedadId: 'nov-1',
+      tipoNovedad: 'HORAS_EXTRA',
       horasExtra: '2.50',
       supervisorId: 'sup-1',
       zoneId: 'zone-1',
@@ -28,6 +29,7 @@ describe('NoOpNotificationAdapter', () => {
   it('PN-10 — returns void (not null, not a value)', async () => {
     const payload: NovedadCreatedPayload = {
       novedadId: 'nov-2',
+      tipoNovedad: 'HORAS_EXTRA',
       horasExtra: '1.00',
       supervisorId: 'sup-2',
       zoneId: 'zone-2',

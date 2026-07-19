@@ -34,12 +34,47 @@ describe('compensacion domain errors', () => {
   });
 
   describe('JornadaPolicyDuplicateEffectiveDateError', () => {
-    it('carries httpStatus 409 and code POLICY_DUPLICATE_DATE', () => {
+    it('carries httpStatus 409 and code POLICY_DUPLICATE_DATE (legacy call signature)', () => {
       const err = new JornadaPolicyDuplicateEffectiveDateError('2026-07-01');
       expect(err.httpStatus).toBe(409);
       expect(err.code).toBe('POLICY_DUPLICATE_DATE');
       expect(err).toBeInstanceOf(Error);
       expect(err.message).toContain('2026-07-01');
+    });
+
+    it('T6a — scope = GLOBAL → message mentions "ámbito global"', () => {
+      const err = new JornadaPolicyDuplicateEffectiveDateError({
+        vigenteDesde: '2026-07-01',
+        operarioId: null,
+        zoneId: null,
+      });
+      expect(err.code).toBe('POLICY_DUPLICATE_DATE');
+      expect(err.httpStatus).toBe(409);
+      expect(err.message).toContain('2026-07-01');
+      expect(err.message).toContain('ámbito global');
+    });
+
+    it('T6b — scope = per-zone → message mentions "zona {zoneId}"', () => {
+      const err = new JornadaPolicyDuplicateEffectiveDateError({
+        vigenteDesde: '2026-08-01',
+        operarioId: null,
+        zoneId: 'zona-norte',
+      });
+      expect(err.code).toBe('POLICY_DUPLICATE_DATE');
+      expect(err.message).toContain('2026-08-01');
+      expect(err.message).toContain('zona zona-norte');
+      expect(err.message).not.toContain('ámbito global');
+    });
+
+    it('T6c — scope = per-operario → message mentions "operario {operarioId}"', () => {
+      const err = new JornadaPolicyDuplicateEffectiveDateError({
+        vigenteDesde: '2026-09-01',
+        operarioId: 'op-77',
+        zoneId: null,
+      });
+      expect(err.code).toBe('POLICY_DUPLICATE_DATE');
+      expect(err.message).toContain('2026-09-01');
+      expect(err.message).toContain('operario op-77');
     });
   });
 

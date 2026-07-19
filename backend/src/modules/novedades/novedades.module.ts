@@ -13,7 +13,7 @@
  * Pattern mirrors asistencia.module.ts LazyRequestScopeContextHolder / REQUEST factory wiring.
  */
 
-import { Module, Scope } from '@nestjs/common';
+import { forwardRef, Module, Scope } from '@nestjs/common';
 import { PrismaModule } from '../../database/prisma.module';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthModule } from '../auth/auth.module';
@@ -45,7 +45,7 @@ import {
 } from './interface/novedad.controller';
 
 @Module({
-  imports: [PrismaModule, AuthModule, IamModule, AsistenciaModule, NotificationsModule],
+  imports: [PrismaModule, AuthModule, IamModule, forwardRef(() => AsistenciaModule), NotificationsModule],
   controllers: [NovedadController],
   providers: [
     // ── ScopedNovedadRepository — request-scoped (needs SCOPE_CONTEXT_HOLDER) ──
@@ -113,5 +113,6 @@ import {
       inject: [NOVEDAD_REPOSITORY_PORT],
     },
   ],
+  exports: [NOVEDAD_REPOSITORY_PORT],
 })
 export class NovedadesModule {}

@@ -50,11 +50,12 @@ import {
   CreatedIdDto,
   UserResponseDto,
 } from './response-dtos';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 import type { Role } from '@prisma/client';
 import { Roles } from './roles.decorator';
 import type { AssignCoordinadorToZoneUseCase } from '../application/assign-coordinador-to-zone.use-case';
 import type { ProvisionManagementUserUseCase } from '../application/provision-management-user.use-case';
+import type { UpdateUserUseCase } from '../application/update-user.use-case';
 import type { OrgRepositoryPort } from '../domain/ports/org-repository.port';
 import {
   ZoneNotFoundError,
@@ -68,12 +69,18 @@ import {
   MunicipioNameInUseError,
   MunicipioHasDependentsError,
 } from '../domain/org.errors';
+import {
+  AreaNotFoundError,
+  AreaNameInUseError,
+  AreaHasDependentsError,
+} from '../domain/area.errors';
 
 // ─── Injection tokens ─────────────────────────────────────────────────────────
 
 export const ORG_REPO = Symbol('OrgRepositoryPort');
 export const ASSIGN_COORDINADOR_USE_CASE = Symbol('AssignCoordinadorToZoneUseCase');
 export const PROVISION_MANAGEMENT_USER_USE_CASE = Symbol('ProvisionManagementUserUseCase');
+export const UPDATE_USER_USE_CASE = Symbol('UpdateUserUseCase');
 
 // ─── Role constants ───────────────────────────────────────────────────────────
 
@@ -131,6 +138,11 @@ export class ProvisionUserBody {
   @ApiProperty({ enum: PROVISIONABLE_ROLES })
   @IsIn(PROVISIONABLE_ROLES)
   role!: string;
+
+  @ApiPropertyOptional({ description: 'Optional human-readable display name' })
+  @IsOptional()
+  @IsString()
+  displayName?: string;
 }
 
 export class CreateZoneBody {
@@ -167,6 +179,86 @@ export class UpdateMunicipioBody {
   zoneId?: string;
 }
 
+// ─── Área DTOs ────────────────────────────────────────────────────────────────
+
+export class CreateAreaBody {
+  @ApiProperty({ description: 'Area name (unique within zone)' })
+  @IsNotEmpty()
+  @IsString()
+  name!: string;
+
+  @ApiProperty({ description: 'HH:MM', example: '06:00' })
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/)
+  horaInicio!: string;
+
+  @ApiProperty({ description: 'HH:MM', example: '14:00' })
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/)
+  horaFin!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  @IsNotEmpty()
+  @IsUUID()
+  zoneId!: string;
+}
+
+export class UpdateAreaBody {
+  @ApiPropertyOptional({ description: 'New area name (unique within zone)' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'HH:MM', example: '06:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/)
+  horaInicio?: string;
+
+  @ApiPropertyOptional({ description: 'HH:MM', example: '14:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/)
+  horaFin?: string;
+}
+
+export class UpdateUserBody {
+  @ApiPropertyOptional({ description: 'New human-readable display name' })
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @ApiPropertyOptional({ enum: PROVISIONABLE_ROLES, description: 'New role (rank-checked)' })
+  @IsOptional()
+  @IsIn(PROVISIONABLE_ROLES)
+  role?: string;
+}
+
+export class AreaResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ description: 'HH:MM' })
+  horaInicio!: string;
+
+  @ApiProperty({ description: 'HH:MM' })
+  horaFin!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  zoneId!: string;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp' })
+  createdAt!: string;
+
+  @ApiProperty({ description: 'ISO 8601 timestamp' })
+  updatedAt!: string;
+}
+
 // ─── Controller ──────────────────────────────────────────────────────────────
 
 @Controller('org')
@@ -177,6 +269,8 @@ export class OrgController {
     private readonly assignUseCase: Pick<AssignCoordinadorToZoneUseCase, 'execute'>,
     @Inject(PROVISION_MANAGEMENT_USER_USE_CASE)
     private readonly provisionUseCase: Pick<ProvisionManagementUserUseCase, 'execute'>,
+    @Inject(UPDATE_USER_USE_CASE)
+    private readonly updateUserUseCase: Pick<UpdateUserUseCase, 'execute'>,
   ) {}
 
   // ─── Read endpoints ────────────────────────────────────────────────────────
@@ -232,6 +326,7 @@ export class OrgController {
         email: body.email,
         password: body.password,
         role: body.role as Role,
+        displayName: body.displayName,
       });
     } catch (err) {
       if (err instanceof UnsupportedProvisionRoleError) {
@@ -239,6 +334,51 @@ export class OrgController {
       }
       if (err instanceof EmailInUseError) {
         throw new ConflictException(err.message);
+      }
+      // ForbiddenException from privilege-escalation guard — re-throw as-is
+      throw err;
+    }
+  }
+
+  // ─── Update user ───────────────────────────────────────────────────────────
+
+  /**
+   * PATCH /org/users/:id — update a user's displayName and/or role.
+   * Error mapping:
+   *   UserNotFoundError               → 404 NotFoundException
+   *   UnsupportedProvisionRoleError   → 400 BadRequestException
+   *   ForbiddenException              → 403 (re-thrown)
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Patch('users/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: UserResponseDto })
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateUserBody,
+  ): Promise<UserResponseDto> {
+    try {
+      const result = await this.updateUserUseCase.execute({
+        id,
+        displayName: body.displayName,
+        role: body.role as Role,
+      });
+
+      return {
+        id: result.id,
+        email: result.email,
+        role: result.role,
+        mustChangePassword: result.mustChangePassword,
+        coordinatedZoneId: result.coordinatedZoneId,
+        displayName: result.displayName,
+        createdAt: result.createdAt,
+      };
+    } catch (err) {
+      if (err instanceof UnsupportedProvisionRoleError) {
+        throw new BadRequestException(err.message);
+      }
+      if (err instanceof UserNotFoundError) {
+        throw new NotFoundException(err.message);
       }
       // ForbiddenException from privilege-escalation guard — re-throw as-is
       throw err;
@@ -395,6 +535,101 @@ export class OrgController {
         throw new NotFoundException(err.message);
       }
       if (err instanceof MunicipioHasDependentsError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  // ─── Área CRUD ──────────────────────────────────────────────────────────────
+
+  /**
+   * GET /org/areas — list áreas (scope-filtered by role).
+   */
+  @Roles(...ORG_READ_ROLES)
+  @Get('areas')
+  @ApiOkResponse({ type: AreaResponseDto, isArray: true })
+  async listAreas() {
+    return this.orgRepo.findAreas();
+  }
+
+  /**
+   * POST /org/areas — create an área.
+   * Error mapping:
+   *   ZoneNotFoundError  → 400 BadRequestException (zone must exist)
+   *   AreaNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Post('areas')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({ type: CreatedIdDto })
+  async createArea(@Body() body: CreateAreaBody): Promise<{ id: string }> {
+    try {
+      return await this.orgRepo.createArea({
+        name: body.name,
+        horaInicio: body.horaInicio,
+        horaFin: body.horaFin,
+        zoneId: body.zoneId,
+      });
+    } catch (err) {
+      if (err instanceof ZoneNotFoundError) {
+        throw new BadRequestException(err.message);
+      }
+      if (err instanceof AreaNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * PATCH /org/areas/:id — update an área.
+   * Error mapping:
+   *   AreaNotFoundError  → 404 NotFoundException
+   *   AreaNameInUseError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Patch('areas/:id')
+  @ApiOkResponse({ type: AreaResponseDto })
+  async updateArea(
+    @Param('id') id: string,
+    @Body() body: UpdateAreaBody,
+  ): Promise<AreaResponseDto> {
+    try {
+      return await this.orgRepo.updateArea(id, {
+        name: body.name,
+        horaInicio: body.horaInicio,
+        horaFin: body.horaFin,
+      }) as unknown as AreaResponseDto;
+    } catch (err) {
+      if (err instanceof AreaNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof AreaNameInUseError) {
+        throw new ConflictException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * DELETE /org/areas/:id — delete an área.
+   * Error mapping:
+   *   AreaNotFoundError      → 404 NotFoundException
+   *   AreaHasDependentsError → 409 ConflictException
+   */
+  @Roles(...ORG_WRITE_ROLES)
+  @Delete('areas/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Area deleted' })
+  async deleteArea(@Param('id') id: string): Promise<void> {
+    try {
+      await this.orgRepo.deleteArea(id);
+    } catch (err) {
+      if (err instanceof AreaNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
+      if (err instanceof AreaHasDependentsError) {
         throw new ConflictException(err.message);
       }
       throw err;

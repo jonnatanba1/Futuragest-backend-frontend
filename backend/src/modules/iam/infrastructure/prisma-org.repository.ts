@@ -24,7 +24,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { Zone, Municipio, Prisma } from '@prisma/client';
+import type { Zone, Municipio, Area, Role, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
   OrgRepositoryPort,
@@ -43,8 +43,14 @@ import {
   MunicipioNameInUseError,
   MunicipioHasDependentsError,
 } from '../domain/org.errors';
+import {
+  AreaNotFoundError,
+  AreaNameInUseError,
+  AreaHasDependentsError,
+} from '../domain/area.errors';
 import type { ScopedZoneRepository } from './scoped-zone.repository';
 import type { ScopedMunicipioRepository } from './scoped-municipio.repository';
+import type { ScopedAreaRepository } from './scoped-area.repository';
 
 @Injectable()
 export class PrismaOrgRepository implements OrgRepositoryPort {
@@ -52,6 +58,7 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
     private readonly prisma: PrismaService,
     private readonly zoneRepo: ScopedZoneRepository,
     private readonly municipioRepo: ScopedMunicipioRepository,
+    private readonly areaRepo: ScopedAreaRepository,
   ) {}
 
   // ─── createManagementUser ──────────────────────────────────────────────────
@@ -64,6 +71,7 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
           passwordHash: params.passwordHash,
           role: params.role,
           mustChangePassword: true,
+          displayName: params.displayName,
           // coordinatedZoneId intentionally omitted — Prisma default is null.
           // Management roles (GERENCIA, TALENTO_HUMANO, LIDER_OPERATIVO) are GLOBAL_ROLES.
         },
@@ -134,9 +142,40 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
         role: true,
         mustChangePassword: true,
         coordinatedZoneId: true,
+        displayName: true,
         createdAt: true,
       },
       orderBy: { email: 'asc' },
+    });
+  }
+
+  async updateUser(
+    id: string,
+    data: { displayName?: string; role?: Role },
+  ): Promise<UserListItem> {
+    // Pre-check existence
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new UserNotFoundError(id);
+    }
+
+    // Build update data (only provided fields)
+    const updateData: { displayName?: string; role?: Role } = {};
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.role !== undefined) updateData.role = data.role;
+
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        mustChangePassword: true,
+        coordinatedZoneId: true,
+        displayName: true,
+        createdAt: true,
+      },
     });
   }
 
@@ -256,6 +295,85 @@ export class PrismaOrgRepository implements OrgRepositoryPort {
       throw new MunicipioHasDependentsError(id);
     }
     await this.municipioRepo.delete(id);
+  }
+
+  // ─── Área CRUD ────────────────────────────────────────────────────────────
+  // Same pattern as Municipio: delegate writes to ScopedAreaRepository,
+  // pre-validate zone existence, wrap unique constraint violations.
+
+  async findAreas(): Promise<Area[]> {
+    return this.areaRepo.findMany();
+  }
+
+  async createArea(params: { name: string; horaInicio: string; horaFin: string; zoneId: string }): Promise<{ id: string }> {
+    // Validate zone exists first — gives a clear ZoneNotFoundError instead of FK violation
+    const zone = await this.zoneRepo.findByIdForWrite(params.zoneId);
+    if (!zone) {
+      throw new ZoneNotFoundError(params.zoneId);
+    }
+    try {
+      const area = await this.areaRepo.create({
+        name: params.name,
+        horaInicio: params.horaInicio,
+        horaFin: params.horaFin,
+        zoneId: params.zoneId,
+      });
+      return { id: area.id };
+    } catch (err) {
+      if (this.isPrismaUniqueError(err)) {
+        throw new AreaNameInUseError(params.name, params.zoneId);
+      }
+      throw err;
+    }
+  }
+
+  async updateArea(
+    id: string,
+    params: { name?: string; horaInicio?: string; horaFin?: string; zoneId?: string },
+  ): Promise<Area> {
+    const existing = await this.areaRepo.findByIdForWrite(id);
+    if (!existing) {
+      throw new AreaNotFoundError(id);
+    }
+
+    // If changing zone, validate new zone exists
+    if (params.zoneId !== undefined) {
+      const zone = await this.zoneRepo.findByIdForWrite(params.zoneId);
+      if (!zone) {
+        throw new ZoneNotFoundError(params.zoneId);
+      }
+    }
+
+    // Build update data (only provided fields)
+    const data: { name?: string; horaInicio?: string; horaFin?: string; zoneId?: string } = {};
+    if (params.name !== undefined) data.name = params.name;
+    if (params.horaInicio !== undefined) data.horaInicio = params.horaInicio;
+    if (params.horaFin !== undefined) data.horaFin = params.horaFin;
+    if (params.zoneId !== undefined) data.zoneId = params.zoneId;
+
+    try {
+      return await this.areaRepo.update(id, data);
+    } catch (err) {
+      if (this.isPrismaUniqueError(err)) {
+        const effectiveName = params.name ?? existing.name;
+        const effectiveZoneId = params.zoneId ?? existing.zoneId;
+        throw new AreaNameInUseError(effectiveName, effectiveZoneId);
+      }
+      throw err;
+    }
+  }
+
+  async deleteArea(id: string): Promise<void> {
+    const existing = await this.areaRepo.findByIdForWrite(id);
+    if (!existing) {
+      throw new AreaNotFoundError(id);
+    }
+    const deps = await this.areaRepo.checkDependents(id);
+    const hasDependents = Object.values(deps).some((count) => (count ?? 0) > 0);
+    if (hasDependents) {
+      throw new AreaHasDependentsError(id);
+    }
+    await this.areaRepo.delete(id);
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────

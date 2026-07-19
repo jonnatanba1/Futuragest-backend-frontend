@@ -18,6 +18,9 @@ RUN pnpm exec prisma generate
 # Copy source code
 COPY . .
 
+# Clear tsbuildinfo to ensure a clean compiler run
+RUN rm -f tsconfig.build.tsbuildinfo
+
 # Build the API
 RUN pnpm run build
 
@@ -36,11 +39,15 @@ COPY prisma/ prisma/
 RUN pnpm install --frozen-lockfile --prod
 
 # Generate Prisma client for production
-RUN pnpm dlx prisma generate
+RUN pnpm exec prisma generate
+
+# Create prisma config for production (plain JS — no tsx needed)
+RUN echo 'module.exports = { schema: "./prisma/schema.prisma", datasource: { url: process.env.DATABASE_URL } };' > prisma.config.js
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist dist
 
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+# Run migrations on startup, then start the app
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main"]

@@ -23,7 +23,8 @@ export function useApproveNovedad() {
 export function useRejectNovedad() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => novedadesApi.rejectNovedad(id),
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      novedadesApi.rejectNovedad(id, reason ? { reason } : undefined),
     onSuccess: () => qc.invalidateQueries({ queryKey: [NOVEDADES_KEY] }),
   });
 }

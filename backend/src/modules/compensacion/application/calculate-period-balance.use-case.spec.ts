@@ -13,6 +13,7 @@ import { CalculatePeriodBalanceUseCase } from './calculate-period-balance.use-ca
 import { NoPolicyForDateError } from '../domain/compensacion.errors';
 import type { AttendanceReaderRecord } from '../domain/ports/attendance-reader.port';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import type { SurchargeRates } from '../domain/surcharge-value-calculator';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ function makeAttendance(
   return {
     id: `att-${date}`,
     operarioId: 'O1',
+    zoneId: 'Z1',
     date,
     checkInCapturedAt: checkIn,
     checkOutCapturedAt: completed ? checkOut : null,
@@ -37,6 +39,17 @@ function makeAttendance(
 function makePolicy(vigenteDesdeStr: string, horasDiarias: number): JornadaPolicyRecord {
   return {
     id: `pol-${vigenteDesdeStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(horasDiarias * 5),
     horasDiarias: new Decimal(horasDiarias),
     vigenteDesde: new Date(`${vigenteDesdeStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -236,5 +249,216 @@ describe('CalculatePeriodBalanceUseCase', () => {
     expect(result.creditos.toNumber()).toBe(0);
     expect(result.debitos.toNumber()).toBe(0);
     expect(result.saldo.toNumber()).toBe(0);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // T4.2 — Enhanced period balance with breakdown aggregation (REQ-009)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('breakdown-enabled (REQ-009)', () => {
+    function makeAttendanceWithBreakdown(
+      date: string,
+      checkInHourUTC: number,
+      durationHours: number,
+      breakdown: {
+        horasOrdinariasDiurnas: number;
+        horasOrdinariasNocturnas: number;
+        horasExtraDiurnas: number;
+        horasExtraNocturnas: number;
+        totalHoras: number;
+        esDominical?: boolean;
+        esFestivo?: boolean;
+        esDiaLaboral?: boolean;
+      },
+    ): AttendanceReaderRecord {
+      const checkIn = new Date(`${date}T${String(checkInHourUTC).padStart(2, '0')}:00:00Z`);
+      const checkOut = new Date(checkIn.getTime() + durationHours * 3600_000);
+      return {
+        id: `att-${date}`,
+        operarioId: 'O1',
+        zoneId: 'Z1',
+        date,
+        checkInCapturedAt: checkIn,
+        checkOutCapturedAt: checkOut,
+        completedAt: checkOut,
+        breakdown: {
+          horasOrdinariasDiurnas: new Decimal(breakdown.horasOrdinariasDiurnas),
+          horasOrdinariasNocturnas: new Decimal(breakdown.horasOrdinariasNocturnas),
+          horasExtraDiurnas: new Decimal(breakdown.horasExtraDiurnas),
+          horasExtraNocturnas: new Decimal(breakdown.horasExtraNocturnas),
+          totalHoras: new Decimal(breakdown.totalHoras),
+          esDominical: breakdown.esDominical ?? false,
+          esFestivo: breakdown.esFestivo ?? false,
+          esDiaLaboral: breakdown.esDiaLaboral ?? true,
+        },
+      };
+    }
+
+    it('BREAK-01 — breakdown enabled aggregates categories from all attendances', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const attendances = [
+        makeAttendanceWithBreakdown('2026-05-01', 7, 8, {
+          horasOrdinariasDiurnas: 7.5,
+          horasOrdinariasNocturnas: 0,
+          horasExtraDiurnas: 0.5,
+          horasExtraNocturnas: 0,
+          totalHoras: 8,
+        }),
+        makeAttendanceWithBreakdown('2026-05-02', 7, 9.5, {
+          horasOrdinariasDiurnas: 5,
+          horasOrdinariasNocturnas: 3,
+          horasExtraDiurnas: 1.5,
+          horasExtraNocturnas: 0,
+          totalHoras: 9.5,
+        }),
+      ];
+
+      const result = useCase.execute({
+        attendances,
+        policyTimeline: policies,
+        breakdownEnabled: true,
+      });
+
+      // Aggregated breakdown categories
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown!.horasOrdinariasDiurnas.toNumber()).toBeCloseTo(12.5, 2); // 7.5 + 5
+      expect(result.breakdown!.horasOrdinariasNocturnas.toNumber()).toBeCloseTo(3, 2); // 0 + 3
+      expect(result.breakdown!.horasExtraDiurnas.toNumber()).toBeCloseTo(2, 2); // 0.5 + 1.5
+      expect(result.breakdown!.horasExtraNocturnas.toNumber()).toBeCloseTo(0, 2);
+      expect(result.breakdown!.horasDominicalesFestivas.toNumber()).toBeCloseTo(0, 2);
+    });
+
+    it('BREAK-02 — breakdown enabled with Sunday adds horasDominicalesFestivas', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const attendances = [
+        makeAttendanceWithBreakdown('2026-05-04', 7, 7.5, {
+          horasOrdinariasDiurnas: 7.5,
+          horasOrdinariasNocturnas: 0,
+          horasExtraDiurnas: 0,
+          horasExtraNocturnas: 0,
+          totalHoras: 7.5,
+          esDominical: true,
+          esDiaLaboral: false,
+        }),
+      ];
+
+      const result = useCase.execute({
+        attendances,
+        policyTimeline: policies,
+        breakdownEnabled: true,
+      });
+
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown!.horasDominicalesFestivas.toNumber()).toBeCloseTo(7.5, 2);
+      expect(result.breakdown!.horasOrdinariasDiurnas.toNumber()).toBeCloseTo(7.5, 2);
+    });
+
+    it('BREAK-03 — breakdown disabled falls back to legacy calculation', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const att = makeAttendance('2026-05-01', 7, 8.5);
+
+      const result = useCase.execute({
+        attendances: [att],
+        policyTimeline: policies,
+        breakdownEnabled: false,
+      });
+
+      // Legacy behavior: horasReales computed from timestamps
+      expect(result.perDay[0].horasReales.toNumber()).toBe(8.5);
+      expect(result.perDay[0].delta.toNumber()).toBe(0.5);
+      expect(result.breakdown).toBeUndefined();
+    });
+
+    it('BREAK-04 — mixed: attendances without breakdown fall back individually, others aggregated', () => {
+      // One attendance WITH breakdown (1h overtime), one WITHOUT (0h overtime)
+      const policies = [makePolicy('2026-01-01', 8)];
+      const withBreakdown = makeAttendanceWithBreakdown('2026-05-01', 7, 9, {
+        horasOrdinariasDiurnas: 7,
+        horasOrdinariasNocturnas: 0,
+        horasExtraDiurnas: 1,
+        horasExtraNocturnas: 0,
+        totalHoras: 8,
+      });
+      const withoutBreakdown = makeAttendance('2026-05-02', 7, 8); // no breakdown field: 8h shift = delta 0
+
+      const result = useCase.execute({
+        attendances: [withBreakdown, withoutBreakdown],
+        policyTimeline: policies,
+        breakdownEnabled: true,
+      });
+
+      // Only the first attendance's breakdown is aggregated
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown!.horasOrdinariasDiurnas.toNumber()).toBeCloseTo(7, 2);
+      expect(result.breakdown!.horasExtraDiurnas.toNumber()).toBeCloseTo(1, 2);
+      // Core balance: both attendances counted
+      // First: 9h raw, 8h net (breakdown) vs 8h policy → delta 0
+      // Second: 8h raw, no breakdown → 8h vs 8h policy → delta 0
+      expect(result.perDay).toHaveLength(2);
+      expect(result.creditos.toNumber()).toBe(0);
+    });
+
+    it('BREAK-05 — surcharge rates can be passed without valorHora (C-13: monetary not used)', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const attendances = [
+        makeAttendanceWithBreakdown('2026-05-01', 7, 10.5, {
+          horasOrdinariasDiurnas: 7.5,
+          horasOrdinariasNocturnas: 2,
+          horasExtraDiurnas: 1,
+          horasExtraNocturnas: 0,
+          totalHoras: 10.5,
+        }),
+      ];
+
+      const result = useCase.execute({
+        attendances,
+        policyTimeline: policies,
+        breakdownEnabled: true,
+        surchargeRates: {
+          RECARGO_NOCTURNO: new Decimal(35),
+          HORA_EXTRA_DIURNA: new Decimal(25),
+          HORA_EXTRA_NOCTURNA: new Decimal(75),
+          RECARGO_DOMINICAL_FESTIVO: new Decimal(90),
+        },
+      });
+
+      // C-13: valor monetario no se usara — valorRecargos is no longer computed.
+      // The category breakdown is still available for display.
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown!.horasOrdinariasNocturnas.toNumber()).toBeCloseTo(2, 2);
+      expect(result.breakdown!.horasExtraDiurnas.toNumber()).toBeCloseTo(1, 2);
+    });
+
+    // C-13: valor monetario removido — valorRecargos no se usara
+
+    it('BREAK-06 — breakdown enabled but no breakdown data → breakdown undefined', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const att = makeAttendance('2026-05-01', 7, 8);
+
+      const result = useCase.execute({
+        attendances: [att],
+        policyTimeline: policies,
+        breakdownEnabled: true,
+      });
+
+      expect(result.breakdown).toBeUndefined();
+      // Legacy perDay is still computed
+      expect(result.perDay).toHaveLength(1);
+    });
+
+    it('BREAK-07 — breakdown disabled ignores all new params (backward compat)', () => {
+      const policies = [makePolicy('2026-01-01', 8)];
+      const att = makeAttendance('2026-05-01', 7, 8.5);
+
+      // Pass new params but flag OFF
+      const result = useCase.execute({
+        attendances: [att],
+        policyTimeline: policies,
+        breakdownEnabled: false,
+      });
+
+      expect(result.breakdown).toBeUndefined();
+      expect(result.perDay[0].horasReales.toNumber()).toBe(8.5);
+    });
   });
 });

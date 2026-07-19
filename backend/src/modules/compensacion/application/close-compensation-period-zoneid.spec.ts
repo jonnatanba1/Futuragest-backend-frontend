@@ -76,6 +76,9 @@ function makePolicyRepo(): jest.Mocked<JornadaPolicyRepositoryPort> {
     ]),
     create: jest.fn(),
     findLatestBefore: jest.fn(),
+    delete: jest.fn(),
+    findByScope: jest.fn().mockResolvedValue([]),
+    existsByOperarioZoneVigente: jest.fn().mockResolvedValue(false),
   };
 }
 

@@ -10,15 +10,38 @@
  * from the asistencia domain port.
  */
 
+import type { Decimal } from '@prisma/client/runtime/client';
+
 export const ATTENDANCE_READER_PORT = Symbol('AttendanceReaderPort');
+
+/**
+ * Optional breakdown data attached to an attendance record.
+ * When present, enables category-based aggregation in CalculatePeriodBalanceUseCase
+ * instead of the legacy raw-duration (horasReales) calculation.
+ */
+export interface AttendanceBreakdownData {
+  horasOrdinariasDiurnas: Decimal;
+  horasOrdinariasNocturnas: Decimal;
+  horasExtraDiurnas: Decimal;
+  horasExtraNocturnas: Decimal;
+  totalHoras: Decimal;
+  esDominical: boolean;
+  esFestivo: boolean;
+  esDiaLaboral: boolean;
+}
 
 export interface AttendanceReaderRecord {
   id: string;
   operarioId: string;
+  /** Zone where this attendance was recorded. Required for scope-aware policy resolution.
+   *  Undefined only in test fixtures; production records always have a zone. */
+  zoneId?: string | null;
   date: string; // YYYY-MM-DD Colombia local
   checkInCapturedAt: Date;
   checkOutCapturedAt: Date | null;
   completedAt: Date | null;
+  /** When present, enables category-based breakdown aggregation (REQ-009). */
+  breakdown?: AttendanceBreakdownData | null;
 }
 
 export interface AttendanceReaderPort {

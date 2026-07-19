@@ -4,6 +4,7 @@ import { ChangePasswordPage } from '../features/auth/ChangePasswordPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AppShellLayout } from '../features/shell/AppShellLayout';
+import { ConfigLayout } from '../features/config/ConfigLayout';
 import { ADMIN_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../lib/auth/roles';
 import { RequireAuth, RequireAuthAllowChange, RequireGuest } from '../routes/guards';
 
@@ -24,6 +25,19 @@ const AdminPage = lazy(() =>
 );
 const CompensacionPage = lazy(() =>
   import('../features/compensacion/CompensacionPage').then((m) => ({ default: m.CompensacionPage })),
+);
+const ReportesPage = lazy(() =>
+  import('../features/reportes/ReportesPage').then((m) => ({ default: m.ReportesPage })),
+);
+
+const ConfigJornadaPage = lazy(() =>
+  import('../features/config/ConfigJornadaPage').then((m) => ({ default: m.ConfigJornadaPage })),
+);
+const ConfigHolidaysPage = lazy(() =>
+  import('../features/config/ConfigHolidaysPage').then((m) => ({ default: m.ConfigHolidaysPage })),
+);
+const ConfigSurchargesPage = lazy(() =>
+  import('../features/config/ConfigSurchargesPage').then((m) => ({ default: m.ConfigSurchargesPage })),
 );
 
 export function AppRoutes() {
@@ -94,6 +108,45 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        <Route
+          path="reportes"
+          element={
+            <RequireAuth roles={['SYSTEM_ADMIN', 'TALENTO_HUMANO']}>
+              <ReportesPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route path="config" element={<ConfigLayout />}>
+          <Route
+            index
+            element={<Navigate to="jornada" replace />}
+          />
+          <Route
+            path="jornada"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigJornadaPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigHolidaysPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="surcharges"
+            element={
+              <RequireAuth roles={OFFICE_ROLES}>
+                <ConfigSurchargesPage />
+              </RequireAuth>
+            }
+          />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

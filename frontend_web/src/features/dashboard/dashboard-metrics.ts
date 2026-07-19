@@ -316,3 +316,28 @@ export function activeJornadaPolicy(
   }
   return active;
 }
+
+// ── Late arrivals ─────────────────────────────────────────────────────────────
+
+/**
+ * Count attendances on `todayStr` whose check-in time exceeds the policy's
+ * horaInicio + toleranciaMin. Returns 0 when there is no active policy or
+ * no attendances for today.
+ */
+export function lateArrivalsCount(
+  attendances: AttendanceDto[],
+  policy: JornadaPolicyDto | null,
+  todayStr: string,
+): number {
+  if (!policy || !policy.horaInicio) return 0;
+  const [hh, mm] = policy.horaInicio.split(':').map(Number);
+  const limitMinutes = hh * 60 + mm + (policy.toleranciaMin ?? 0);
+  let count = 0;
+  for (const a of attendances) {
+    if (a.date !== todayStr || !a.checkInCapturedAt) continue;
+    const dt = new Date(a.checkInCapturedAt);
+    const checkInMinutes = dt.getHours() * 60 + dt.getMinutes();
+    if (checkInMinutes > limitMinutes) count++;
+  }
+  return count;
+}

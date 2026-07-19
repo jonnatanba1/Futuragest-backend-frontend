@@ -18,6 +18,7 @@
 import type { Attendance, VerificationMethod } from '@prisma/client';
 import type { AttendanceRepositoryPort } from '../domain/ports/attendance-repository.port';
 import type { CompensationDriftMarkerPort } from '../domain/ports/compensation-drift-marker.port';
+import type { AttendanceClassificationPort } from '../domain/ports/attendance-classification.port';
 import {
   AttendanceNotFoundError,
   ImmutableAttendanceError,
@@ -74,6 +75,12 @@ export class CheckOutAttendanceUseCase {
      * Failures are absorbed (try/catch) — drift marking must NEVER fail a check-out.
      */
     private readonly driftMarker?: CompensationDriftMarkerPort,
+    /**
+     * Optional classification port (Fase 2). When provided, a completed check-out
+     * triggers async classification of the shift.
+     * Failures are absorbed — classification must NEVER fail the check-out.
+     */
+    private readonly classifier?: AttendanceClassificationPort,
   ) {}
 
   async execute(input: CheckOutInput): Promise<CheckOutResult> {
@@ -144,6 +151,20 @@ export class CheckOutAttendanceUseCase {
         await this.driftMarker.markDivergedIfClosed(attendance.operarioId, attendance.date);
       } catch {
         // Log is handled by the adapter; swallow here to protect check-out flow.
+      }
+    }
+
+    // 9. Fase 2 — shift classification: calculate and persist breakdown.
+    //    Await is required because ClassifyAttendanceUseCase is request-scoped
+    //    (inherited from ATTENDANCE_REPOSITORY_PORT with ScopeContextHolder).
+    //    Fire-and-forget would race against ALS teardown — the scope context
+    //    is gone by the time the Promise resolves, silently losing the breakdown.
+    //    Failures are absorbed — classification must NEVER fail the check-out.
+    if (this.classifier) {
+      try {
+        await this.classifier.classifyAttendance(record.id);
+      } catch {
+        // Swallow to protect checkout flow.
       }
     }
 

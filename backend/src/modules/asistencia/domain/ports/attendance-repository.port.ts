@@ -8,7 +8,7 @@
  * Writes live inside the same sanctioned file to satisfy the meta-guard.
  */
 
-import type { Attendance, VerificationMethod } from '@prisma/client';
+import type { Attendance, VerificationMethod, AttendanceBreakdown } from '@prisma/client';
 
 export const ATTENDANCE_REPOSITORY_PORT = Symbol('AttendanceRepositoryPort');
 
@@ -79,4 +79,11 @@ export interface AttendanceRepositoryPort {
 
   /** Partial update (check-out fields, checkInPhotoKey, checkOutPhotoKey). */
   update(id: string, data: UpdateAttendanceData): Promise<Attendance>;
+
+  /** Scoped list of completed attendances with breakdowns in a date range. */
+  findManyWithBreakdown?(
+    desde: string,
+    hasta: string,
+    zoneId?: string,
+  ): Promise<(Attendance & { breakdown: AttendanceBreakdown | null })[]>;
 }

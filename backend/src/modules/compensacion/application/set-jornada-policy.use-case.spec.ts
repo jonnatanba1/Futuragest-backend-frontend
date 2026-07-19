@@ -20,6 +20,17 @@ import type { CompensationPeriodLookupPort } from '../domain/ports/compensation-
 function makePolicy(vigenteDesdeStr: string, horasDiarias = 8): JornadaPolicyRecord {
   return {
     id: `pol-${vigenteDesdeStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(horasDiarias * 5),
     horasDiarias: new Decimal(horasDiarias),
     vigenteDesde: new Date(`${vigenteDesdeStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -28,11 +39,15 @@ function makePolicy(vigenteDesdeStr: string, horasDiarias = 8): JornadaPolicyRec
 
 function makePolicyRepo(
   timeline: JornadaPolicyRecord[] = [],
+  exists = false,
 ): jest.Mocked<JornadaPolicyRepositoryPort> {
   return {
     create: jest.fn().mockResolvedValue(makePolicy('2026-07-01')),
     findTimeline: jest.fn().mockResolvedValue(timeline),
     findLatestBefore: jest.fn().mockResolvedValue(null),
+    delete: jest.fn(),
+    findByScope: jest.fn().mockResolvedValue([]),
+    existsByOperarioZoneVigente: jest.fn().mockResolvedValue(exists),
   };
 }
 
@@ -55,7 +70,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-07-01' });
+    const result = await useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result.horasDiarias.toNumber()).toBe(8);
@@ -70,7 +85,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 7.5, vigenteDesde: '2026-01-01' });
+    const result = await useCase.execute({ horasDiarias: 7.5, horasSemanales: 7.5 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-01-01' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result.horasDiarias.toNumber()).toBe(7.5);
@@ -86,7 +101,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-01' }),
+      useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-01' }),
     ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
 
     expect(policyRepo.create).not.toHaveBeenCalled();
@@ -100,7 +115,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-15' }),
+      useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-15' }),
     ).rejects.toThrow(JornadaPolicyOverlapsLiquidatedPeriodError);
   });
 
@@ -112,26 +127,111 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
-    const result = await useCase.execute({ horasDiarias: 8, vigenteDesde: '2026-05-16' });
+    const result = await useCase.execute({ horasDiarias: 8, horasSemanales: 8 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-05-16' });
 
     expect(policyRepo.create).toHaveBeenCalledTimes(1);
     expect(result).toBeDefined();
   });
 
-  // ── SJP-03 — Duplicate vigenteDesde ──────────────────────────────────────
+  // ── SJP-03 — Duplicate vigenteDesde (scope-aware) ──────────────────────
 
-  it('SJP-03 — duplicate vigenteDesde → DuplicateEffectiveDateError before hitting DB', async () => {
-    const existing = makePolicy('2026-07-01', 8);
-    const policyRepo = makePolicyRepo([existing]);
+  it('SJP-03 — duplicate vigenteDesde (GLOBAL) → DuplicateEffectiveDateError before hitting DB; uses existsByOperarioZoneVigente', async () => {
+    const policyRepo = makePolicyRepo([], /* exists */ true);
     const periodLookup = makePeriodLookupPort(null);
 
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 9, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 9, horasSemanales: 9 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyDuplicateEffectiveDateError);
 
+    // The new scope-aware check must be used (replaces findTimeline + .find)
+    expect(policyRepo.existsByOperarioZoneVigente).toHaveBeenCalledTimes(1);
+    const [op, zone, date] = policyRepo.existsByOperarioZoneVigente.mock.calls[0];
+    expect(op).toBeNull();
+    expect(zone).toBeNull();
+    expect(date.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    // The legacy findTimeline path must NOT be used for duplicate detection
+    expect(policyRepo.findTimeline).not.toHaveBeenCalled();
     expect(policyRepo.create).not.toHaveBeenCalled();
+  });
+
+  // ── T3 — scope-aware duplicate matrix (R1.4) ──────────────────────────
+
+  it('T3-1 — two per-zone policies same date, DIFFERENT zones → both succeed', async () => {
+    // First zone insert
+    const policyRepo1 = makePolicyRepo([], false);
+    policyRepo1.create.mockResolvedValue(makePolicy('2026-07-01'));
+    const useCase1 = new SetJornadaPolicyUseCase(policyRepo1, makePeriodLookupPort(null));
+    await useCase1.execute({
+      horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+      diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01', zoneId: 'zona-norte',
+    });
+    expect(policyRepo1.create).toHaveBeenCalledTimes(1);
+    expect(policyRepo1.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, 'zona-norte', expect.any(Date));
+
+    // Second zone insert — same date, different zone, also succeeds
+    const policyRepo2 = makePolicyRepo([], false);
+    policyRepo2.create.mockResolvedValue(makePolicy('2026-07-01'));
+    const useCase2 = new SetJornadaPolicyUseCase(policyRepo2, makePeriodLookupPort(null));
+    await useCase2.execute({
+      horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+      diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01', zoneId: 'zona-sur',
+    });
+    expect(policyRepo2.create).toHaveBeenCalledTimes(1);
+    expect(policyRepo2.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, 'zona-sur', expect.any(Date));
+  });
+
+  it('T3-2 — same zone, same date → second throws JornadaPolicyDuplicateEffectiveDateError with per-zone message', async () => {
+    const policyRepo = makePolicyRepo([], /* exists */ true);
+    const useCase = new SetJornadaPolicyUseCase(policyRepo, makePeriodLookupPort(null));
+
+    await expect(
+      useCase.execute({
+        horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+        diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01', zoneId: 'zona-norte',
+      }),
+    ).rejects.toThrow(JornadaPolicyDuplicateEffectiveDateError);
+
+    expect(policyRepo.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, 'zona-norte', expect.any(Date));
+    expect(policyRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('T3-3 — two GLOBAL policies same date → second throws', async () => {
+    const policyRepo = makePolicyRepo([], /* exists */ true);
+    const useCase = new SetJornadaPolicyUseCase(policyRepo, makePeriodLookupPort(null));
+
+    await expect(
+      useCase.execute({
+        horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+        diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01',
+      }),
+    ).rejects.toThrow(JornadaPolicyDuplicateEffectiveDateError);
+
+    expect(policyRepo.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, null, expect.any(Date));
+  });
+
+  it('T3-4 — per-zone same date as existing global → both succeed (different scopes)', async () => {
+    // global insert passes (no existing global)
+    const globalRepo = makePolicyRepo([], false);
+    globalRepo.create.mockResolvedValue(makePolicy('2026-07-01'));
+    const globalUse = new SetJornadaPolicyUseCase(globalRepo, makePeriodLookupPort(null));
+    await globalUse.execute({
+      horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+      diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01',
+    });
+    expect(globalRepo.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, null, expect.any(Date));
+
+    // per-zone insert same date — duplicate check is scope-aware, still resolves to no dup
+    const zoneRepo = makePolicyRepo([], false);
+    zoneRepo.create.mockResolvedValue(makePolicy('2026-07-01'));
+    const zoneUse = new SetJornadaPolicyUseCase(zoneRepo, makePeriodLookupPort(null));
+    await zoneUse.execute({
+      horasDiarias: 8, horasSemanales: 40, horaInicio: "06:00", horaFin: "14:00",
+      diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01', zoneId: 'zona-norte',
+    });
+    expect(zoneRepo.existsByOperarioZoneVigente).toHaveBeenCalledWith(null, 'zona-norte', expect.any(Date));
+    expect(zoneRepo.create).toHaveBeenCalledTimes(1);
   });
 
   // ── SJP-04 — horasDiarias range validation ───────────────────────────────
@@ -142,7 +242,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 0, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 0, horasSemanales: 0 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyInvalidHorasError);
   });
 
@@ -152,7 +252,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
     await expect(
-      useCase.execute({ horasDiarias: 24.01, vigenteDesde: '2026-07-01' }),
+      useCase.execute({ horasDiarias: 24.01, horasSemanales: 24.01 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' }),
     ).rejects.toThrow(JornadaPolicyInvalidHorasError);
   });
 
@@ -163,7 +263,7 @@ describe('SetJornadaPolicyUseCase', () => {
     const periodLookup = makePeriodLookupPort(null);
     const useCase = new SetJornadaPolicyUseCase(policyRepo, periodLookup);
 
-    const result = await useCase.execute({ horasDiarias: 7.5, vigenteDesde: '2026-07-01' });
+    const result = await useCase.execute({ horasDiarias: 7.5, horasSemanales: 7.5 * 5, horaInicio: "06:00", horaFin: "14:00", diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' });
 
     expect(result.horasDiarias.toNumber()).toBe(7.5);
   });

@@ -13,13 +13,18 @@ import type { VerificationMethod } from './asistencia';
 
 export type NovedadStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+export type TipoNovedad = 'HORAS_EXTRA' | 'LLEGADA_TARDE';
+
 export interface NovedadDto {
   id: string;
   attendanceId: string;
   supervisorId: string;
   zoneId: string;
+  tipoNovedad: TipoNovedad;
   /** Overtime hours. Prisma Decimal serialized as string — parse as decimal in Flutter, NOT double. */
   horasExtra: string;
+  /** Minutes late. Only present when tipoNovedad = LLEGADA_TARDE. */
+  minutosTarde: number | null;
   motivo: string | null;
   status: NovedadStatus;
   /** Optional idempotency token for offline sync. Null when not provided at creation. */
@@ -33,8 +38,21 @@ export interface NovedadDto {
    * Audit trail only — no authorization gate depends on this value.
    */
   decisionVerification: VerificationMethod | null;
+  /**
+   * Optional reason provided by the líder when REJECTING the novedad.
+   * Captured from a dialog in the Flutter app or web modal. Null when APPROVED or PENDING.
+   */
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Enriched: operario full name (resolved from attendanceId at query time). */
+  operarioName?: string;
+  /** Enriched: operario documento (resolved from attendanceId at query time). */
+  operarioDocumento?: string;
+  /** Enriched: supervisor email (resolved from supervisorId at query time). */
+  supervisorEmail?: string;
+  /** Enriched: zone name (resolved from zoneId at query time). */
+  zoneName?: string;
 }
 
 export interface CreateNovedadDto {
@@ -53,4 +71,9 @@ export interface ApproveRejectNovedadDto {
    * Absent = web admin (no biometrics).
    */
   verification?: VerificationMethod;
+  /**
+   * Optional reason provided by the líder when REJECTING the novedad.
+   * Free-text, captured from a dialog in the Flutter app or web modal.
+   */
+  reason?: string;
 }

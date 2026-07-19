@@ -21,6 +21,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   HttpStatus,
   Inject,
@@ -33,14 +34,16 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiProperty } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiProperty, ApiQuery } from '@nestjs/swagger';
 import {
-  IsNumber as IsNumberValidator,
+  IsNumber,
   Max,
   Min,
-  Matches as MatchesValidator,
+  Matches,
   IsOptional,
   IsEnum,
+  IsString,
+  IsArray,
 } from 'class-validator';
 import type { Request, Response } from 'express';
 import { Roles } from '../../iam/interface/roles.decorator';
@@ -52,6 +55,10 @@ import type { GetPeriodPayoutUseCase, PeriodPayout } from '../application/get-pe
 import type { ConfirmPeriodPayoutUseCase, ConfirmedPayout } from '../application/confirm-period-payout.use-case';
 import type { PeriodBalance } from '../domain/period-balance.vo';
 import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import {
+  JORNADA_POLICY_REPOSITORY_PORT,
+  type JornadaPolicyRepositoryPort,
+} from '../domain/ports/jornada-policy-repository.port';
 import type {
   CompensationPeriodRecord,
   CompensationDisposition,
@@ -76,6 +83,7 @@ import {
   JornadaPolicyResponseDto,
   CompensationPeriodResponseDto,
   DayBreakdownDto,
+  CategoryBreakdownDto,
   PeriodPayoutResponseDto,
 } from './response-dtos';
 
@@ -122,14 +130,58 @@ const PAYOUT_ROLES = ['TALENTO_HUMANO', 'SYSTEM_ADMIN'] as const;
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export class SetJornadaPolicyBody {
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  operarioId?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  zoneId?: string | null;
+
+  @ApiProperty({ example: '07:00' })
+  @IsString()
+  horaInicio!: string;
+
+  @ApiProperty({ example: '17:00' })
+  @IsString()
+  horaFin!: string;
+
+  @ApiProperty({ isArray: true, type: Number })
+  @IsArray()
+  diasLaborales!: number[];
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  almuerzoInicio?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  almuerzoFin?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  desayunoInicio?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  desayunoFin?: string | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  toleranciaMin?: number;
+
   @ApiProperty({ description: 'Daily work hours [0.5, 24]', example: 8 })
-  @IsNumberValidator()
+  @IsNumber()
   @Min(0.5)
   @Max(24)
   horasDiarias!: number;
 
+  @ApiProperty({ description: 'Weekly work hours', example: 40 })
+  @IsNumber()
+  horasSemanales!: number;
+
   @ApiProperty({ description: 'Effective date — YYYY-MM-DD Colombia local', example: '2026-07-01' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'vigenteDesde debe tener el formato YYYY-MM-DD',
   })
   vigenteDesde!: string;
@@ -137,11 +189,11 @@ export class SetJornadaPolicyBody {
 
 export class CloseFortnightBody {
   @ApiProperty({ description: 'Fortnight start — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-01' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener el formato YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener el formato YYYY-MM-DD' })
   desde!: string;
 
   @ApiProperty({ description: 'Fortnight end — YYYY-MM-DD Colombia local (inclusive)', example: '2026-05-15' })
-  @MatchesValidator(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener el formato YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener el formato YYYY-MM-DD' })
   hasta!: string;
 
   @ApiProperty({
@@ -219,9 +271,20 @@ function serializeBalance(
   const breakdown: DayBreakdownDto[] = balance.perDay.map((day) => ({
     date: day.date,
     horasReales: day.horasReales.toString(),
+    horasTrabajadas: day.horasTrabajadas?.toString(),
     jornadaHoras: day.jornadaHoras.toString(),
     delta: day.delta.toString(),
   }));
+
+  const categoryBreakdown: CategoryBreakdownDto | undefined = balance.breakdown
+    ? {
+        horasOrdinariasDiurnas: balance.breakdown.horasOrdinariasDiurnas.toString(),
+        horasOrdinariasNocturnas: balance.breakdown.horasOrdinariasNocturnas.toString(),
+        horasExtraDiurnas: balance.breakdown.horasExtraDiurnas.toString(),
+        horasExtraNocturnas: balance.breakdown.horasExtraNocturnas.toString(),
+        horasDominicalesFestivas: balance.breakdown.horasDominicalesFestivas.toString(),
+      }
+    : undefined;
 
   return {
     operarioId,
@@ -232,13 +295,30 @@ function serializeBalance(
     carryIn: balance.carryIn.toString(),
     saldoHoras: balance.saldo.toString(),
     breakdown,
+    isClosed: balance.isClosed,
+    disposition: balance.disposition,
+    paidAt: balance.paidAt?.toISOString() ?? null,
+    payoutRef: balance.payoutRef,
+    divergedAt: balance.divergedAt?.toISOString() ?? null,
+    categoryBreakdown,
   };
 }
 
 function serializePolicy(policy: JornadaPolicyRecord): JornadaPolicyResponseDto {
   return {
     id: policy.id,
+    operarioId: policy.operarioId,
+    zoneId: policy.zoneId,
+    horaInicio: policy.horaInicio,
+    horaFin: policy.horaFin,
+    diasLaborales: policy.diasLaborales,
+    almuerzoInicio: policy.almuerzoInicio,
+    almuerzoFin: policy.almuerzoFin,
+    desayunoInicio: policy.desayunoInicio,
+    desayunoFin: policy.desayunoFin,
+    toleranciaMin: policy.toleranciaMin,
     horasDiarias: policy.horasDiarias.toString(),
+    horasSemanales: policy.horasSemanales.toString(),
     vigenteDesde: policy.vigenteDesde.toISOString(),
     createdAt: policy.createdAt.toISOString(),
   };
@@ -290,7 +370,7 @@ function serializePayout(
 // Body DTO for confirm-payout endpoint
 export class ConfirmPayoutBody {
   @ApiProperty({ description: 'Canonical fortnight identifier e.g. "2026-05-Q1"', example: '2026-05-Q1' })
-  @MatchesValidator(/^\d{4}-\d{2}-Q[12]$/, {
+  @Matches(/^\d{4}-\d{2}-Q[12]$/, {
     message: 'periodKey debe tener el formato YYYY-MM-Q1 o YYYY-MM-Q2',
   })
   periodKey!: string;
@@ -305,6 +385,8 @@ export class CompensacionController {
     private readonly setJornadaPolicyUseCase: Pick<SetJornadaPolicyUseCase, 'execute'>,
     @Inject(GET_JORNADA_POLICY_TIMELINE_USE_CASE)
     private readonly getTimelineUseCase: Pick<GetJornadaPolicyTimelineUseCase, 'execute'>,
+    @Inject(JORNADA_POLICY_REPOSITORY_PORT)
+    private readonly policyRepo: JornadaPolicyRepositoryPort,
     @Inject(CLOSE_COMPENSATION_PERIOD_USE_CASE)
     private readonly closeUseCase: Pick<CloseCompensationPeriodUseCase, 'execute'>,
     @Inject(GET_PERIOD_PAYOUT_USE_CASE)
@@ -323,6 +405,7 @@ export class CompensacionController {
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
     @Res({ passthrough: true }) res: Response,
+    @Query('enhanced') enhanced?: string,
   ): Promise<PeriodBalanceResponseDto> {
     // Validate date query params
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -335,8 +418,10 @@ export class CompensacionController {
       throw new BadRequestException('"desde" no puede ser posterior a "hasta"');
     }
 
+    const breakdownEnabled = enhanced === 'true';
+
     try {
-      const balance = await this.getBalanceUseCase.execute({ operarioId, desde, hasta });
+      const balance = await this.getBalanceUseCase.execute({ operarioId, desde, hasta, breakdownEnabled });
       res.status(HttpStatus.OK);
       return serializeBalance(operarioId, desde, hasta, balance);
     } catch (err) {
@@ -354,10 +439,7 @@ export class CompensacionController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JornadaPolicyResponseDto> {
     try {
-      const policy = await this.setJornadaPolicyUseCase.execute({
-        horasDiarias: body.horasDiarias,
-        vigenteDesde: body.vigenteDesde,
-      });
+      const policy = await this.setJornadaPolicyUseCase.execute(body);
       res.status(HttpStatus.CREATED);
       return serializePolicy(policy);
     } catch (err) {
@@ -366,13 +448,54 @@ export class CompensacionController {
   }
 
   // ── GET /jornada-policy ───────────────────────────────────────────────────
+  //
+  // R1.5 (T5): optional query params filter the timeline:
+  //   ?zoneId=z1     → policies for that zone (equals "z1")
+  //   ?zoneId=        → global-only policies (IS NULL)
+  //   ?operarioId=o1  → policies for that operario
+  //   (no params)     → all policies (backward-compatible, unfiltered)
+  //
+  // Normalization rule (controller is the SOLE place that distinguishes the
+  // empty-string-from-query from absent):
+  //   absent (undefined)    → pass `undefined` (no filter on that field)
+  //   empty string ""        → pass `null`        (global / IS NULL)
+  //   non-empty string       → pass the string    (scoped to that value)
+  // When BOTH fields are absent, call execute() with NO opts (not an empty
+  // object) so the use case uses findTimeline().
 
   @Roles(...READ_ROLES)
   @Get('jornada-policy')
   @ApiOkResponse({ type: JornadaPolicyResponseDto, isArray: true })
-  async getJornadaPolicyTimeline(): Promise<JornadaPolicyResponseDto[]> {
-    const timeline = await this.getTimelineUseCase.execute();
+  @ApiQuery({ name: 'zoneId', required: false, type: String, description: 'Filter by zone. Empty string => global-only (IS NULL).' })
+  @ApiQuery({ name: 'operarioId', required: false, type: String, description: 'Filter by operario.' })
+  async getJornadaPolicyTimeline(
+    @Query('zoneId') zoneId?: string,
+    @Query('operarioId') operarioId?: string,
+  ): Promise<JornadaPolicyResponseDto[]> {
+    // Preserve ABSENT (undefined) vs EMPTY STRING (global) semantics.
+    const hasZoneFilter = zoneId !== undefined;
+    const hasOperarioFilter = operarioId !== undefined;
+
+    if (!hasZoneFilter && !hasOperarioFilter) {
+      const timeline = await this.getTimelineUseCase.execute();
+      return timeline.map(serializePolicy);
+    }
+
+    const opts: { zoneId?: string | null; operarioId?: string | null } = {};
+    if (hasZoneFilter) opts.zoneId = zoneId === '' ? null : zoneId!;
+    if (hasOperarioFilter) opts.operarioId = operarioId === '' ? null : operarioId!;
+
+    const timeline = await this.getTimelineUseCase.execute(opts);
     return timeline.map(serializePolicy);
+  }
+
+  // ── DELETE /jornada-policy/:id ──────────────────────────────────────────────
+
+  @Roles(...WRITE_POLICY_ROLES)
+  @Delete('jornada-policy/:id')
+  @ApiOkResponse({ description: 'Elimina una política de jornada' })
+  async deleteJornadaPolicy(@Param('id') id: string): Promise<void> {
+    await this.policyRepo.delete(id);
   }
 
   // ── POST /compensacion/:operarioId/close ─────────────────────────────────

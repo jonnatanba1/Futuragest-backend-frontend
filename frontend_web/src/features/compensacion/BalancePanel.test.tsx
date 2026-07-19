@@ -13,8 +13,10 @@ const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
 const { useBalanceQueryMock } = vi.hoisted(() => ({ useBalanceQueryMock: vi.fn() }));
+const { useEnhancedBalanceQueryMock } = vi.hoisted(() => ({ useEnhancedBalanceQueryMock: vi.fn() }));
 vi.mock('./compensacion-queries', () => ({
   useBalanceQuery: useBalanceQueryMock,
+  useEnhancedBalanceQuery: useEnhancedBalanceQueryMock,
   useClosePeriodMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePayoutQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
   useConfirmPayoutMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -58,6 +60,7 @@ function defaultSetup(role = 'TALENTO_HUMANO') {
   useAuthMock.mockReturnValue({ user: { id: 'u', email: 'a@b.co', role } });
   useOperariosMock.mockReturnValue({ data: OPERARIOS, isLoading: false });
   useBalanceQueryMock.mockReturnValue({ data: BALANCE, isLoading: false, isError: false, error: null });
+  useEnhancedBalanceQueryMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
 }
 
 function renderPanel() {
@@ -162,12 +165,11 @@ describe('BalancePanel', () => {
     expect(calls[0][0]).toBeNull();
   });
 
-  // Operario select populates options from useOperarios
-  it('renders operario options from useOperarios hook', () => {
+  // Renders search text input
+  it('renders search input for filtering operarios', () => {
     defaultSetup();
     renderPanel();
-    // The select should exist (searchable Select renders an input)
-    expect(screen.getByPlaceholderText(/operario/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/buscar por nombre o documento/i)).toBeInTheDocument();
   });
 
   // CLO-1: Close button hidden for read-only roles
@@ -195,14 +197,15 @@ describe('BalancePanel', () => {
   it('shows the close period button for TALENTO_HUMANO once an operario is selected', async () => {
     const user = userEvent.setup();
     defaultSetup('TALENTO_HUMANO');
+    // Start with undefined balance query data so the master table is rendered
+    useBalanceQueryMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
     renderPanel();
 
-    // Select an operario: click the combobox input, then pick the first option
-    const combobox = screen.getByPlaceholderText(/operario/i);
-    await user.click(combobox);
-    // Mantine renders options with the operario name — click "Ana García"
-    const option = await screen.findByText('Ana García');
-    await user.click(option);
+    // Select an operario by clicking "Ver detalle" on their row
+    const verDetalleBtn = screen.getAllByRole('button', { name: /ver detalle/i })[0];
+    // Mock the query to return BALANCE when detail view is loaded
+    useBalanceQueryMock.mockReturnValue({ data: BALANCE, isLoading: false, isError: false, error: null });
+    await user.click(verDetalleBtn);
 
     // Now operarioId is set and balance.data is mocked → button must be present
     await waitFor(() =>

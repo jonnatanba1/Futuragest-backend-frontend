@@ -21,6 +21,8 @@ const ACTIVE_OP = {
   cargo: 'Barrido',
   active: true,
   deactivatedAt: null,
+  areaId: null,
+  areaName: null,
   createdAt: '2025-01-15T00:00:00Z',
   updatedAt: '',
 };

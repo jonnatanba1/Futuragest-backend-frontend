@@ -44,6 +44,7 @@ export interface ProvisionManagementUserInput {
   email: string;
   password: string;
   role: Role;
+  displayName?: string;
 }
 
 export interface ProvisionManagementUserOutput {
@@ -87,6 +88,7 @@ export class ProvisionManagementUserUseCase {
       email: input.email,
       passwordHash,
       role: input.role,
+      displayName: input.displayName,
     });
   }
 }

@@ -42,7 +42,10 @@ import {
   ClientRefConflictError,
 } from '../domain/compensacion.errors';
 import type { PeriodBalance } from '../domain/period-balance.vo';
-import type { JornadaPolicyRecord } from '../domain/ports/jornada-policy-repository.port';
+import {
+  JORNADA_POLICY_REPOSITORY_PORT,
+  type JornadaPolicyRecord
+} from '../domain/ports/jornada-policy-repository.port';
 import type { CompensationPeriodRecord } from '../domain/ports/compensation-period-repository.port';
 import { AuthGuard } from '../../auth/interface/auth.guard';
 import { RolesGuard } from '../../iam/interface/roles.guard';
@@ -78,9 +81,20 @@ function makeBalance(saldo: number): PeriodBalance {
   };
 }
 
-function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
+function makePolicy(dateStr: string, hours: number, scope: { operarioId?: string | null; zoneId?: string | null } = {}): JornadaPolicyRecord {
   return {
     id: `pol-${dateStr}`,
+    operarioId: scope.operarioId ?? null,
+    zoneId: scope.zoneId ?? null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(hours * 5),
     horasDiarias: new Decimal(hours),
     vigenteDesde: new Date(`${dateStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -140,6 +154,7 @@ describe('CompensacionController', () => {
         { provide: CLOSE_COMPENSATION_PERIOD_USE_CASE, useValue: { execute: mockClosePeriod } },
         { provide: GET_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockPayout } },
         { provide: CONFIRM_PERIOD_PAYOUT_USE_CASE, useValue: { execute: mockConfirmPayout } },
+        { provide: JORNADA_POLICY_REPOSITORY_PORT, useValue: { findLatestBefore: jest.fn(), delete: jest.fn() } },
       ],
     })
       .overrideGuard(AuthGuard)
@@ -219,7 +234,7 @@ describe('CompensacionController', () => {
 
       const res = makeRes();
       const result = await controller.setJornadaPolicy(
-        { horasDiarias: 8, vigenteDesde: '2026-07-01' },
+        { horasDiarias: 8, horasSemanales: 40, horaInicio: '06:00', horaFin: '14:00', diasLaborales: [1, 2, 3, 4, 5], vigenteDesde: '2026-07-01' },
         res,
       );
 
@@ -231,15 +246,80 @@ describe('CompensacionController', () => {
   // ── GET /jornada-policy ────────────────────────────────────────────────────
 
   describe('getJornadaPolicyTimeline', () => {
-    it('returns timeline with two policies', async () => {
+    it('returns timeline with two policies (no params → execute called with no opts)', async () => {
       const timeline = [makePolicy('2025-01-01', 8), makePolicy('2026-01-01', 7.5)];
       mockGetTimeline.mockResolvedValue(timeline);
 
-      const result = await controller.getJornadaPolicyTimeline();
+      const result = await controller.getJornadaPolicyTimeline(undefined, undefined);
 
       expect(result).toHaveLength(2);
       expect(result[0].horasDiarias).toBe('8');
       expect(result[1].horasDiarias).toBe('7.5');
+      // The controller must call execute with NO opts (undefined) when no query
+      // params are present — not with an empty object, not with { zoneId: undefined }.
+      expect(mockGetTimeline).toHaveBeenCalledTimes(1);
+      expect(mockGetTimeline).toHaveBeenCalledWith();
+    });
+
+    // ── T5 — R1.5 GET filter query params ───────────────────────────────────
+    //   ?zoneId=z1       → execute({ zoneId: "z1" })   (scoped to that zone)
+    //   ?zoneId=         → execute({ zoneId: null })    (global-only, IS NULL)
+    //   ?operarioId=o1   → execute({ operarioId: "o1" })
+    // Both params absent → execute() with no opts (backward-compat).
+    // The controller is the ONLY place allowed to normalize empty-string → null.
+
+    it('T5(2) — ?zoneId=z1 → execute called with { zoneId: "z1" } (scoped)', async () => {
+      const scoped = [makePolicy('2026-01-01', 8, { zoneId: 'z1' })];
+      mockGetTimeline.mockResolvedValue(scoped);
+
+      const result = await controller.getJornadaPolicyTimeline('z1', undefined);
+
+      // The controller serializes via serializePolicy (new objects). Assert the
+      // serialized shape carries the zoneId and the execute call got the right opts.
+      expect(result).toHaveLength(1);
+      expect(result[0].zoneId).toBe('z1');
+      expect(result[0].horasDiarias).toBe('8');
+      expect(mockGetTimeline).toHaveBeenCalledWith({ zoneId: 'z1' });
+    });
+
+    it('T5(3) — ?zoneId= (empty string) → execute called with { zoneId: null } (global-only)', async () => {
+      const globalOnly = [makePolicy('2026-01-01', 8, { zoneId: null })];
+      mockGetTimeline.mockResolvedValue(globalOnly);
+
+      const result = await controller.getJornadaPolicyTimeline('', undefined);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].zoneId).toBeNull();
+      // Critical: empty string MUST be normalized to null before passing to execute,
+      // so the use case dispatches findByScope({ zoneId: null }) (global-only / IS NULL).
+      expect(mockGetTimeline).toHaveBeenCalledWith({ zoneId: null });
+    });
+
+    it('T5(4) — ?operarioId=o1 → execute called with { operarioId: "o1" }', async () => {
+      const operarioScoped = [makePolicy('2026-01-01', 8, { operarioId: 'o1' })];
+      mockGetTimeline.mockResolvedValue(operarioScoped);
+
+      const result = await controller.getJornadaPolicyTimeline(undefined, 'o1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].operarioId).toBe('o1');
+      expect(mockGetTimeline).toHaveBeenCalledWith({ operarioId: 'o1' });
+    });
+
+    it('T5 — both zoneId=z1 & operarioId=o1 → execute({ zoneId: "z1", operarioId: "o1" })', async () => {
+      mockGetTimeline.mockResolvedValue([]);
+
+      await controller.getJornadaPolicyTimeline('z1', 'o1');
+
+      expect(mockGetTimeline).toHaveBeenCalledWith({ zoneId: 'z1', operarioId: 'o1' });
+    });
+
+    it('T5 — both zoneId= (empty) & operarioId=o1 → execute({ zoneId: null, operarioId: "o1" })', async () => {
+      mockGetTimeline.mockResolvedValue([]);
+
+      await controller.getJornadaPolicyTimeline('', 'o1');
+
+      expect(mockGetTimeline).toHaveBeenCalledWith({ zoneId: null, operarioId: 'o1' });
     });
   });
 

@@ -200,7 +200,6 @@ describe('DashboardPage', () => {
       defaultEmptyOk();
       renderPage();
       expect(screen.getByText('Asistencias por día')).toBeInTheDocument();
-      expect(screen.getByText('Verificación de ingresos')).toBeInTheDocument();
       expect(screen.getByText('Asistencias por zona')).toBeInTheDocument();
       expect(screen.getByText('Novedades en el período')).toBeInTheDocument();
       // "Jornadas abiertas" appears as both KPI label and section title — verify both exist
@@ -219,7 +218,6 @@ describe('DashboardPage', () => {
       // "Jornadas abiertas" appears as KPI label and section title — use getAllByText
       expect(screen.getAllByText('Jornadas abiertas').length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText('Novedades pendientes')).toBeInTheDocument();
-      expect(screen.getByText('Verificación con huella')).toBeInTheDocument();
     });
 
     it('shows active operario count', () => {
@@ -337,7 +335,7 @@ describe('DashboardPage', () => {
       zonesMock.mockReturnValue(ok([]));
       renderPage();
       expect(
-        screen.getByText(/Horas extra aprobadas en el período: 4\.0 h/),
+        screen.getByText(/Horas extra aprobadas: 4\.0 h/),
       ).toBeInTheDocument();
     });
   });
@@ -534,11 +532,11 @@ describe('DashboardPage', () => {
   });
 
   describe('empty chart states', () => {
-    it('renders EmptyState for area, verification and zone charts when the period has no attendances', () => {
+    it('renders EmptyState for area and zone charts when the period has no attendances', () => {
       defaultEmptyOk();
       renderPage();
-      // Area chart + verification donut + zones bar chart.
-      expect(screen.getAllByText('Sin asistencias en el período').length).toBeGreaterThanOrEqual(3);
+      // Area chart + zones bar chart.
+      expect(screen.getAllByText('Sin asistencias en el período').length).toBeGreaterThanOrEqual(2);
     });
 
     it('renders EmptyState for novedades donut when there are none in the period', () => {
@@ -546,7 +544,7 @@ describe('DashboardPage', () => {
       renderPage();
       expect(screen.getByText('Sin novedades en el período')).toBeInTheDocument();
       expect(
-        screen.getByText('Horas extra aprobadas en el período: 0 h'),
+        screen.getByText('Horas extra aprobadas: 0 h'),
       ).toBeInTheDocument();
     });
   });

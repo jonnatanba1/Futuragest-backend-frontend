@@ -11,12 +11,24 @@ vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 // Panel dependencies — mocked here so CompensacionPage tests stay focused on page-level behavior
 vi.mock('./compensacion-queries', () => ({
   useBalanceQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useEnhancedBalanceQuery: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
   useJornadaPoliciesQuery: () => ({ data: [], isLoading: false, isError: false, error: null }),
   useCreateJornadaPolicyMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock('../config/config-queries', () => ({
+  useCompensatoryRestQuery: () => ({ data: [], isLoading: false, isError: false }),
+  useScheduleCompensatoryMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 vi.mock('../operarios/operario-queries', () => ({
-  useOperarios: () => ({ data: [], isLoading: false }),
+  useOperarios: () => ({
+    data: [
+      { id: 'op-1', documento: '12345', fullName: 'Carlos Restrepo', active: true },
+    ],
+    isLoading: false,
+  }),
+  useZones: () => ({ data: [], isLoading: false }),
 }));
 
 function setRole(role: string) {
@@ -38,6 +50,12 @@ describe('CompensacionPage', () => {
     setRole('TALENTO_HUMANO');
     renderPage();
     expect(screen.getByRole('tab', { name: /balance y cierre/i })).toBeInTheDocument();
+  });
+
+  it('renders the "Descansos compensatorios" tab label', () => {
+    setRole('TALENTO_HUMANO');
+    renderPage();
+    expect(screen.getByRole('tab', { name: /descansos compensatorios/i })).toBeInTheDocument();
   });
 
   it('renders the "Política de jornada" tab label', () => {

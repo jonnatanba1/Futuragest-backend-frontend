@@ -17,9 +17,10 @@ import * as path from 'path';
 // Load .env from backend/ so DATABASE_URL is available before Prisma client init
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
-import { SupervisorArea } from '@prisma/client';
+import { SupervisorArea, HolidayType, SurchargeCategory } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { createPrismaClient } from '../src/database/prisma-client';
+import { HolidayCalculator } from '../src/modules/jornada/domain/holiday-calculator';
 
 const prisma = createPrismaClient();
 
@@ -160,6 +161,146 @@ async function main() {
     },
   });
   console.log('  SYSTEM_ADMIN: admin@futuragest.co (mustChangePassword: true)');
+
+  // -- 4. Upsert Surcharge Rates (Ley 789/2002, Ley 2466/2025) --
+  const rates = [
+    { category: SurchargeCategory.RECARGO_NOCTURNO, percentage: 0.35, desde: '2000-01-01T00:00:00Z' },
+    { category: SurchargeCategory.HORA_EXTRA_DIURNA, percentage: 0.25, desde: '2000-01-01T00:00:00Z' },
+    { category: SurchargeCategory.HORA_EXTRA_NOCTURNA, percentage: 0.75, desde: '2000-01-01T00:00:00Z' },
+    // Recargo dominical/festivo escalonado:
+    // 80% hasta 30 junio 2026 (Ley 789/2002 Art. 179)
+    { category: SurchargeCategory.RECARGO_DOMINICAL_FESTIVO, percentage: 0.80, desde: '2000-01-01T00:00:00Z' },
+    // 90% desde 1 julio 2026 (Ley 2466/2025)
+    { category: SurchargeCategory.RECARGO_DOMINICAL_FESTIVO, percentage: 0.90, desde: '2026-07-01T00:00:00Z' },
+    // 100% desde 1 julio 2027 (Ley 2466/2025 — segunda etapa)
+    { category: SurchargeCategory.RECARGO_DOMINICAL_FESTIVO, percentage: 1.00, desde: '2027-07-01T00:00:00Z' },
+  ];
+
+  for (const rate of rates) {
+    await prisma.surchargeRate.upsert({
+      where: {
+        category_vigenteDesde: {
+          category: rate.category,
+          vigenteDesde: new Date(rate.desde)
+        }
+      },
+      update: { percentage: rate.percentage },
+      create: {
+        category: rate.category,
+        percentage: rate.percentage,
+        vigenteDesde: new Date(rate.desde),
+        creadoPor: 'SYSTEM'
+      }
+    });
+  }
+  console.log('  Surcharge rates seeded (including 2026 July 90% increase).');
+
+  // -- 5. Upsert Jornada Policies (Global) --
+  // Ley 2101/2021:
+  // - Hasta 2025: 44 horas semanales (8.8h/d)
+  // - 16 Julio 2025: nueva jornada base (37.5h/sem, 7.5h/d, 6:00-14:00)
+  // - 16 Julio 2026: sin cambio (solo marca hito legal, mismo horario)
+  const policies = [
+    {
+      desde: '2024-01-01T00:00:00Z',
+      horasSemanales: 41.5,
+      horasDiarias: 8.3, // 8.8 - 0.5 (desayuno)
+      horaInicio: '07:00',
+      horaFin: '17:00',
+      diasLaborales: [1,2,3,4,5],
+      almuerzoInicio: null,
+      almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
+      toleranciaMin: 5,
+    },
+    {
+      desde: '2025-07-16T00:00:00Z',
+      horasSemanales: 35.00,
+      horasDiarias: 7.00, // 7.50 - 0.5 (desayuno). (6:00-14:00 = 8h gross - 1h lunch - 0.5h breakfast)
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1,2,3,4,5],
+      almuerzoInicio: null, 
+      almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
+      toleranciaMin: 5,
+    },
+    {
+      desde: '2026-07-16T00:00:00Z',
+      horasSemanales: 35.00,
+      horasDiarias: 7.00,
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1,2,3,4,5],
+      almuerzoInicio: null,
+      almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
+      toleranciaMin: 5,
+    },
+  ];
+
+  // Custom manual upsert for policies:
+  for (const p of policies) {
+    const exists = await prisma.jornadaPolicy.findFirst({
+      where: { operarioId: null, zoneId: null, vigenteDesde: new Date(p.desde) }
+    });
+    if (!exists) {
+      await prisma.jornadaPolicy.create({
+        data: {
+          horasSemanales: p.horasSemanales,
+          horasDiarias: p.horasDiarias,
+          horaInicio: p.horaInicio,
+          horaFin: p.horaFin,
+          diasLaborales: p.diasLaborales,
+          almuerzoInicio: p.almuerzoInicio,
+          almuerzoFin: p.almuerzoFin,
+          desayunoInicio: p.desayunoInicio,
+          desayunoFin: p.desayunoFin,
+          toleranciaMin: p.toleranciaMin,
+          vigenteDesde: new Date(p.desde)
+        }
+      });
+    } else {
+      await prisma.jornadaPolicy.update({
+        where: { id: exists.id },
+        data: {
+          horasSemanales: p.horasSemanales,
+          horasDiarias: p.horasDiarias,
+          horaInicio: p.horaInicio,
+          horaFin: p.horaFin,
+          diasLaborales: p.diasLaborales,
+          almuerzoInicio: p.almuerzoInicio,
+          almuerzoFin: p.almuerzoFin,
+          desayunoInicio: p.desayunoInicio,
+          desayunoFin: p.desayunoFin,
+          toleranciaMin: p.toleranciaMin,
+        }
+      });
+    }
+  }
+  console.log('  Jornada policies seeded (6:00-14:00, 7.00h/d, 35.00h/w, lunch/breakfast auto).');
+
+  // -- 6. Upsert Holidays (2025 and 2026) --
+  const yearsToSeed = [2025, 2026];
+  for (const year of yearsToSeed) {
+    const holidays = HolidayCalculator.generateYear(year);
+    for (const holiday of holidays) {
+      await prisma.holiday.upsert({
+        where: { date: holiday.date },
+        update: {},
+        create: {
+          date: holiday.date,
+          name: holiday.name,
+          type: holiday.type,
+          year: holiday.year
+        }
+      });
+    }
+  }
+  console.log(`  Holidays seeded for years ${yearsToSeed.join(', ')}.`);
 
   // -- Summary --
   const zoneCount = await prisma.zone.count();

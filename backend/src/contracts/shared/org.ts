@@ -48,4 +48,6 @@ export interface ProvisionUserDto {
   email: string;
   password: string;
   role: string;
+  /** Optional human-readable display name. Falls back to email when null. */
+  displayName?: string;
 }

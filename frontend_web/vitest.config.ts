@@ -10,7 +10,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@futuragest/contracts': new URL('../packages/contracts/src/index.ts', import.meta.url)
+      '@futuragest/contracts': new URL('./src/contracts/index.ts', import.meta.url)
         .pathname,
     },
   },

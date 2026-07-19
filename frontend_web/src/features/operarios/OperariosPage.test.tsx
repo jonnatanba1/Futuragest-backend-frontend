@@ -20,6 +20,8 @@ const OPS = [
     supervisorId: 's-1',
     cargo: 'Barrido',
     deactivatedAt: null,
+    areaId: null,
+    areaName: null,
     createdAt: '',
     updatedAt: '',
   },
@@ -30,6 +32,8 @@ const OPS = [
     supervisorId: 's-1',
     cargo: '',
     deactivatedAt: '2026-02-01T00:00:00Z',
+    areaId: null,
+    areaName: null,
     createdAt: '',
     updatedAt: '',
   },
@@ -40,6 +44,7 @@ vi.mock('./operario-queries', () => ({
   useSupervisors: () => ({ data: [{ id: 's-1', userId: 'u', municipioId: 'm-1', zoneId: 'z-1', area: 'BARRIDO', email: 's1@futuragest.co', createdAt: '' }] }),
   useZones: () => ({ data: [{ id: 'z-1', name: 'Zona Urabá', createdAt: '', updatedAt: '' }] }),
   useMunicipios: () => ({ data: [{ id: 'm-1', name: 'Turbo', zoneId: 'z-1', createdAt: '', updatedAt: '' }] }),
+  useAreas: () => ({ data: [{ id: 'a-1', name: 'Área Norte', horaInicio: '06:00', horaFin: '14:00', zoneId: 'z-1', createdAt: '', updatedAt: '' }] }),
   useCreateOperario: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeactivateOperario: () => ({ mutateAsync: deactivateMock, isPending: false, variables: undefined }),
   useReactivateOperario: () => ({ mutateAsync: vi.fn(), isPending: false, variables: undefined }),
@@ -82,7 +87,7 @@ describe('OperariosPage', () => {
     setRole('TALENTO_HUMANO');
     const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole('button', { name: /nuevo operario/i })).toBeInTheDocument();
+    // expect(screen.getByRole('button', { name: /nuevo operario/i })).toBeInTheDocument(); // Oculto a pedido del usuario
     expect(screen.getByRole('button', { name: /^importar$/i })).toBeInTheDocument();
     // Action buttons live inside the drawer — open it by clicking the row
     await user.click(screen.getByText('Wilson Palacios'));

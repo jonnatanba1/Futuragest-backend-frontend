@@ -67,4 +67,32 @@ export class NovedadResponseDto {
 
   @ApiProperty({ description: 'ISO 8601 timestamp — delta cursor for ?since= queries' })
   updatedAt!: string;
+
+  @ApiPropertyOptional()
+  operarioName?: string;
+
+  @ApiPropertyOptional()
+  operarioDocumento?: string;
+
+  @ApiPropertyOptional()
+  supervisorEmail?: string;
+
+  @ApiPropertyOptional()
+  zoneName?: string;
+
+  @ApiProperty({
+    description: 'Novelty type: HORAS_EXTRA (supervisor-requested) or LLEGADA_TARDE (auto-generated).',
+    example: 'LLEGADA_TARDE',
+  })
+  tipoNovedad!: string;
+
+  @ApiPropertyOptional({
+    description: 'Minutes late from horaInicio when tipoNovedad = LLEGADA_TARDE.',
+  })
+  minutosTarde?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Reason provided by the líder when REJECTING the novedad.',
+  })
+  rejectionReason?: string | null;
 }

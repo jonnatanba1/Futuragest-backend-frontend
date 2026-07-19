@@ -16,6 +16,7 @@ import {
   REACTIVATE_OPERARIO_USE_CASE,
   BULK_IMPORT_OPERARIOS_USE_CASE,
   CREATE_SUPERVISOR_USE_CASE,
+  UPDATE_SUPERVISOR_USE_CASE,
   REASSIGN_OPERARIO_USE_CASE,
 } from './operario.controller';
 import {
@@ -41,8 +42,11 @@ const sampleDto = {
   fullName: 'Test Worker',
   documento: '12345678',
   supervisorId: 'sup-1',
+  cargo: '',
   active: true,
   deactivatedAt: null,
+  areaId: null,
+  areaName: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -54,6 +58,7 @@ describe('OperarioController', () => {
   let reactivateUseCase: { execute: jest.Mock };
   let bulkImportUseCase: { execute: jest.Mock };
   let createSupervisorUseCase: { execute: jest.Mock };
+  let updateSupervisorUseCase: { execute: jest.Mock };
   let reassignUseCase: { execute: jest.Mock };
 
   const sampleImportResult = { imported: 2, failed: 0, errors: [] };
@@ -64,6 +69,15 @@ describe('OperarioController', () => {
     reactivateUseCase = { execute: jest.fn().mockResolvedValue({ ...sampleDto, active: true, deactivatedAt: null }) };
     bulkImportUseCase = { execute: jest.fn().mockResolvedValue(sampleImportResult) };
     createSupervisorUseCase = { execute: jest.fn().mockResolvedValue({ id: 'sup-1' }) };
+    updateSupervisorUseCase = { execute: jest.fn().mockResolvedValue({
+      id: 'sup-1',
+      userId: 'user-1',
+      municipioId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+      zoneId: 'zone-1',
+      area: 'BARRIDO',
+      user: { email: 'sup@test.co', displayName: null },
+      createdAt: new Date(),
+    }) };
     reassignUseCase = { execute: jest.fn().mockResolvedValue(sampleDto) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -74,6 +88,7 @@ describe('OperarioController', () => {
         { provide: REACTIVATE_OPERARIO_USE_CASE, useValue: reactivateUseCase },
         { provide: BULK_IMPORT_OPERARIOS_USE_CASE, useValue: bulkImportUseCase },
         { provide: CREATE_SUPERVISOR_USE_CASE, useValue: createSupervisorUseCase },
+        { provide: UPDATE_SUPERVISOR_USE_CASE, useValue: updateSupervisorUseCase },
         { provide: REASSIGN_OPERARIO_USE_CASE, useValue: reassignUseCase },
         Reflector,
       ],
@@ -106,6 +121,22 @@ describe('OperarioController', () => {
         documento: '99887766',
         supervisorId: 'sup-1',
         cargo: '',
+      });
+    });
+
+    it('accepts optional areaId', async () => {
+      const resp = await request(app.getHttpServer())
+        .post('/iam/operarios')
+        .send({ fullName: 'Ana Lopez', documento: '99887766', supervisorId: 'sup-1', areaId: 'd5b7e2c3-1234-4abc-9def-0123456789ab' })
+        .expect(201);
+
+      expect(resp.body).toHaveProperty('id', 'op-1');
+      expect(createUseCase.execute).toHaveBeenCalledWith({
+        fullName: 'Ana Lopez',
+        documento: '99887766',
+        supervisorId: 'sup-1',
+        cargo: '',
+        areaId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
       });
     });
 
@@ -177,6 +208,139 @@ describe('OperarioController', () => {
       reactivateUseCase.execute.mockRejectedValue(new OperarioNotFoundError('ghost'));
       await request(app.getHttpServer())
         .patch('/iam/operarios/ghost/reactivate')
+        .expect(404);
+    });
+  });
+
+  // ─── Supervisor routes ────────────────────────────────────────────────────
+
+  describe('POST /iam/supervisors — create', () => {
+    it('returns 201 on valid body', async () => {
+      const resp = await request(app.getHttpServer())
+        .post('/iam/supervisors')
+        .send({
+          email: 'sup@test.co',
+          password: 'Temp1234!',
+          area: 'BARRIDO',
+          zoneId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+          municipioId: 'a1b2c3d4-5678-4abc-9def-0123456789ab',
+        })
+        .expect(201);
+
+      expect(resp.body).toHaveProperty('id', 'sup-1');
+      expect(createSupervisorUseCase.execute).toHaveBeenCalledWith({
+        email: 'sup@test.co',
+        password: 'Temp1234!',
+        area: 'BARRIDO',
+        zoneId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+        municipioId: 'a1b2c3d4-5678-4abc-9def-0123456789ab',
+      });
+    });
+
+    it('accepts optional displayName', async () => {
+      await request(app.getHttpServer())
+        .post('/iam/supervisors')
+        .send({
+          email: 'sup2@test.co',
+          password: 'Temp1234!',
+          area: 'RECOLECCION',
+          zoneId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+          municipioId: 'a1b2c3d4-5678-4abc-9def-0123456789ab',
+          displayName: 'María Supervisora',
+        })
+        .expect(201);
+
+      expect(createSupervisorUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          displayName: 'María Supervisora',
+        }),
+      );
+    });
+
+    it('omits displayName when not provided', async () => {
+      await request(app.getHttpServer())
+        .post('/iam/supervisors')
+        .send({
+          email: 'sup3@test.co',
+          password: 'Temp1234!',
+          area: 'SUPERNUMERARIO',
+          zoneId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+          municipioId: 'a1b2c3d4-5678-4abc-9def-0123456789ab',
+        })
+        .expect(201);
+
+      const callArg = createSupervisorUseCase.execute.mock.calls.at(-1)[0];
+      expect(callArg.displayName).toBeUndefined();
+    });
+
+    it('returns 400 on missing required fields', async () => {
+      await request(app.getHttpServer())
+        .post('/iam/supervisors')
+        .send({ email: 'sup@test.co' })
+        .expect(400);
+    });
+
+    it('maps EmailInUseError → 409', async () => {
+      const { EmailInUseError } = require('../domain/org.errors');
+      createSupervisorUseCase.execute.mockRejectedValue(new EmailInUseError('dup@test.co'));
+      await request(app.getHttpServer())
+        .post('/iam/supervisors')
+        .send({
+          email: 'dup@test.co',
+          password: 'Temp1234!',
+          area: 'BARRIDO',
+          zoneId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+          municipioId: 'a1b2c3d4-5678-4abc-9def-0123456789ab',
+        })
+        .expect(409);
+    });
+  });
+
+  // ─── PATCH /iam/supervisors/:id ───────────────────────────────────────────
+
+  describe('PATCH /iam/supervisors/:id — update', () => {
+    it('returns 200 when updating municipioId', async () => {
+      await request(app.getHttpServer())
+        .patch('/iam/supervisors/sup-1')
+        .send({ municipioId: 'd5b7e2c3-1234-4abc-9def-0123456789ab' })
+        .expect(200);
+
+      expect(updateSupervisorUseCase.execute).toHaveBeenCalledWith({
+        id: 'sup-1',
+        municipioId: 'd5b7e2c3-1234-4abc-9def-0123456789ab',
+        area: undefined,
+        displayName: undefined,
+      });
+    });
+
+    it('returns 200 when updating displayName', async () => {
+      updateSupervisorUseCase.execute.mockResolvedValue({
+        id: 'sup-2',
+        userId: 'user-2',
+        municipioId: 'muni-1',
+        zoneId: 'zone-1',
+        area: 'RECOLECCION',
+        user: { email: 'sup2@test.co', displayName: 'Nuevo Nombre' },
+        createdAt: new Date(),
+      });
+
+      const resp = await request(app.getHttpServer())
+        .patch('/iam/supervisors/sup-2')
+        .send({ displayName: 'Nuevo Nombre' })
+        .expect(200);
+
+      expect(resp.body.displayName).toBe('Nuevo Nombre');
+      expect(updateSupervisorUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ displayName: 'Nuevo Nombre' }),
+      );
+    });
+
+    it('maps SupervisorNotFoundError → 404', async () => {
+      const { SupervisorNotFoundError } = require('../domain/org.errors');
+      updateSupervisorUseCase.execute.mockRejectedValue(new SupervisorNotFoundError('bad-id'));
+      await request(app.getHttpServer())
+        .patch('/iam/supervisors/bad-id')
+        .send({ displayName: 'X' })
         .expect(404);
     });
   });

@@ -84,6 +84,9 @@ export class ScopedNovedadRepository
         horasExtra: data.horasExtra,
         motivo: data.motivo ?? null,
         clientRef: data.clientRef ?? null,
+        tipoNovedad: data.tipoNovedad ?? 'HORAS_EXTRA',
+        autoGenerada: data.autoGenerada ?? false,
+        minutosTarde: data.minutosTarde ?? null,
         status: 'PENDING',
         approvedByUserId: null,
         decidedAt: null,
@@ -103,6 +106,7 @@ export class ScopedNovedadRepository
         approvedByUserId: data.approvedByUserId,
         decidedAt: data.decidedAt,
         decisionVerification: data.decisionVerification,
+        rejectionReason: data.rejectionReason ?? null,
       },
     });
   }

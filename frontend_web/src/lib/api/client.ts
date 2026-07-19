@@ -1,10 +1,16 @@
 import type {
+  AreaResponseDto,
   AttendanceDto,
   ClosePeriodRequest,
   CompensationPeriodDto,
+  CompensatoryRestDto,
   ConfirmPayoutRequest,
+  CreateAreaBody,
   CreateJornadaPolicyRequest,
   CreateOperarioRequest,
+  CreateSurchargeRateRequest,
+  EnhancedPeriodBalanceDto,
+  HolidayDto,
   ImportResultDto,
   JornadaPolicyDto,
   MeResponse,
@@ -14,8 +20,13 @@ import type {
   PeriodBalanceDto,
   PeriodPayoutDto,
   PhotoUrlResponseDto,
+  ScheduleCompensatoryRequest,
   SupervisorDto,
+  SurchargeRateDto,
+  UpdateAreaBody,
+  UpdateJornadaPolicyRequest,
   ZoneResponseDto,
+  PslReportRowDto,
 } from '@futuragest/contracts';
 
 export type { SupervisorDto };
@@ -157,7 +168,9 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
 
   if (!res.ok) await raise(res);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 // --- Typed endpoint surface -------------------------------------------------
@@ -234,7 +247,13 @@ export const iamApi = {
     area: string;
     zoneId: string;
     municipioId: string;
+    displayName?: string;
   }): Promise<{ id: string }> => request<{ id: string }>('POST', '/iam/supervisors', { body }),
+
+  updateSupervisor: (
+    id: string,
+    body: { municipioId?: string; area?: string; displayName?: string },
+  ): Promise<SupervisorDto> => request<SupervisorDto>('PATCH', `/iam/supervisors/${id}`, { body }),
 };
 
 export const orgApi = {
@@ -265,11 +284,34 @@ export const orgApi = {
 
   listUsers: (): Promise<UserListItemDto[]> => request<UserListItemDto[]>('GET', '/org/users'),
 
-  provisionUser: (body: { email: string; password: string; role: string }): Promise<{ id: string }> =>
-    request<{ id: string }>('POST', '/org/users', { body }),
+  provisionUser: (body: {
+    email: string;
+    password: string;
+    role: string;
+    displayName?: string;
+  }): Promise<{ id: string }> => request<{ id: string }>('POST', '/org/users', { body }),
+
+  updateUser: (
+    id: string,
+    body: { displayName?: string; role?: string },
+  ): Promise<UserListItemDto> => request<UserListItemDto>('PATCH', `/org/users/${id}`, { body }),
 
   assignCoordinador: (body: { userId: string; zoneId: string }): Promise<void> =>
     request<void>('POST', '/org/coordinadores/assign', { body }),
+
+  // --- Área CRUD (editable-areas-with-schedules) ---
+
+  listAreas: (): Promise<AreaResponseDto[]> =>
+    request<AreaResponseDto[]>('GET', '/org/areas'),
+
+  createArea: (body: CreateAreaBody): Promise<{ id: string }> =>
+    request<{ id: string }>('POST', '/org/areas', { body }),
+
+  updateArea: (id: string, body: UpdateAreaBody): Promise<AreaResponseDto> =>
+    request<AreaResponseDto>('PATCH', `/org/areas/${id}`, { body }),
+
+  deleteArea: (id: string): Promise<void> =>
+    request<void>('DELETE', `/org/areas/${id}`),
 };
 
 /** User row from GET /org/users (admin). Never includes passwordHash. */
@@ -279,6 +321,7 @@ export interface UserListItemDto {
   role: string;
   mustChangePassword: boolean;
   coordinatedZoneId: string | null;
+  displayName?: string;
   createdAt: string;
 }
 
@@ -309,6 +352,32 @@ export const healthApi = {
 
 // --- Compensación de Horas --------------------------------------------------
 
+/** Filter for GET /jornada-policy (scope-aware timeline lookups).
+ *  - `undefined` zoneId/operarioId ⇒ param omitted entirely
+ *  - `null` or `""` zoneId ⇒ `zoneId=` (global / IS NULL filter)
+ *  - non-empty string ⇒ that value as the param
+ */
+export interface JornadaPolicyFilter {
+  zoneId?: string | null;
+  operarioId?: string | null;
+}
+
+/** Build the query string for a JornadaPolicy filter.
+ *  Returns "" when no filter is provided (no query key defined) → back-compat. */
+function toJornadaPolicyQuery(filter?: JornadaPolicyFilter): string {
+  if (!filter) return '';
+  const params = new URLSearchParams();
+  if (filter.zoneId !== undefined) {
+    // null and "" both serialize as `zoneId=` (global IS NULL filter on backend).
+    params.set('zoneId', filter.zoneId ?? '');
+  }
+  if (filter.operarioId !== undefined) {
+    params.set('operarioId', filter.operarioId ?? '');
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const compensacionApi = {
   /** GET /compensacion/:operarioId?desde=...&hasta=... */
   getBalance: (operarioId: string, desde: string, hasta: string): Promise<PeriodBalanceDto> =>
@@ -332,9 +401,9 @@ export const compensacionApi = {
   confirmPayout: (operarioId: string, body: ConfirmPayoutRequest): Promise<PeriodPayoutDto> =>
     request<PeriodPayoutDto>('POST', `/compensacion/${operarioId}/payout/confirm`, { body }),
 
-  /** GET /jornada-policy */
-  getJornadaPolicies: (): Promise<JornadaPolicyDto[]> =>
-    request<JornadaPolicyDto[]>('GET', '/jornada-policy'),
+  /** GET /jornada-policy (scope-aware: filter omitted ⇒ full timeline). */
+  getJornadaPolicies: (filter?: JornadaPolicyFilter): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', `/jornada-policy${toJornadaPolicyQuery(filter)}`),
 
   /** POST /jornada-policy */
   createJornadaPolicy: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
@@ -348,10 +417,114 @@ export const novedadesApi = {
       `/novedades${opts.since ? `?since=${encodeURIComponent(opts.since)}` : ''}`,
     ),
 
-  // approve/reject carry no body — all fields are server-derived from the JWT.
+  // All fields in approve/reject are server-derived from the JWT.
+  // Optional body fields (verification, reason) are audit labels only.
   approveNovedad: (id: string): Promise<NovedadDto> =>
     request<NovedadDto>('PATCH', `/novedades/${id}/approve`),
 
-  rejectNovedad: (id: string): Promise<NovedadDto> =>
-    request<NovedadDto>('PATCH', `/novedades/${id}/reject`),
+  rejectNovedad: (id: string, body?: { reason?: string; verification?: string }): Promise<NovedadDto> =>
+    request<NovedadDto>('PATCH', `/novedades/${id}/reject`, { body }),
+};
+
+// --- JornadaPolicy (full CRUD — PR 5) ---------------------------------------
+
+export const jornadaPolicyApi = {
+  list: (filter?: JornadaPolicyFilter): Promise<JornadaPolicyDto[]> =>
+    request<JornadaPolicyDto[]>('GET', `/jornada-policy${toJornadaPolicyQuery(filter)}`),
+
+  get: (id: string): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('GET', `/jornada-policy/${id}`),
+
+  create: (body: CreateJornadaPolicyRequest): Promise<JornadaPolicyDto> =>
+    request<JornadaPolicyDto>('POST', '/jornada-policy', { body }),
+
+  // JornadaPolicy is append-only — edits create a new row with updated vigenteDesde.
+  // There is no PATCH endpoint on the backend.
+
+  archive: (id: string): Promise<void> =>
+    request<void>('DELETE', `/jornada-policy/${id}`),
+};
+
+// --- Holidays (PR 5) --------------------------------------------------------
+
+export const holidayApi = {
+  listByYear: (year: number): Promise<HolidayDto[]> =>
+    request<HolidayDto[]>('GET', `/holidays?year=${year}`),
+
+  generateYear: (year: number): Promise<HolidayDto[]> =>
+    request<HolidayDto[]>('POST', `/holidays/generate`, { body: { year } }),
+
+  create: (body: { date: string; name: string }): Promise<HolidayDto> =>
+    request<HolidayDto>('POST', '/holidays', { body }),
+};
+
+// --- SurchargeRates (PR 5) --------------------------------------------------
+
+export const surchargeRateApi = {
+  list: (): Promise<SurchargeRateDto[]> =>
+    request<SurchargeRateDto[]>('GET', '/surcharge-rates'),
+
+  create: (body: CreateSurchargeRateRequest): Promise<SurchargeRateDto> =>
+    request<SurchargeRateDto>('POST', '/surcharge-rates', { body }),
+};
+
+// --- CompensatoryRest (PR 5) ------------------------------------------------
+
+export const compensatoryRestApi = {
+  list: (opts: { operarioId?: string; month?: string } = {}): Promise<CompensatoryRestDto[]> => {
+    const params = new URLSearchParams();
+    if (opts.operarioId) params.set('operarioId', opts.operarioId);
+    if (opts.month) params.set('month', opts.month);
+    const qs = params.toString();
+    return request<CompensatoryRestDto[]>('GET', `/compensatorio${qs ? `?${qs}` : ''}`);
+  },
+
+  schedule: (id: string, body: ScheduleCompensatoryRequest): Promise<CompensatoryRestDto> =>
+    request<CompensatoryRestDto>('PATCH', `/compensatorio/${id}/schedule`, { body }),
+};
+
+// --- Enhanced Balance (PR 5) ------------------------------------------------
+
+export const enhancedBalanceApi = {
+  getBalance: (operarioId: string, desde: string, hasta: string): Promise<EnhancedPeriodBalanceDto> =>
+    request<EnhancedPeriodBalanceDto>(
+      'GET',
+      `/compensacion/${operarioId}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&enhanced=true`,
+    ),
+};
+
+export const reportesApi = {
+  getPreview: (desde: string, hasta: string, zoneId?: string): Promise<PslReportRowDto[]> => {
+    const params = new URLSearchParams({ desde, hasta });
+    if (zoneId) params.append('zoneId', zoneId);
+    return request<PslReportRowDto[]>('GET', `/reportes/psl?${params.toString()}`);
+  },
+
+  downloadPsl: async (desde: string, hasta: string, zoneId?: string): Promise<Blob> => {
+    const params = new URLSearchParams({ desde, hasta });
+    if (zoneId) params.append('zoneId', zoneId);
+    const url = `${config.apiBaseUrl}/reportes/psl?${params.toString()}`;
+    
+    const send = async (token: string | null) => {
+      const headers: Record<string, string> = { 'Accept': 'text/csv' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(url, { headers });
+    };
+
+    let token = tokenStore.getAccessToken();
+    let res = await send(token);
+
+    if (res.status === 401) {
+      const fresh = await refresh();
+      if (!fresh) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+      res = await send(fresh);
+    }
+
+    if (!res.ok) {
+      await raise(res);
+    }
+    return res.blob();
+  }
 };

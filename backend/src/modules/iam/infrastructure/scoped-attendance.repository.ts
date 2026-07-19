@@ -21,7 +21,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { Attendance } from '@prisma/client';
+import type { Attendance, AttendanceBreakdown } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type { ScopeContextHolder } from '../../auth/domain/scope-context';
 import { ScopedRepository } from './scoped-repository';
@@ -109,7 +109,35 @@ export class ScopedAttendanceRepository
         completedAt: { not: null },
         date: { gte: desde, lte: hasta },
       },
+      // Include the breakdown relation so CalculatePeriodBalanceUseCase can use
+      // breakdown.totalHoras (net, lunch/breakfast deducted) instead of raw horasReales
+      // for the delta calculation (GAP-1 fix).
+      include: { breakdown: true },
     }) as Promise<AttendanceReaderRecord[]>;
+  }
+
+  /**
+   * Returns completed attendance records in a date range with their breakdowns.
+   * Scope-enforced via findManyScoped.
+   */
+  async findManyWithBreakdown(
+    desde: string,
+    hasta: string,
+    zoneId?: string,
+  ): Promise<(Attendance & { breakdown: AttendanceBreakdown | null })[]> {
+    const where: any = {
+      completedAt: { not: null },
+      date: { gte: desde, lte: hasta },
+    };
+    if (zoneId) {
+      where.zoneId = zoneId;
+    }
+    return this.findManyScoped({
+      where,
+      include: {
+        breakdown: true,
+      },
+    }) as any;
   }
 
   // ── Writes (inside sanctioned file — safe from meta-guard scan) ─────────────

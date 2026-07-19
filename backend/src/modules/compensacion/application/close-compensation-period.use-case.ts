@@ -191,6 +191,11 @@ export class CloseCompensationPeriodUseCase {
         if (clientRef) {
           throw new ClientRefConflictError(clientRef);
         }
+        // C-05: clientRef was null but P2002 still fired (edge case — possible
+        // with concurrent inserts targeting the same operarioId+periodKey where
+        // the race-existing row was simultaneously deleted). Throw a clean 409
+        // instead of leaking raw Prisma error → HTTP 500.
+        throw new CompensationPeriodAlreadyClosedError(operarioId, periodKey);
       }
       throw err;
     }

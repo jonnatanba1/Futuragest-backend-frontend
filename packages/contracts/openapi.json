@@ -1,0 +1,3507 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "AppController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/push-token": {
+      "post": {
+        "operationId": "AuthController_registerPushToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Push token registered successfully"
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      },
+      "delete": {
+        "operationId": "AuthController_unregisterPushToken",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Push token unregistered successfully"
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/sessions/{deviceId}": {
+      "delete": {
+        "operationId": "AuthController_revokeSession",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/iam/supervisors": {
+      "get": {
+        "operationId": "IamController_listSupervisors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupervisorResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      },
+      "post": {
+        "operationId": "OperarioController_createSupervisor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupervisorBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Returns the created Supervisor.id (not the User.id).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/iam/supervisors/{id}": {
+      "get": {
+        "operationId": "IamController_getSupervisor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/iam/operarios": {
+      "get": {
+        "operationId": "IamController_listOperarios",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperarioResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      },
+      "post": {
+        "operationId": "OperarioController_createOperario",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperarioBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/iam/operarios/{id}": {
+      "get": {
+        "operationId": "IamController_getOperario",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperarioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      },
+      "patch": {
+        "operationId": "OperarioController_reassignOperario",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignOperarioBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperarioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/iam/assignments": {
+      "get": {
+        "operationId": "IamController_listAssignments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/iam/assignments/{id}": {
+      "get": {
+        "operationId": "IamController_getAssignment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/org/zones": {
+      "get": {
+        "operationId": "OrgController_listZones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ZoneResponseDtoClass"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "post": {
+        "operationId": "OrgController_createZone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateZoneBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/municipios": {
+      "get": {
+        "operationId": "OrgController_listMunicipios",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MunicipioResponseDtoClass"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "post": {
+        "operationId": "OrgController_createMunicipio",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMunicipioBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/users": {
+      "get": {
+        "operationId": "OrgController_listUsers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "post": {
+        "operationId": "OrgController_provisionUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionUserBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/coordinadores/assign": {
+      "post": {
+        "operationId": "OrgController_assignCoordinador",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignCoordinadorBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coordinator assigned successfully (no body)"
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/zones/{id}": {
+      "patch": {
+        "operationId": "OrgController_updateZone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateZoneBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneResponseDtoClass"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "delete": {
+        "operationId": "OrgController_deleteZone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zone deleted"
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/municipios/{id}": {
+      "patch": {
+        "operationId": "OrgController_updateMunicipio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMunicipioBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MunicipioResponseDtoClass"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "delete": {
+        "operationId": "OrgController_deleteMunicipio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Municipio deleted"
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/areas": {
+      "get": {
+        "operationId": "OrgController_listAreas",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AreaResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "post": {
+        "operationId": "OrgController_createArea",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAreaBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/org/areas/{id}": {
+      "patch": {
+        "operationId": "OrgController_updateArea",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAreaBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      },
+      "delete": {
+        "operationId": "OrgController_deleteArea",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Area deleted"
+          }
+        },
+        "tags": [
+          "Org"
+        ]
+      }
+    },
+    "/iam/operarios/import": {
+      "post": {
+        "operationId": "OperarioController_importOperarios",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/iam/operarios/{id}/deactivate": {
+      "patch": {
+        "operationId": "OperarioController_deactivateOperario",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperarioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/iam/operarios/{id}/reactivate": {
+      "patch": {
+        "operationId": "OperarioController_reactivateOperario",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperarioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operario"
+        ]
+      }
+    },
+    "/asistencia/check-in": {
+      "post": {
+        "operationId": "AttendanceController_checkIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResponseDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "201 on new record, 200 on idempotent clientRef hit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/asistencia/by-client-ref/{clientRef}/check-out": {
+      "post": {
+        "deprecated": true,
+        "operationId": "AttendanceController_checkOutByClientRef",
+        "parameters": [
+          {
+            "name": "clientRef",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckOutBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "DEPRECATED — check-out is now virtual",
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/asistencia/{id}/check-out": {
+      "post": {
+        "deprecated": true,
+        "operationId": "AttendanceController_checkOut",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckOutBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "DEPRECATED — check-out is now virtual",
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/asistencia/{id}/photo": {
+      "post": {
+        "operationId": "AttendanceController_uploadPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phase",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Attendance"
+        ]
+      },
+      "get": {
+        "operationId": "AttendanceController_getPhotoUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phase",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUrlDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/asistencia": {
+      "get": {
+        "operationId": "AttendanceController_listAttendance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttendanceResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/asistencia/{id}": {
+      "get": {
+        "operationId": "AttendanceController_getAttendance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Attendance"
+        ]
+      }
+    },
+    "/compensacion/{operarioId}": {
+      "get": {
+        "operationId": "CompensacionController_getPeriodBalance",
+        "parameters": [
+          {
+            "name": "operarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodBalanceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/jornada-policy": {
+      "post": {
+        "operationId": "CompensacionController_setJornadaPolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetJornadaPolicyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JornadaPolicyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      },
+      "get": {
+        "operationId": "CompensacionController_getJornadaPolicyTimeline",
+        "parameters": [
+          {
+            "name": "zoneId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by zone. Empty string => global-only (IS NULL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operarioId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by operario.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JornadaPolicyResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/jornada-policy/{id}": {
+      "delete": {
+        "operationId": "CompensacionController_deleteJornadaPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Elimina una política de jornada"
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/compensacion/{operarioId}/close": {
+      "post": {
+        "operationId": "CompensacionController_closeFortnight",
+        "parameters": [
+          {
+            "name": "operarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseFortnightBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompensationPeriodResponseDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompensationPeriodResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/compensacion/{operarioId}/payout": {
+      "get": {
+        "operationId": "CompensacionController_getPeriodPayout",
+        "parameters": [
+          {
+            "name": "operarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodKey",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodPayoutResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/compensacion/{operarioId}/payout/confirm": {
+      "post": {
+        "operationId": "CompensacionController_confirmPeriodPayout",
+        "parameters": [
+          {
+            "name": "operarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmPayoutBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodPayoutResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Compensacion"
+        ]
+      }
+    },
+    "/jornada/auto-complete": {
+      "post": {
+        "operationId": "JornadaController_autoComplete",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Resultado del auto-completado"
+          }
+        },
+        "summary": "Auto-completar asistencias pendientes con check-out virtual",
+        "tags": [
+          "Jornada"
+        ]
+      }
+    },
+    "/compensatorio": {
+      "get": {
+        "operationId": "CompensatorioController_list",
+        "parameters": [
+          {
+            "name": "operarioId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de descansos compensatorios"
+          }
+        },
+        "tags": [
+          "compensatorios"
+        ]
+      }
+    },
+    "/compensatorio/{id}/schedule": {
+      "patch": {
+        "operationId": "CompensatorioController_schedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleCompensatoryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Programa la fecha de un descanso compensatorio"
+          }
+        },
+        "tags": [
+          "compensatorios"
+        ]
+      }
+    },
+    "/holidays": {
+      "get": {
+        "operationId": "HolidaysController_listByYear",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de festivos del año"
+          }
+        },
+        "tags": [
+          "festivos"
+        ]
+      },
+      "post": {
+        "operationId": "HolidaysController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHolidayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Crea un festivo manual"
+          }
+        },
+        "tags": [
+          "festivos"
+        ]
+      }
+    },
+    "/holidays/generate": {
+      "post": {
+        "operationId": "HolidaysController_generateYear",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Genera y persiste los festivos para un año"
+          }
+        },
+        "tags": [
+          "festivos"
+        ]
+      }
+    },
+    "/surcharge-rates": {
+      "get": {
+        "operationId": "SurchargeRatesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de tasas de recargo vigentes"
+          }
+        },
+        "tags": [
+          "recargos"
+        ]
+      },
+      "post": {
+        "operationId": "SurchargeRatesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSurchargeRateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Crea una nueva tasa de recargo"
+          }
+        },
+        "tags": [
+          "recargos"
+        ]
+      }
+    },
+    "/asistencia/{attendanceId}/novedades": {
+      "post": {
+        "operationId": "NovedadController_createNovedad",
+        "parameters": [
+          {
+            "name": "attendanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNovedadBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadResponseDto"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "201 on new record, 200 on idempotent clientRef hit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      }
+    },
+    "/novedades": {
+      "get": {
+        "operationId": "NovedadController_listNovedades",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NovedadResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      }
+    },
+    "/novedades/{id}": {
+      "get": {
+        "operationId": "NovedadController_getNovedad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      },
+      "delete": {
+        "operationId": "NovedadController_cancelNovedad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      }
+    },
+    "/novedades/{id}/approve": {
+      "patch": {
+        "operationId": "NovedadController_approveNovedad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRejectBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      }
+    },
+    "/novedades/{id}/reject": {
+      "patch": {
+        "operationId": "NovedadController_rejectNovedad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRejectBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Novedad"
+        ]
+      }
+    },
+    "/notifications/stream": {
+      "get": {
+        "operationId": "NotificationsController_stream",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/reportes/psl": {
+      "get": {
+        "operationId": "ReportesController_getPslReport",
+        "parameters": [
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM-DD Colombia local",
+            "schema": {
+              "example": "2026-07-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM-DD Colombia local",
+            "schema": {
+              "example": "2026-07-15",
+              "type": "string"
+            }
+          },
+          {
+            "name": "zoneId",
+            "required": false,
+            "in": "query",
+            "description": "Filtro por zona",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reportes"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "FuturaGest API",
+    "description": "",
+    "version": "0.0.1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@futuragest.co"
+          },
+          "password": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Stable per-device id"
+          },
+          "deviceLabel": {
+            "type": "string",
+            "description": "Human-readable device label"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "deviceId"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "passwordChangeRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "passwordChangeRequired"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token from login"
+          }
+        },
+        "required": [
+          "userId",
+          "deviceId",
+          "refreshToken"
+        ]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "oldPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "oldPassword",
+          "newPassword"
+        ]
+      },
+      "MessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ZoneRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MunicipioRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MeSupervisorBlockDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string"
+          },
+          "zone": {
+            "$ref": "#/components/schemas/ZoneRefDto"
+          },
+          "municipio": {
+            "$ref": "#/components/schemas/MunicipioRefDto"
+          }
+        },
+        "required": [
+          "id",
+          "area",
+          "zone",
+          "municipio"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "mustChangePassword": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role name. COORDINADOR and SUPERVISOR have role-specific scoped fields."
+          },
+          "coordinatedZone": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ZoneRefDto"
+              }
+            ]
+          },
+          "supervisor": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MeSupervisorBlockDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "mustChangePassword",
+          "role",
+          "coordinatedZone",
+          "supervisor"
+        ]
+      },
+      "PushTokenDto": {
+        "type": "object",
+        "properties": {
+          "pushToken": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "pushPlatform": {
+            "type": "string",
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "pushToken"
+        ]
+      },
+      "SupervisorResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "municipioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "area": {
+            "type": "string",
+            "description": "SupervisorArea: BARRIDO | RECOLECCION | SUPERNUMERARIO"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "municipioId",
+          "zoneId",
+          "area",
+          "email",
+          "createdAt"
+        ]
+      },
+      "OperarioResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string"
+          },
+          "supervisorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cargo": {
+            "type": "string",
+            "description": "Free-text job position (e.g. \"Barrido\", \"Recolección\")"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Derived: deactivatedAt === null"
+          },
+          "deactivatedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp or null when active",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — delta cursor for ?since= queries"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "documento",
+          "supervisorId",
+          "cargo",
+          "active",
+          "deactivatedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ZoneResponseDtoClass": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — delta cursor for ?since= queries"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MunicipioResponseDtoClass": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — delta cursor for ?since= queries"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "zoneId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role enum (SYSTEM_ADMIN, GERENCIA, …)"
+          },
+          "mustChangePassword": {
+            "type": "boolean"
+          },
+          "coordinatedZoneId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Zone coordinated (COORDINADOR only)"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "mustChangePassword",
+          "coordinatedZoneId",
+          "createdAt"
+        ]
+      },
+      "AssignCoordinadorBody": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "userId",
+          "zoneId"
+        ]
+      },
+      "ProvisionUserBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "GERENCIA",
+              "TALENTO_HUMANO",
+              "LIDER_OPERATIVO"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "role"
+        ]
+      },
+      "CreatedIdDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "CreateZoneBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique zone name"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateZoneBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New zone name"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateMunicipioBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Municipio name (unique within zone)"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Zone this municipio belongs to"
+          }
+        },
+        "required": [
+          "name",
+          "zoneId"
+        ]
+      },
+      "UpdateMunicipioBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New municipio name"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "New zone for this municipio"
+          }
+        }
+      },
+      "AreaResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string",
+            "description": "HH:MM"
+          },
+          "horaFin": {
+            "type": "string",
+            "description": "HH:MM"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "horaInicio",
+          "horaFin",
+          "zoneId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateAreaBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Area name (unique within zone)"
+          },
+          "horaInicio": {
+            "type": "string",
+            "description": "HH:MM",
+            "example": "06:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "description": "HH:MM",
+            "example": "14:00"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name",
+          "horaInicio",
+          "horaFin",
+          "zoneId"
+        ]
+      },
+      "UpdateAreaBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New area name (unique within zone)"
+          },
+          "horaInicio": {
+            "type": "string",
+            "description": "HH:MM",
+            "example": "06:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "description": "HH:MM",
+            "example": "14:00"
+          }
+        }
+      },
+      "CreateOperarioBody": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string",
+            "description": "Unique national document number"
+          },
+          "supervisorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cargo": {
+            "type": "string",
+            "description": "Free-text job position (e.g. \"Barrido\", \"Recolección\")",
+            "default": ""
+          }
+        },
+        "required": [
+          "fullName",
+          "documento",
+          "supervisorId",
+          "cargo"
+        ]
+      },
+      "ImportRowErrorDto": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "number"
+          },
+          "documento": {
+            "type": "object",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "row",
+          "documento",
+          "reason"
+        ]
+      },
+      "ImportResultResponseDto": {
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowErrorDto"
+            }
+          }
+        },
+        "required": [
+          "imported",
+          "failed",
+          "errors"
+        ]
+      },
+      "ReassignOperarioBody": {
+        "type": "object",
+        "properties": {
+          "supervisorId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "New supervisor id"
+          }
+        },
+        "required": [
+          "supervisorId"
+        ]
+      },
+      "CreateSupervisorBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email for the new supervisor user account"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Temporary password (mustChangePassword=true)"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "BARRIDO",
+              "RECOLECCION",
+              "SUPERNUMERARIO"
+            ],
+            "description": "Operational area: BARRIDO | RECOLECCION | SUPERNUMERARIO"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Zone the supervisor is assigned to"
+          },
+          "municipioId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Municipio within the zone"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "area",
+          "zoneId",
+          "municipioId"
+        ]
+      },
+      "CheckInBody": {
+        "type": "object",
+        "properties": {
+          "operarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "description": "Colombia local date",
+            "example": "2026-06-05"
+          },
+          "checkInCapturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkInLat": {
+            "type": "number"
+          },
+          "checkInLng": {
+            "type": "number"
+          },
+          "checkInAccuracy": {
+            "type": "number",
+            "minimum": 0
+          },
+          "clientRef": {
+            "type": "string",
+            "description": "Idempotency token"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "description": "Verification method used by supervisor. Audit label only."
+          }
+        },
+        "required": [
+          "operarioId",
+          "date",
+          "checkInCapturedAt",
+          "checkInLat",
+          "checkInLng",
+          "clientRef"
+        ]
+      },
+      "AttendanceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supervisorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, client-computed Colombia local date"
+          },
+          "checkInCapturedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "checkInReceivedAt": {
+            "type": "string",
+            "description": "ISO 8601 server clock timestamp"
+          },
+          "checkInLat": {
+            "type": "number"
+          },
+          "checkInLng": {
+            "type": "number"
+          },
+          "checkInAccuracy": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkOutCapturedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp",
+            "nullable": true
+          },
+          "checkOutReceivedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp",
+            "nullable": true
+          },
+          "checkOutLat": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkOutLng": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkOutAccuracy": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkInPhotoKey": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkOutPhotoKey": {
+            "type": "object",
+            "nullable": true
+          },
+          "checkInVerification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "nullable": true,
+            "description": "Audit label: verification method used at check-in. Null = legacy / old app version."
+          },
+          "checkOutVerification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "nullable": true,
+            "description": "Audit label: verification method used at check-out. Null = legacy / old app version."
+          },
+          "clientRef": {
+            "type": "string",
+            "description": "Idempotency token"
+          },
+          "checkOutClientRef": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp when both phases done",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — delta cursor for ?since= queries"
+          }
+        },
+        "required": [
+          "id",
+          "supervisorId",
+          "operarioId",
+          "zoneId",
+          "date",
+          "checkInCapturedAt",
+          "checkInReceivedAt",
+          "checkInLat",
+          "checkInLng",
+          "checkInAccuracy",
+          "checkOutCapturedAt",
+          "checkOutReceivedAt",
+          "checkOutLat",
+          "checkOutLng",
+          "checkOutAccuracy",
+          "checkInPhotoKey",
+          "checkOutPhotoKey",
+          "clientRef",
+          "checkOutClientRef",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CheckOutBody": {
+        "type": "object",
+        "properties": {
+          "checkOutCapturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkOutLat": {
+            "type": "number"
+          },
+          "checkOutLng": {
+            "type": "number"
+          },
+          "checkOutAccuracy": {
+            "type": "number",
+            "minimum": 0
+          },
+          "checkOutClientRef": {
+            "type": "string",
+            "description": "Idempotency token"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "description": "Verification method used by supervisor. Audit label only."
+          }
+        },
+        "required": [
+          "checkOutCapturedAt",
+          "checkOutLat",
+          "checkOutLng"
+        ]
+      },
+      "PhotoUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "attendanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "photoKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attendanceId",
+          "photoKey"
+        ]
+      },
+      "PhotoUrlDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Presigned GET URL"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "DayBreakdownDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD Colombia local date"
+          },
+          "horasReales": {
+            "type": "string",
+            "description": "Raw hours worked (no lunch deduction). Decimal string.",
+            "example": "8.50"
+          },
+          "jornadaHoras": {
+            "type": "string",
+            "description": "JornadaPolicy hours for this day. Decimal string.",
+            "example": "8.00"
+          },
+          "delta": {
+            "type": "string",
+            "description": "horasReales - jornadaHoras. Decimal string.",
+            "example": "0.50"
+          }
+        },
+        "required": [
+          "date",
+          "horasReales",
+          "jornadaHoras",
+          "delta"
+        ]
+      },
+      "PeriodBalanceResponseDto": {
+        "type": "object",
+        "properties": {
+          "operarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "desde": {
+            "type": "string",
+            "description": "YYYY-MM-DD range start (inclusive)"
+          },
+          "hasta": {
+            "type": "string",
+            "description": "YYYY-MM-DD range end (inclusive)"
+          },
+          "creditosHoras": {
+            "type": "string",
+            "description": "Σ positive deltas (hours). Decimal string.",
+            "example": "0.75"
+          },
+          "debitosHoras": {
+            "type": "string",
+            "description": "Σ |negative deltas| (hours). Decimal string.",
+            "example": "1.00"
+          },
+          "carryIn": {
+            "type": "string",
+            "description": "carryIn from previous CARRY_OVER period (≤ 0). Decimal string.",
+            "example": "0.00"
+          },
+          "saldoHoras": {
+            "type": "string",
+            "description": "carryIn + creditos - debitos. Decimal string.",
+            "example": "-0.25"
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DayBreakdownDto"
+            }
+          }
+        },
+        "required": [
+          "operarioId",
+          "desde",
+          "hasta",
+          "creditosHoras",
+          "debitosHoras",
+          "carryIn",
+          "saldoHoras",
+          "breakdown"
+        ]
+      },
+      "SetJornadaPolicyBody": {
+        "type": "object",
+        "properties": {
+          "operarioId": {
+            "type": "object",
+            "nullable": true
+          },
+          "zoneId": {
+            "type": "object",
+            "nullable": true
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "07:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "17:00"
+          },
+          "diasLaborales": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "almuerzoInicio": {
+            "type": "object",
+            "nullable": true
+          },
+          "almuerzoFin": {
+            "type": "object",
+            "nullable": true
+          },
+          "desayunoInicio": {
+            "type": "object",
+            "nullable": true
+          },
+          "desayunoFin": {
+            "type": "object",
+            "nullable": true
+          },
+          "toleranciaMin": {
+            "type": "number"
+          },
+          "horasDiarias": {
+            "type": "number",
+            "description": "Daily work hours [0.5, 24]",
+            "example": 8
+          },
+          "horasSemanales": {
+            "type": "number",
+            "description": "Weekly work hours",
+            "example": 40
+          },
+          "vigenteDesde": {
+            "type": "string",
+            "description": "Effective date — YYYY-MM-DD Colombia local",
+            "example": "2026-07-01"
+          }
+        },
+        "required": [
+          "horaInicio",
+          "horaFin",
+          "diasLaborales",
+          "horasDiarias",
+          "horasSemanales",
+          "vigenteDesde"
+        ]
+      },
+      "JornadaPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operarioId": {
+            "type": "object",
+            "nullable": true
+          },
+          "zoneId": {
+            "type": "object",
+            "nullable": true
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "07:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "17:00"
+          },
+          "diasLaborales": {
+            "example": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "almuerzoInicio": {
+            "type": "object",
+            "nullable": true
+          },
+          "almuerzoFin": {
+            "type": "object",
+            "nullable": true
+          },
+          "desayunoInicio": {
+            "type": "object",
+            "nullable": true
+          },
+          "desayunoFin": {
+            "type": "object",
+            "nullable": true
+          },
+          "toleranciaMin": {
+            "type": "number",
+            "example": 5
+          },
+          "horasDiarias": {
+            "type": "string",
+            "description": "Daily work hours. Prisma Decimal serialized as string.",
+            "example": "8.00"
+          },
+          "horasSemanales": {
+            "type": "string",
+            "description": "Weekly work hours. Prisma Decimal serialized as string.",
+            "example": "40.00"
+          },
+          "vigenteDesde": {
+            "type": "string",
+            "description": "ISO 8601 — effective date (Colombia local midnight stored as UTC)"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "operarioId",
+          "zoneId",
+          "horaInicio",
+          "horaFin",
+          "diasLaborales",
+          "almuerzoInicio",
+          "almuerzoFin",
+          "desayunoInicio",
+          "desayunoFin",
+          "toleranciaMin",
+          "horasDiarias",
+          "horasSemanales",
+          "vigenteDesde",
+          "createdAt"
+        ]
+      },
+      "CloseFortnightBody": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "description": "Fortnight start — YYYY-MM-DD Colombia local (inclusive)",
+            "example": "2026-05-01"
+          },
+          "hasta": {
+            "type": "string",
+            "description": "Fortnight end — YYYY-MM-DD Colombia local (inclusive)",
+            "example": "2026-05-15"
+          },
+          "disposition": {
+            "type": "string",
+            "description": "Required when saldo < 0. CARRY_OVER rolls debt to next period; PAYROLL_DEDUCTION settles in payroll.",
+            "enum": [
+              "CARRY_OVER",
+              "PAYROLL_DEDUCTION"
+            ]
+          },
+          "clientRef": {
+            "type": "object",
+            "description": "Optional client idempotency token"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta"
+        ]
+      },
+      "CompensationPeriodResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodKey": {
+            "type": "string",
+            "description": "Canonical fortnight identifier e.g. \"2026-05-Q1\""
+          },
+          "desde": {
+            "type": "string",
+            "description": "YYYY-MM-DD Colombia local (inclusive)"
+          },
+          "hasta": {
+            "type": "string",
+            "description": "YYYY-MM-DD Colombia local (inclusive)"
+          },
+          "creditosHoras": {
+            "type": "string",
+            "description": "Σ positive deltas (hours). Decimal string.",
+            "example": "0.75"
+          },
+          "debitosHoras": {
+            "type": "string",
+            "description": "Σ |negative deltas| (hours). Decimal string.",
+            "example": "1.00"
+          },
+          "carryIn": {
+            "type": "string",
+            "description": "carryIn from previous CARRY_OVER period (≤ 0). Decimal string.",
+            "example": "0.00"
+          },
+          "saldoHoras": {
+            "type": "string",
+            "description": "carryIn + creditos - debitos. Decimal string.",
+            "example": "-0.50"
+          },
+          "disposition": {
+            "type": "string",
+            "description": "Disposition decision at close. Null when saldo >= 0 (no action needed).",
+            "enum": [
+              "CARRY_OVER",
+              "PAYROLL_DEDUCTION"
+            ],
+            "nullable": true,
+            "example": "CARRY_OVER"
+          },
+          "approvedByUserId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp — when the close decision was made",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — immutability lock (server time at close)"
+          },
+          "clientRef": {
+            "type": "object",
+            "description": "Client-provided idempotency token",
+            "nullable": true
+          },
+          "paidAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp — when payout was confirmed by HR. Null until confirmed.",
+            "nullable": true
+          },
+          "payoutRef": {
+            "type": "object",
+            "description": "Server-generated UUID for payout idempotency. Null until confirmed.",
+            "nullable": true
+          },
+          "divergedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp — set when attendance data changes inside this closed period. Null = snapshot is current.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "operarioId",
+          "periodKey",
+          "desde",
+          "hasta",
+          "creditosHoras",
+          "debitosHoras",
+          "carryIn",
+          "saldoHoras",
+          "disposition",
+          "approvedByUserId",
+          "decidedAt",
+          "closedAt",
+          "clientRef",
+          "paidAt",
+          "payoutRef",
+          "divergedAt",
+          "createdAt"
+        ]
+      },
+      "PeriodPayoutResponseDto": {
+        "type": "object",
+        "properties": {
+          "operarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodKey": {
+            "type": "string",
+            "description": "Canonical fortnight identifier e.g. \"2026-05-Q1\""
+          },
+          "saldoHoras": {
+            "type": "string",
+            "description": "Frozen saldo of the closed period (can be ≤ 0). Decimal string.",
+            "example": "8.00"
+          },
+          "horasBase": {
+            "type": "string",
+            "description": "Payable base hours (positive saldo only; 0 if saldo ≤ 0). Decimal string.",
+            "example": "8.00"
+          },
+          "factorRecargo": {
+            "type": "string",
+            "description": "Recargo factor applied (1.25 daytime). Decimal string.",
+            "example": "1.25"
+          },
+          "horasPagables": {
+            "type": "string",
+            "description": "horasBase × factorRecargo — payable hours to liquidate. Decimal string.",
+            "example": "10.00"
+          },
+          "paidAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp — when payout was confirmed by HR. Null until confirmed.",
+            "nullable": true
+          },
+          "payoutRef": {
+            "type": "object",
+            "description": "Server-generated UUID for payout idempotency. Null until confirmed.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "operarioId",
+          "periodKey",
+          "saldoHoras",
+          "horasBase",
+          "factorRecargo",
+          "horasPagables",
+          "paidAt",
+          "payoutRef"
+        ]
+      },
+      "ConfirmPayoutBody": {
+        "type": "object",
+        "properties": {
+          "periodKey": {
+            "type": "string",
+            "description": "Canonical fortnight identifier e.g. \"2026-05-Q1\"",
+            "example": "2026-05-Q1"
+          }
+        },
+        "required": [
+          "periodKey"
+        ]
+      },
+      "ScheduleCompensatoryBody": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateHolidayBody": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateSurchargeRateBody": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateNovedadBody": {
+        "type": "object",
+        "properties": {
+          "horasExtra": {
+            "type": "string",
+            "description": "Overtime hours as a numeric string, e.g. \"2.50\"",
+            "example": "2.50"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "clientRef": {
+            "type": "string",
+            "description": "Idempotency token (UUID v4)"
+          }
+        },
+        "required": [
+          "horasExtra"
+        ]
+      },
+      "NovedadResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attendanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supervisorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "horasExtra": {
+            "type": "string",
+            "description": "Overtime hours. Prisma Decimal serialized as string — parse as decimal, NOT double.",
+            "example": "2.50"
+          },
+          "motivo": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "PENDING | APPROVED | REJECTED"
+          },
+          "clientRef": {
+            "type": "object",
+            "description": "Idempotency token for offline sync. Null when not provided.",
+            "nullable": true
+          },
+          "approvedByUserId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "object",
+            "description": "ISO 8601 timestamp when approved/rejected. Null while PENDING.",
+            "nullable": true
+          },
+          "decisionVerification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "nullable": true,
+            "description": "Audit label: verification method used by the líder operativo when deciding. Null = web admin decision (no biometrics) or legacy row."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 timestamp — delta cursor for ?since= queries"
+          },
+          "operarioName": {
+            "type": "string"
+          },
+          "operarioDocumento": {
+            "type": "string"
+          },
+          "supervisorEmail": {
+            "type": "string"
+          },
+          "zoneName": {
+            "type": "string"
+          },
+          "tipoNovedad": {
+            "type": "string",
+            "description": "Novelty type: HORAS_EXTRA (supervisor-requested) or LLEGADA_TARDE (auto-generated).",
+            "example": "LLEGADA_TARDE"
+          },
+          "minutosTarde": {
+            "type": "object",
+            "description": "Minutes late from horaInicio when tipoNovedad = LLEGADA_TARDE."
+          },
+          "rejectionReason": {
+            "type": "object",
+            "description": "Reason provided by the líder when REJECTING the novedad."
+          }
+        },
+        "required": [
+          "id",
+          "attendanceId",
+          "supervisorId",
+          "zoneId",
+          "horasExtra",
+          "motivo",
+          "status",
+          "clientRef",
+          "approvedByUserId",
+          "decidedAt",
+          "createdAt",
+          "updatedAt",
+          "tipoNovedad"
+        ]
+      },
+      "ApproveRejectBody": {
+        "type": "object",
+        "properties": {
+          "verification": {
+            "type": "string",
+            "enum": [
+              "BIOMETRIC",
+              "DEVICE_CREDENTIAL",
+              "NONE"
+            ],
+            "description": "Verification method used by the actor. Audit label only."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Rejection reason provided by the líder. Audit label only."
+          }
+        }
+      }
+    }
+  }
+}

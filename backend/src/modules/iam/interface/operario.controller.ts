@@ -44,15 +44,17 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiProperty, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
-import { CreatedIdDto, ImportResultResponseDto, OperarioResponseDto } from './response-dtos';
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import type { UploadedFile as MulterFile } from '../../../types/uploaded-file';
+import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { CreatedIdDto, ImportResultResponseDto, OperarioResponseDto, SupervisorResponseDto } from './response-dtos';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { Roles } from './roles.decorator';
 import type { CreateOperarioUseCase } from '../application/create-operario.use-case';
 import type { DeactivateOperarioUseCase } from '../application/deactivate-operario.use-case';
 import type { ReactivateOperarioUseCase } from '../application/reactivate-operario.use-case';
 import type { BulkImportOperariosUseCase } from '../application/bulk-import-operarios.use-case';
 import type { CreateSupervisorUseCase } from '../application/create-supervisor.use-case';
+import type { UpdateSupervisorUseCase } from '../application/update-supervisor.use-case';
 import type { ReassignOperarioUseCase } from '../application/reassign-operario.use-case';
 import {
   DuplicateDocumentoError,
@@ -66,9 +68,10 @@ import {
   ZoneNotFoundError,
   MunicipioNotFoundError,
   MunicipioNotInZoneError,
+  SupervisorNotFoundError,
 } from '../domain/org.errors';
 import { parseOperarioImport, UnsupportedImportFormatError } from '../infrastructure/operario-import.parser';
-import type { OperarioDto, ImportResultDto } from '@futuragest/contracts';
+import type { OperarioDto, ImportResultDto, SupervisorDto } from '@futuragest/contracts';
 
 // ─── Injection tokens ─────────────────────────────────────────────────────────
 
@@ -77,6 +80,7 @@ export const DEACTIVATE_OPERARIO_USE_CASE = Symbol('DeactivateOperarioUseCase');
 export const REACTIVATE_OPERARIO_USE_CASE = Symbol('ReactivateOperarioUseCase');
 export const BULK_IMPORT_OPERARIOS_USE_CASE = Symbol('BulkImportOperariosUseCase');
 export const CREATE_SUPERVISOR_USE_CASE = Symbol('CreateSupervisorUseCase');
+export const UPDATE_SUPERVISOR_USE_CASE = Symbol('UpdateSupervisorUseCase');
 export const REASSIGN_OPERARIO_USE_CASE = Symbol('ReassignOperarioUseCase');
 
 // ─── Role constants ───────────────────────────────────────────────────────────
@@ -106,6 +110,11 @@ export class CreateOperarioBody {
   @IsOptional()
   @IsString()
   cargo?: string;
+
+  @ApiProperty({ format: 'uuid', description: 'Optional área assignment', required: false })
+  @IsOptional()
+  @IsUUID()
+  areaId?: string;
 }
 
 export class ReassignOperarioBody {
@@ -145,6 +154,31 @@ export class CreateSupervisorBody {
   @IsString()
   @IsNotEmpty()
   municipioId!: string;
+
+  @ApiProperty({ description: 'Optional human-readable display name', required: false })
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+}
+
+export class UpdateSupervisorBody {
+  @ApiPropertyOptional({ format: 'uuid', description: 'New municipio assignment' })
+  @IsOptional()
+  @IsUUID()
+  municipioId?: string;
+
+  @ApiPropertyOptional({
+    enum: SUPERVISOR_AREA_VALUES,
+    description: 'New operational area: BARRIDO | RECOLECCION | SUPERNUMERARIO',
+  })
+  @IsOptional()
+  @IsIn(SUPERVISOR_AREA_VALUES)
+  area?: SupervisorAreaValue;
+
+  @ApiPropertyOptional({ description: 'New human-readable display name' })
+  @IsOptional()
+  @IsString()
+  displayName?: string;
 }
 
 // ─── Controller ──────────────────────────────────────────────────────────────
@@ -162,6 +196,8 @@ export class OperarioController {
     private readonly bulkImportUseCase: Pick<BulkImportOperariosUseCase, 'execute'>,
     @Inject(CREATE_SUPERVISOR_USE_CASE)
     private readonly createSupervisorUseCase: Pick<CreateSupervisorUseCase, 'execute'>,
+    @Inject(UPDATE_SUPERVISOR_USE_CASE)
+    private readonly updateSupervisorUseCase: Pick<UpdateSupervisorUseCase, 'execute'>,
     @Inject(REASSIGN_OPERARIO_USE_CASE)
     private readonly reassignUseCase: Pick<ReassignOperarioUseCase, 'execute'>,
   ) {}
@@ -179,6 +215,7 @@ export class OperarioController {
         documento: body.documento,
         supervisorId: body.supervisorId,
         cargo: body.cargo ?? '',
+        areaId: body.areaId,
       });
     } catch (err) {
       this.mapDomainError(err);
@@ -200,7 +237,7 @@ export class OperarioController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiOkResponse({ type: ImportResultResponseDto })
   async importOperarios(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
   ): Promise<ImportResultDto> {
     // No file or empty buffer → 400
     if (!file || !file.buffer || file.buffer.length === 0) {
@@ -307,8 +344,60 @@ export class OperarioController {
         area: body.area,
         zoneId: body.zoneId,
         municipioId: body.municipioId,
+        displayName: body.displayName,
       });
     } catch (err) {
+      this.mapSupervisorError(err);
+    }
+  }
+
+  // ─── Update Supervisor ────────────────────────────────────────────────────
+
+  /**
+   * PATCH /iam/supervisors/:id
+   *
+   * Updates a supervisor's municipal assignment, area, and/or display name.
+   * displayName is stored on the related User row; municipio and area on Supervisor.
+   * Returns the updated SupervisorDto.
+   *
+   * Error mapping:
+   *   SupervisorNotFoundError  → 404
+   *   MunicipioNotFoundError   → 400
+   *   MunicipioNotInZoneError  → 400
+   */
+  @Roles(...OPERARIO_WRITE_ROLES)
+  @Patch('supervisors/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    type: SupervisorResponseDto,
+    description: 'Returns the updated supervisor with displayName.',
+  })
+  async updateSupervisor(
+    @Param('id') id: string,
+    @Body() body: UpdateSupervisorBody,
+  ): Promise<SupervisorDto> {
+    try {
+      const result = await this.updateSupervisorUseCase.execute({
+        id,
+        municipioId: body.municipioId,
+        area: body.area,
+        displayName: body.displayName,
+      });
+
+      return {
+        id: result.id,
+        userId: result.userId,
+        municipioId: result.municipioId,
+        zoneId: result.zoneId,
+        area: result.area,
+        email: result.user.email,
+        displayName: result.user.displayName ?? undefined,
+        createdAt: result.createdAt.toISOString(),
+      };
+    } catch (err) {
+      if (err instanceof SupervisorNotFoundError) {
+        throw new NotFoundException(err.message);
+      }
       this.mapSupervisorError(err);
     }
   }

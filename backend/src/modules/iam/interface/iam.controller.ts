@@ -35,7 +35,7 @@ import {
 import { IsISO8601, IsOptional } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import type { SupervisorDto } from '@futuragest/contracts';
+import type { SupervisorDto, OperarioDto } from '@futuragest/contracts';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { SupervisorResponseDto, OperarioResponseDto } from './response-dtos';
 import {
@@ -45,6 +45,7 @@ import {
 import { ScopedOperarioRepository } from '../infrastructure/scoped-operario.repository';
 import { ScopedAssignmentRepository } from '../infrastructure/scoped-assignment.repository';
 import { Roles } from './roles.decorator';
+import type { Operario } from '@prisma/client';
 
 /** Map an enriched supervisor row to the public SupervisorDto (email flattened). */
 function toSupervisorDto(s: SupervisorWithUser): SupervisorDto {
@@ -55,7 +56,25 @@ function toSupervisorDto(s: SupervisorWithUser): SupervisorDto {
     zoneId: s.zoneId,
     area: s.area,
     email: s.user.email,
+    displayName: s.user.displayName ?? undefined,
     createdAt: s.createdAt.toISOString(),
+  };
+}
+
+/** Map an enriched operario row (with area include) to OperarioDto. */
+function toOperarioDto(o: Operario & { area?: { id: string; name: string } | null }): OperarioDto {
+  return {
+    id: o.id,
+    fullName: o.fullName,
+    documento: o.documento,
+    supervisorId: o.supervisorId,
+    cargo: o.cargo,
+    areaId: o.areaId ?? null,
+    areaName: o.area?.name ?? null,
+    active: o.deactivatedAt === null,
+    deactivatedAt: o.deactivatedAt?.toISOString() ?? null,
+    createdAt: o.createdAt.toISOString(),
+    updatedAt: o.updatedAt.toISOString(),
   };
 }
 
@@ -136,12 +155,14 @@ export class IamController {
     // Non-delta mode: honour ?includeInactive=true (or exclude inactive by default).
     if (query.since) {
       const since = new Date(query.since);
-      return this.operarioRepo.findMany({ updatedAt: { gte: since } });
+      const ops = await this.operarioRepo.findMany({ updatedAt: { gte: since } });
+      return ops.map(toOperarioDto);
     }
 
     // REQ-08: exclude inactive by default; ?includeInactive=true includes all
     const where = query.includeInactive === 'true' ? {} : { deactivatedAt: null };
-    return this.operarioRepo.findMany(where);
+    const ops = await this.operarioRepo.findMany(where);
+    return ops.map(toOperarioDto);
   }
 
   @Roles(...IAM_READ_ROLES)
@@ -152,7 +173,7 @@ export class IamController {
     if (!operario) {
       throw new NotFoundException('Operario no encontrado');
     }
-    return operario;
+    return toOperarioDto(operario);
   }
 
   // ─── Assignments ─────────────────────────────────────────────────────────

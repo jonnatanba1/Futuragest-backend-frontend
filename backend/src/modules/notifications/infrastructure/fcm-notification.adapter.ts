@@ -25,6 +25,7 @@ import * as path from 'path';
 import type { NotificationPort, NovedadCreatedPayload } from '../domain/notification.port';
 import type { AuthRepositoryPort } from '../../auth/domain/auth-repository.port';
 import { RecipientResolver } from './recipient-resolver';
+import { PrismaService } from '../../../database/prisma.service';
 
 /**
  * FCM error codes that indicate a permanently dead/invalid registration token.
@@ -49,6 +50,7 @@ export class FcmNotificationAdapter implements NotificationPort {
   constructor(
     private readonly recipientResolver: RecipientResolver,
     private readonly authRepo: AuthRepositoryPort,
+    private readonly prisma: PrismaService,
   ) {}
 
   async notifyNovedadCreated(payload: NovedadCreatedPayload): Promise<void> {
@@ -98,15 +100,60 @@ export class FcmNotificationAdapter implements NotificationPort {
         });
       }
 
-      // Build the multicast message body (tokens are attached per batch below)
+      // Enrich notification by querying DB for names
+      let operarioName = 'Operario';
+      let supervisorDisplay = 'Supervisor';
+
+      if (payload.novedadId) {
+        try {
+          const novelty = await this.prisma.novedad.findUnique({
+            where: { id: payload.novedadId },
+            include: {
+              attendance: {
+                include: {
+                  operario: true,
+                },
+              },
+              supervisor: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          });
+          if (novelty) {
+            if (novelty.attendance?.operario?.fullName) {
+              operarioName = novelty.attendance.operario.fullName;
+            }
+            if (novelty.supervisor?.user?.email) {
+              supervisorDisplay = novelty.supervisor.user.email.split('@')[0];
+            }
+          }
+        } catch (dbErr) {
+          this.logger.warn(`Failed to enrich notification with DB names: ${dbErr}`);
+        }
+      }
+
+      // Build the multicast message body (tokens are attached per batch below).
+      // Copy is tipoNovedad-driven so LLEGADA_TARDE and HORAS_EXTRA each get their
+      // own title/body. data carries tipoNovedad so the Flutter tap handler can
+      // route to the right screen (LlegadasTardeScreen vs LiderNovedadesScreen).
+      const isLateArrival = payload.tipoNovedad === 'LLEGADA_TARDE';
+      const notification = isLateArrival
+        ? {
+            title: 'Reporte de Llegada Tarde',
+            body: `${operarioName} llegó tarde (${payload.minutosTarde ?? 0} min). Registrado por ${supervisorDisplay}.`,
+          }
+        : {
+            title: 'Solicitud de Horas Extra',
+            body: `${operarioName} tiene una solicitud de ${payload.horasExtra} horas extra por ${supervisorDisplay}.`,
+          };
       const baseMessage = {
-        notification: {
-          title: 'Nueva novedad de horas extra',
-          body: `Se registraron ${payload.horasExtra} horas extra pendientes de aprobación.`,
-        },
+        notification,
         // FCM data fields must be string values only
         data: {
           novedadId: payload.novedadId,
+          tipoNovedad: payload.tipoNovedad ?? 'HORAS_EXTRA',
           type: 'NOVEDAD_CREATED',
         },
       };

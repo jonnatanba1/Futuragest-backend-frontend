@@ -42,6 +42,19 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     updateMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id', name: 'Muni', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
     deleteMunicipio: jest.fn().mockResolvedValue(undefined),
     findUsers: jest.fn().mockResolvedValue([]),
+    updateUser: jest.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'user@test.co',
+      role: 'LIDER_OPERATIVO' as Role,
+      mustChangePassword: false,
+      coordinatedZoneId: null,
+      displayName: null,
+      createdAt: new Date(),
+    }),
+    findAreas: jest.fn().mockResolvedValue([]),
+    createArea: jest.fn().mockResolvedValue({ id: 'area-id' }),
+    updateArea: jest.fn().mockResolvedValue({ id: 'area-id', name: 'Area', horaInicio: '08:00', horaFin: '16:00', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
+    deleteArea: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -109,6 +122,24 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     ).rejects.toThrow(UnsupportedProvisionRoleError);
 
     expect(repo.createManagementUser).not.toHaveBeenCalled();
+  });
+
+  it('passes optional displayName to repo', async () => {
+    const repo = makeRepo();
+    const hasher = makeHasher();
+    const holder = makeHolder('SYSTEM_ADMIN');
+    const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
+
+    await useCase.execute({
+      email: 'g@test.co',
+      password: 'Temp1234!',
+      role: 'GERENCIA',
+      displayName: 'Gerente General',
+    });
+
+    expect(repo.createManagementUser).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: 'Gerente General' }),
+    );
   });
 
   it('rejects COORDINADOR via UnsupportedProvisionRoleError', async () => {

@@ -30,6 +30,7 @@ export interface CreateSupervisorInput {
   area: Supervisor['area'];
   zoneId: string;
   municipioId: string;
+  displayName?: string;
 }
 
 export interface CreateSupervisorOutput {
@@ -73,6 +74,7 @@ export class CreateSupervisorUseCase {
       area: input.area,
       zoneId: input.zoneId,
       municipioId: input.municipioId,
+      displayName: input.displayName,
     };
 
     return this.supervisorRepo.createWithUser(params);

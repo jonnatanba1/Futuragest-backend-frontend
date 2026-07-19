@@ -36,6 +36,17 @@ import type { SupervisorZoneReaderPort } from '../domain/ports/supervisor-zone-r
 function makePolicy(dateStr: string, hours: number): JornadaPolicyRecord {
   return {
     id: `pol-${dateStr}`,
+    operarioId: null,
+    zoneId: null,
+    horaInicio: '06:00',
+    horaFin: '14:00',
+    diasLaborales: [1, 2, 3, 4, 5],
+    almuerzoInicio: null,
+    almuerzoFin: null,
+    desayunoInicio: null,
+    desayunoFin: null,
+    toleranciaMin: 5,
+    horasSemanales: new Decimal(hours * 5),
     horasDiarias: new Decimal(hours),
     vigenteDesde: new Date(`${dateStr}T00:00:00Z`),
     createdAt: new Date(),
@@ -48,6 +59,7 @@ function makeAttendance(date: string, durationHours: number): AttendanceReaderRe
   return {
     id: `att-${date}`,
     operarioId: 'O1',
+    zoneId: 'Z1',
     date,
     checkInCapturedAt: checkIn,
     checkOutCapturedAt: checkOut,
@@ -91,6 +103,9 @@ function makePolicyRepo(policies: JornadaPolicyRecord[]): jest.Mocked<JornadaPol
     create: jest.fn(),
     findTimeline: jest.fn().mockResolvedValue(policies),
     findLatestBefore: jest.fn(),
+    delete: jest.fn(),
+    findByScope: jest.fn().mockResolvedValue([]),
+    existsByOperarioZoneVigente: jest.fn().mockResolvedValue(false),
   };
 }
 

@@ -1,7 +1,7 @@
 import { Button, Modal, Select, Stack, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import React, { useId } from 'react';
+import React, { useId, useRef } from 'react';
 import { ApiError } from '../../lib/api/client';
 import { useClosePeriodMutation } from './compensacion-queries';
 
@@ -60,6 +60,17 @@ export function CloseFortnightModal({
   const closeMutation = useClosePeriodMutation();
   const disposicionId = useId();
 
+  // C-04: Persist clientRef across retries so the backend can recognize
+  // idempotent replays. Regenerate only when the period context changes.
+  const clientRefRef = useRef(generateClientRef());
+  const clientRefKey = `${operarioId}|${desde}|${hasta}`;
+  const lastKeyRef = useRef(clientRefKey);
+  if (lastKeyRef.current !== clientRefKey) {
+    lastKeyRef.current = clientRefKey;
+    clientRefRef.current = generateClientRef();
+  }
+  const clientRef = clientRefRef.current;
+
   const form = useForm({
     mode: 'uncontrolled',
     validateInputOnBlur: true,
@@ -87,7 +98,7 @@ export function CloseFortnightModal({
           disposition: isNegative
             ? (values.disposition as 'CARRY_OVER' | 'PAYROLL_DEDUCTION')
             : null,
-          clientRef: generateClientRef(),
+          clientRef,
         },
       });
 

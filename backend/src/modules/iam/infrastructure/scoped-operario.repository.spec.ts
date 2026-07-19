@@ -53,7 +53,14 @@ describe('ScopedOperarioRepository — write methods', () => {
     it('calls prisma.operario.create with data and deactivatedAt:null', async () => {
       await repo.create({ fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '' });
       expect(prisma.operario.create).toHaveBeenCalledWith({
-        data: { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '', deactivatedAt: null },
+        data: { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '', areaId: null, deactivatedAt: null },
+      });
+    });
+
+    it('passes areaId when provided', async () => {
+      await repo.create({ fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '', areaId: 'area-1' });
+      expect(prisma.operario.create).toHaveBeenCalledWith({
+        data: { fullName: 'Ana', documento: '111', supervisorId: 'sup-1', cargo: '', deactivatedAt: null, areaId: 'area-1' },
       });
     });
   });

@@ -128,3 +128,13 @@ export class MunicipioNotInZoneError extends Error {
     this.name = 'MunicipioNotInZoneError';
   }
 }
+
+/**
+ * Thrown when a supervisor lookup by id returns no record.
+ */
+export class SupervisorNotFoundError extends Error {
+  constructor(supervisorId: string) {
+    super(`Supervisor no encontrado: "${supervisorId}".`);
+    this.name = 'SupervisorNotFoundError';
+  }
+}

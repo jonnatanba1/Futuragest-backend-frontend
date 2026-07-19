@@ -12,11 +12,33 @@ export type CompensationDisposition = 'CARRY_OVER' | 'PAYROLL_DEDUCTION';
 
 // ─── Response DTOs ────────────────────────────────────────────────────────────
 
-/** Mirrors JornadaPolicyResponseDto from the backend. */
+/** Mirrors full JornadaPolicyResponseDto from the backend (PR 5 enriched). */
 export interface JornadaPolicyDto {
   id: string;
+  /** Per-operario override. null = zone-level or global. */
+  operarioId: string | null;
+  /** Per-zone override. null + operarioId null = global. */
+  zoneId: string | null;
+  /** HH:mm — shift start (Colombia local). */
+  horaInicio: string;
+  /** HH:mm — shift end (Colombia local). */
+  horaFin: string;
+  /** ISO weekday array: [1,2,3,4,5] = Mon-Fri. */
+  diasLaborales: number[];
+  /** HH:mm — lunch start. null = auto-calculated. */
+  almuerzoInicio: string | null;
+  /** HH:mm — lunch end. null = auto. */
+  almuerzoFin: string | null;
+  /** HH:mm — breakfast start. */
+  desayunoInicio: string | null;
+  /** HH:mm — breakfast end. */
+  desayunoFin: string | null;
+  /** Late arrival tolerance in minutes. Default 5. */
+  toleranciaMin: number;
   /** Daily work hours. Prisma Decimal serialized as string. e.g. "8.00" */
   horasDiarias: string;
+  /** Weekly work hours. Prisma Decimal serialized as string. e.g. "44.00" */
+  horasSemanales: string;
   /** ISO 8601 effective date (Colombia local midnight stored as UTC). */
   vigenteDesde: string;
   /** ISO 8601 creation timestamp. */
@@ -55,6 +77,12 @@ export interface PeriodBalanceDto {
   /** carryIn + creditosHoras − debitosHoras. Decimal string. */
   saldoHoras: string;
   breakdown: DayBreakdownDto[];
+  isClosed?: boolean;
+  disposition?: CompensationDisposition | null;
+  paidAt?: string | null;
+  payoutRef?: string | null;
+  /** ISO 8601 — set when attendance data changed inside this closed period. */
+  divergedAt?: string | null;
 }
 
 /**
@@ -112,12 +140,134 @@ export interface PeriodPayoutDto {
 
 // ─── Request types ────────────────────────────────────────────────────────────
 
-/** Body for POST /compensacion/jornada-policy. */
+/** Body for POST /jornada-policy (full CRUD — PR 5). */
 export interface CreateJornadaPolicyRequest {
-  /** Daily work hours as a number (backend validates range [0.5, 24]). */
+  operarioId?: string | null;
+  zoneId?: string | null;
+  horaInicio: string;
+  horaFin: string;
+  diasLaborales: number[];
+  almuerzoInicio?: string | null;
+  almuerzoFin?: string | null;
+  desayunoInicio?: string | null;
+  desayunoFin?: string | null;
+  toleranciaMin?: number;
   horasDiarias: number;
-  /** Effective date — YYYY-MM-DD. */
+  horasSemanales: number;
   vigenteDesde: string;
+}
+
+/** Body for PATCH /jornada-policy/:id (edit existing — PR 5). */
+export interface UpdateJornadaPolicyRequest {
+  horaInicio?: string;
+  horaFin?: string;
+  diasLaborales?: number[];
+  almuerzoInicio?: string | null;
+  almuerzoFin?: string | null;
+  desayunoInicio?: string | null;
+  desayunoFin?: string | null;
+  toleranciaMin?: number;
+  horasDiarias?: number;
+  horasSemanales?: number;
+  vigenteDesde?: string;
+}
+
+// ─── Holiday types ────────────────────────────────────────────────────────────
+
+export type HolidayType = 'FIXED' | 'EMILIANI' | 'EASTER_BASED' | 'MANUAL';
+
+export interface HolidayDto {
+  id: string;
+  date: string;       // "YYYY-MM-DD"
+  name: string;
+  type: HolidayType;
+  year: number;
+  isManual: boolean;
+  createdAt: string;
+}
+
+// ─── SurchargeRate types ──────────────────────────────────────────────────────
+
+export type SurchargeCategory =
+  | 'RECARGO_NOCTURNO'
+  | 'HORA_EXTRA_DIURNA'
+  | 'HORA_EXTRA_NOCTURNA'
+  | 'RECARGO_DOMINICAL_FESTIVO';
+
+export interface SurchargeRateDto {
+  id: string;
+  category: SurchargeCategory;
+  /** Percentage as string (Prisma Decimal). e.g. "90.00" */
+  percentage: string;
+  /** ISO 8601 effective date. */
+  vigenteDesde: string;
+  creadoPor: string | null;
+  legalRef: string | null;
+  createdAt: string;
+}
+
+export interface CreateSurchargeRateRequest {
+  category: SurchargeCategory;
+  percentage: number;
+  vigenteDesde: string;
+  legalRef?: string | null;
+}
+
+// ─── CompensatoryRest types ───────────────────────────────────────────────────
+
+export type CompensatoryType = 'OCCASIONAL' | 'HABITUAL';
+export type CompensatoryStatus = 'PENDING' | 'SCHEDULED' | 'TAKEN';
+
+export interface CompensatoryRestDto {
+  id: string;
+  operarioId: string;
+  attendanceId: string;
+  month: string;           // "YYYY-MM"
+  type: CompensatoryType;
+  status: CompensatoryStatus;
+  scheduledDate: string | null;
+  takenDate: string | null;
+  resolvedAt: string | null;
+  resolvedByUserId: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ScheduleCompensatoryRequest {
+  scheduledDate: string;   // "YYYY-MM-DD"
+  notes?: string | null;
+}
+
+// ─── Enhanced balance types ───────────────────────────────────────────────────
+
+/** Category breakdown from enhanced balance (REQ-009). */
+export interface CategoryBreakdownDto {
+  horasOrdinariasDiurnas: string;
+  horasOrdinariasNocturnas: string;
+  horasExtraDiurnas: string;
+  horasExtraNocturnas: string;
+  horasDominicalesFestivas: string;
+  totalHoras: string;
+}
+
+/** Monetary surcharge value item. */
+export interface SurchargeDetailDto {
+  label: string;
+  horas: string;
+  percentage: string;
+  valor: string;
+}
+
+export interface ValorRecargosDto {
+  items: SurchargeDetailDto[];
+  total: string;
+}
+
+/** Enhanced period balance with category breakdown + surcharge values. */
+export interface EnhancedPeriodBalanceDto extends PeriodBalanceDto {
+  categoryBreakdown?: CategoryBreakdownDto | null;
+  valorRecargos?: ValorRecargosDto | null;
+  tasaDominicalAplicada?: string | null;
 }
 
 /** Body for POST /compensacion/:operarioId/close. */

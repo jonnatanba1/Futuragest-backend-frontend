@@ -4,11 +4,12 @@ import type {
   CompensationPeriodDto,
   ConfirmPayoutRequest,
   CreateJornadaPolicyRequest,
+  EnhancedPeriodBalanceDto,
   JornadaPolicyDto,
   PeriodBalanceDto,
   PeriodPayoutDto,
 } from '@futuragest/contracts';
-import { compensacionApi } from '../../lib/api/client';
+import { compensacionApi, enhancedBalanceApi, jornadaPolicyApi } from '../../lib/api/client';
 
 const FIVE_MIN = 5 * 60 * 1000;
 
@@ -21,6 +22,16 @@ const payoutKey = (operarioId: string, periodKey: string) =>
   ['compensacion', 'payout', operarioId, periodKey] as const;
 
 const policiesKey = ['compensacion', 'policies'] as const;
+
+/**
+ * Query key for the jornada-policy timeline, scoped by zone.
+ * - undefined zoneId ⇒ 'all' sentinel (full timeline, back-compat)
+ * - null / "" zoneId ⇒ '' (global / IS NULL filter)
+ * - non-empty zoneId ⇒ that value
+ * Using a sentinel avoids [.., undefined] collisions across cache entries.
+ */
+const policiesKeyByZone = (zoneId?: string | null) =>
+  ['compensacion', 'policies', zoneId === undefined ? 'all' : zoneId] as const;
 
 // ─── Query hooks ──────────────────────────────────────────────────────────────
 
@@ -60,11 +71,23 @@ export function usePayoutQuery(
   });
 }
 
-/** Jornada policy timeline (company-wide reference data; cached 5 min). */
-export function useJornadaPoliciesQuery() {
+/**
+ * Jornada policy timeline, optionally scoped by zone.
+ * - `undefined` zoneId ⇒ no filter (full timeline; back-compat with the
+ *   unscoped call site).
+ * - `null` or `""` zoneId ⇒ `{ zoneId: "" }` (global / IS NULL filter).
+ * - non-empty zoneId ⇒ `{ zoneId }` (that zone's timeline).
+ * Cached 5 min; kept broad so the panel can switch filters cheaply.
+ */
+export function useJornadaPoliciesQuery(zoneId?: string | null) {
   return useQuery<JornadaPolicyDto[]>({
-    queryKey: policiesKey,
-    queryFn: compensacionApi.getJornadaPolicies,
+    queryKey: policiesKeyByZone(zoneId),
+    // Wrap in an arrow so TanStack's queryFn context object is NOT passed as
+    // the filter argument to getJornadaPolicies.
+    queryFn: () =>
+      compensacionApi.getJornadaPolicies(
+        zoneId === undefined ? undefined : { zoneId: zoneId ?? '' },
+      ),
     staleTime: FIVE_MIN,
     retry: false,
   });
@@ -116,6 +139,42 @@ export function useCreateJornadaPolicyMutation() {
   const qc = useQueryClient();
   return useMutation<JornadaPolicyDto, Error, CreateJornadaPolicyRequest>({
     mutationFn: (body) => compensacionApi.createJornadaPolicy(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: policiesKey }),
+    // Broad prefix (exact:false) so every zone-scoped entry refetches, not
+    // just the unscoped one.
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: policiesKey, exact: false }),
+  });
+}
+
+/** Archives (deletes) a jornada policy by ID. On success, invalidates the policies list. */
+export function useArchiveJornadaPolicyMutation() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => jornadaPolicyApi.archive(id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: policiesKey, exact: false }),
+  });
+}
+
+// ─── Enhanced balance (PR 5) ──────────────────────────────────────────────────
+
+const enhancedBalanceKey = (operarioId: string, desde: string, hasta: string) =>
+  ['compensacion', 'enhanced-balance', operarioId, desde, hasta] as const;
+
+/**
+ * Enhanced period balance with category breakdown + surcharge values.
+ * Falls back gracefully if the backend doesn't support the enhanced=true param.
+ */
+export function useEnhancedBalanceQuery(
+  operarioId: string | null,
+  desde: string,
+  hasta: string,
+) {
+  return useQuery<EnhancedPeriodBalanceDto>({
+    queryKey: operarioId ? enhancedBalanceKey(operarioId, desde, hasta) : ['compensacion', 'enhanced-balance', null],
+    queryFn: () => enhancedBalanceApi.getBalance(operarioId!, desde, hasta),
+    enabled: Boolean(operarioId && desde && hasta),
+    staleTime: 0,
+    retry: false,
   });
 }

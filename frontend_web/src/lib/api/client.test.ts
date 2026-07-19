@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, authApi, compensacionApi, setUnauthorizedHandler } from './client';
+import { ApiError, authApi, compensacionApi, jornadaPolicyApi, orgApi, setUnauthorizedHandler } from './client';
 import type { ConfirmPayoutRequest } from '@futuragest/contracts';
 import { tokenStore } from '../auth/token-store';
 
@@ -179,6 +179,68 @@ describe('compensacionApi', () => {
     expect(String(url)).toMatch(/\/jornada-policy$/);
   });
 
+  describe('getJornadaPolicies filter (T9)', () => {
+    function stubPolicies() {
+      const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify([{ id: 'pol-1', horasDiarias: '8.00', vigenteDesde: '2026-01-01', createdAt: '' }]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    it('with no filter issues GET /jornada-policy with no query string', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies();
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy$/);
+    });
+
+    it('with zoneId="zA" issues /jornada-policy?zoneId=zA', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: 'zA' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA$/);
+    });
+
+    it('with zoneId="" issues /jornada-policy?zoneId= (global IS NULL filter)', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: '' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=$/);
+    });
+
+    it('with zoneId=null issues /jornada-policy?zoneId= (same as empty string)', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: null });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=$/);
+    });
+
+    it('with operarioId="o1" issues /jornada-policy?operarioId=o1', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?operarioId=o1$/);
+    });
+
+    it('with zoneId="zA" and operarioId="o1" issues /jornada-policy?zoneId=zA&operarioId=o1', async () => {
+      const fetchMock = stubPolicies();
+      await compensacionApi.getJornadaPolicies({ zoneId: 'zA', operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA&operarioId=o1$/);
+    });
+
+    it('jornadaPolicyApi.list forwards the filter the same way', async () => {
+      const fetchMock = stubPolicies();
+      await jornadaPolicyApi.list({ zoneId: 'zA', operarioId: 'o1' });
+      const [url] = fetchMock.mock.calls[0];
+      expect(String(url)).toMatch(/\/jornada-policy\?zoneId=zA&operarioId=o1$/);
+    });
+  });
+
   it('confirmPayout POSTs to /compensacion/:operarioId/payout/confirm with body', async () => {
     const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       new Response(
@@ -218,7 +280,14 @@ describe('compensacionApi', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await compensacionApi.createJornadaPolicy({ horasDiarias: 7, vigenteDesde: '2026-07-01' });
+    const result = await compensacionApi.createJornadaPolicy({
+      horaInicio: '06:00',
+      horaFin: '14:00',
+      diasLaborales: [1, 2, 3, 4, 5],
+      horasDiarias: 7,
+      horasSemanales: 44,
+      vigenteDesde: '2026-07-01',
+    });
 
     expect(result.horasDiarias).toBe('7.00');
     const [url, init] = fetchMock.mock.calls[0];
@@ -245,5 +314,109 @@ describe('cold reload', () => {
 
     const me = await authApi.me();
     expect(me).toMatchObject({ id: 'user-1' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// orgApi — Área CRUD
+// ---------------------------------------------------------------------------
+
+describe('orgApi area endpoints', () => {
+  beforeEach(() => {
+    tokenStore.setAccessToken('test-token');
+  });
+
+  it('listAreas GETs /org/areas and returns an array', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, [
+        { id: 'a-1', name: 'Patio Central', horaInicio: '06:00', horaFin: '14:00', zoneId: 'z-1', createdAt: '', updatedAt: '' },
+      ]),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await orgApi.listAreas();
+
+    expect(result[0].name).toBe('Patio Central');
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/org\/areas$/);
+  });
+
+  it('createArea POSTs /org/areas with the body and returns { id }', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(201, { id: 'a-new' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await orgApi.createArea({
+      name: 'Depósito',
+      horaInicio: '08:00',
+      horaFin: '16:00',
+      zoneId: 'z-1',
+    });
+
+    expect(result.id).toBe('a-new');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/org\/areas$/);
+    expect(init?.method).toBe('POST');
+    const sent = JSON.parse(init?.body as string);
+    expect(sent).toMatchObject({ name: 'Depósito', horaInicio: '08:00', horaFin: '16:00', zoneId: 'z-1' });
+  });
+
+  it('createArea throws ApiError on 409 conflict', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      jsonResponse(409, { message: 'Area name already in use in this zone', code: 'AREA_NAME_IN_USE' }),
+    ));
+
+    await expect(
+      orgApi.createArea({ name: 'Duplicate', horaInicio: '06:00', horaFin: '14:00', zoneId: 'z-1' }),
+    ).rejects.toMatchObject({ status: 409, message: 'Area name already in use in this zone' });
+  });
+
+  it('updateArea PATCHes /org/areas/:id with partial body and returns AreaResponseDto', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, { id: 'a-1', name: 'Almacén', horaInicio: '07:00', horaFin: '15:00', zoneId: 'z-1', createdAt: '', updatedAt: '' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await orgApi.updateArea('a-1', { name: 'Almacén' });
+
+    expect(result.name).toBe('Almacén');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/org/areas/a-1');
+    expect(init?.method).toBe('PATCH');
+    const sent = JSON.parse(init?.body as string);
+    expect(sent).toEqual({ name: 'Almacén' });
+  });
+
+  it('updateArea throws ApiError on 404 not found', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      jsonResponse(404, { message: 'Area not found', code: 'AREA_NOT_FOUND' }),
+    ));
+
+    await expect(
+      orgApi.updateArea('nonexistent', { name: 'Nope' }),
+    ).rejects.toMatchObject({ status: 404, message: 'Area not found' });
+  });
+
+  it('deleteArea DELETEs /org/areas/:id', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await orgApi.deleteArea('a-1');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/org/areas/a-1');
+    expect(init?.method).toBe('DELETE');
+  });
+
+  it('deleteArea throws ApiError on 409 with dependents', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      jsonResponse(409, { message: 'Area has dependent operarios', code: 'AREA_HAS_DEPENDENTS' }),
+    ));
+
+    await expect(orgApi.deleteArea('a-1')).rejects.toMatchObject({
+      status: 409,
+      message: 'Area has dependent operarios',
+    });
   });
 });

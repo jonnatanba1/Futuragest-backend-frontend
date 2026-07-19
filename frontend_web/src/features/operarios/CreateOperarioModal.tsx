@@ -10,14 +10,21 @@ export interface SupervisorOption {
   label: string;
 }
 
+export interface AreaOption {
+  value: string;
+  label: string;
+}
+
 export function CreateOperarioModal({
   opened,
   onClose,
   supervisorOptions,
+  areaOptions,
 }: {
   opened: boolean;
   onClose: () => void;
   supervisorOptions: SupervisorOption[];
+  areaOptions?: AreaOption[];
 }) {
   const createOperario = useCreateOperario();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -25,7 +32,8 @@ export function CreateOperarioModal({
   const form = useForm({
     mode: 'uncontrolled',
     validateInputOnBlur: true,
-    initialValues: { fullName: '', documento: '', supervisorId: '', cargo: '' },
+    validateInputOnChange: true,
+    initialValues: { fullName: '', documento: '', supervisorId: '', cargo: '', areaId: '' },
     validate: {
       fullName: (v) => (v.trim().length > 0 ? null : 'Ingrese el nombre completo'),
       documento: (v) => (/^\d{5,}$/.test(v.trim()) ? null : 'Ingrese un número de documento válido'),
@@ -47,6 +55,7 @@ export function CreateOperarioModal({
         documento: values.documento.trim(),
         supervisorId: values.supervisorId,
         cargo: values.cargo.trim(),
+        areaId: values.areaId || undefined,
       });
       notifications.show({ color: 'teal', message: 'Operario creado' });
       handleClose();
@@ -89,6 +98,17 @@ export function CreateOperarioModal({
             key={form.key('supervisorId')}
             {...form.getInputProps('supervisorId')}
           />
+          {areaOptions && areaOptions.length > 0 && (
+            <Select
+              label="Área"
+              placeholder="Seleccione un área (opcional)"
+              data={areaOptions}
+              searchable
+              clearable
+              key={form.key('areaId')}
+              {...form.getInputProps('areaId')}
+            />
+          )}
           <TextInput
             label="Cargo"
             placeholder="Ej: Barrido, Recolección"

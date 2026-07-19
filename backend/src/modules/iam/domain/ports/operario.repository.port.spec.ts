@@ -18,7 +18,7 @@ describe('OperarioRepositoryPort', () => {
   it('interface has all required method signatures (compile-time check)', () => {
     // This is a compile-time check — if the interface is missing methods, TS fails
     const _typeCheck = (port: OperarioRepositoryPort) => {
-      port.create({ fullName: '', documento: '', supervisorId: '', cargo: '' });
+      port.create({ fullName: '', documento: '', supervisorId: '', cargo: '', areaId: '' });
       port.findByDocumento('');
       port.findByIdScoped('');
       port.setDeactivatedAt('', new Date());
