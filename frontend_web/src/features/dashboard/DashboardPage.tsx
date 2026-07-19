@@ -43,6 +43,7 @@ import { useNovedades } from '../novedades/novedad-queries';
 import { useOperarios, useZones } from '../operarios/operario-queries';
 import './dashboard.css';
 import {
+  type CargoBucket,
   type Period,
   absentToday,
   activeJornadaPolicy,
@@ -405,6 +406,156 @@ function SectionCard({
       </Group>
       <Box style={{ minHeight: minH }}>{children}</Box>
     </Card>
+  );
+}
+
+// ── Operarios por cargo (hoy: ingresaron / faltaron) ─────────────────────────
+
+function CargoByRolePanel({ cargoList }: { cargoList: CargoBucket[] }) {
+  const totals = cargoList.reduce(
+    (acc, c) => ({
+      total: acc.total + c.total,
+      ingresaron: acc.ingresaron + c.ingresaron,
+      faltaron: acc.faltaron + c.faltaron,
+    }),
+    { total: 0, ingresaron: 0, faltaron: 0 },
+  );
+  const overallPct = totals.total > 0
+    ? Math.round((totals.ingresaron / totals.total) * 100)
+    : 0;
+
+  return (
+    <Stack gap="md">
+      <div className="fg-cargo-summary" aria-label="Resumen de asistencia por cargo hoy">
+        <div className="fg-cargo-summary-stat fg-cargo-summary-stat--in">
+          <Group gap={6} wrap="nowrap">
+            <ThemeIcon variant="light" color="teal" size={28} radius="md">
+              <IconCircleCheck size={16} />
+            </ThemeIcon>
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.4px' }}>
+              Ingresaron
+            </Text>
+          </Group>
+          <Text
+            className="fg-cargo-summary-value"
+            c={totals.ingresaron > 0 ? 'teal.7' : 'dimmed'}
+            fw={700}
+            lh={1}
+          >
+            {totals.ingresaron}
+          </Text>
+          <Text size="xs" c="dimmed">{overallPct}% del personal</Text>
+        </div>
+
+        <div className="fg-cargo-summary-stat fg-cargo-summary-stat--out">
+          <Group gap={6} wrap="nowrap">
+            <ThemeIcon
+              variant="light"
+              color={totals.faltaron > 0 ? 'red' : 'gray'}
+              size={28}
+              radius="md"
+            >
+              <IconUserOff size={16} />
+            </ThemeIcon>
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.4px' }}>
+              Faltaron
+            </Text>
+          </Group>
+          <Text
+            className="fg-cargo-summary-value"
+            c={totals.faltaron > 0 ? 'red.7' : 'dimmed'}
+            fw={700}
+            lh={1}
+          >
+            {totals.faltaron}
+          </Text>
+          <Text size="xs" c="dimmed">sin fichaje hoy</Text>
+        </div>
+
+        <div className="fg-cargo-summary-bar" aria-hidden="true">
+          <Progress.Root size={10} radius="xl">
+            {totals.ingresaron > 0 && (
+              <Progress.Section
+                value={totals.total > 0 ? (totals.ingresaron / totals.total) * 100 : 0}
+                color="teal.6"
+              />
+            )}
+            {totals.faltaron > 0 && (
+              <Progress.Section
+                value={totals.total > 0 ? (totals.faltaron / totals.total) * 100 : 0}
+                color="red.4"
+              />
+            )}
+          </Progress.Root>
+          <Group justify="space-between" mt={6}>
+            <Text size="xs" c="dimmed">{totals.total} operarios activos</Text>
+            <Text size="xs" c="dimmed">Asistencia del día</Text>
+          </Group>
+        </div>
+      </div>
+
+      <div className="fg-cargo-grid" role="list" aria-label="Desglose por cargo">
+        {cargoList.map((bucket) => (
+          <CargoRoleCard key={bucket.cargo} bucket={bucket} />
+        ))}
+      </div>
+    </Stack>
+  );
+}
+
+function CargoRoleCard({ bucket }: { bucket: CargoBucket }) {
+  const { cargo, total, ingresaron, faltaron } = bucket;
+  const ingrPct = total > 0 ? Math.round((ingresaron / total) * 100) : 0;
+  const faltPct = total > 0 ? 100 - ingrPct : 0;
+  const allPresent = faltaron === 0 && total > 0;
+  const allAbsent = ingresaron === 0 && total > 0;
+
+  return (
+    <article
+      className={`fg-cargo-card${allAbsent ? ' fg-cargo-card--alert' : ''}${allPresent ? ' fg-cargo-card--ok' : ''}`}
+      role="listitem"
+      aria-label={`${cargo}: ${ingresaron} ingresaron, ${faltaron} faltaron de ${total}`}
+    >
+      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs" mb="sm">
+        <div style={{ minWidth: 0 }}>
+          <Text fw={700} size="sm" lineClamp={1} title={cargo}>{cargo}</Text>
+          <Text size="xs" c="dimmed">{total} {total === 1 ? 'operario' : 'operarios'}</Text>
+        </div>
+        <Badge
+          variant="light"
+          color={allPresent ? 'teal' : allAbsent ? 'red' : 'gray'}
+          size="sm"
+          radius="xl"
+        >
+          {ingrPct}%
+        </Badge>
+      </Group>
+
+      <div className="fg-cargo-stats">
+        <div className="fg-cargo-stat fg-cargo-stat--in">
+          <Text className="fg-cargo-stat-label">Ingresaron</Text>
+          <Text className="fg-cargo-stat-value" c={ingresaron > 0 ? 'teal.7' : 'dimmed'}>
+            {ingresaron}
+          </Text>
+        </div>
+        <div className="fg-cargo-stat-divider" aria-hidden="true" />
+        <div className="fg-cargo-stat fg-cargo-stat--out">
+          <Text className="fg-cargo-stat-label">Faltaron</Text>
+          <Text className="fg-cargo-stat-value" c={faltaron > 0 ? 'red.7' : 'dimmed'}>
+            {faltaron}
+          </Text>
+        </div>
+      </div>
+
+      <Progress.Root size={8} radius="xl" mt="sm" className="fg-cargo-ratio">
+        {ingresaron > 0 && (
+          <Progress.Section value={ingrPct} color="teal.6" />
+        )}
+        {faltaron > 0 && (
+          <Progress.Section value={faltPct} color="red.4" />
+        )}
+      </Progress.Root>
+    </article>
   );
 }
 
@@ -776,58 +927,23 @@ export function DashboardPage() {
         </SectionCard>
 
         {/* ── Operarios by cargo ───────────────────────────────────── */}
-        <SectionCard className="fg-bento-cargo" title="Operarios por cargo"
+        <SectionCard
+          className="fg-bento-cargo"
+          title="Operarios por cargo"
           action={
-            <Group gap="md" wrap="nowrap">
-              <Badge variant="light" color="brand" size="sm" radius="xl">
-                Total: {activeCount}
-              </Badge>
-              <Group gap={6} wrap="nowrap">
-                <Box w={10} h={10} bg="teal.6" style={{ borderRadius: 999 }} />
-                <Text size="xs" c="dimmed">Ingresaron</Text>
-              </Group>
-              <Group gap={6} wrap="nowrap">
-                <Box w={10} h={10} bg="red.4" style={{ borderRadius: 999 }} />
-                <Text size="xs" c="dimmed">Faltaron (hoy)</Text>
-              </Group>
-            </Group>
-          }>
-          {operariosActive.isLoading ? <Skeleton height={200} radius="md" />
-          : operariosForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-          : cargoList.length === 0 ? <EmptyState title="Sin operarios registrados" />
-          : (
-            <Stack gap={0}>
-              {cargoList.map(({ cargo, total, ingresaron, faltaron }) => {
-                const ingrPct = Math.round((ingresaron / total) * 100);
-                const faltPct = 100 - ingrPct;
-                return (
-                  <Box key={cargo} className="fg-cargo-row">
-                    <Group justify="space-between" align="flex-end" mb={6} wrap="nowrap">
-                      <Text fw={600} size="sm">{cargo}</Text>
-                      <Text size="xs" c="dimmed" fw={500}>{total} operarios</Text>
-                    </Group>
-                    <Progress.Root size="xl" radius="xl">
-                      {ingresaron > 0 && (
-                        <Progress.Section value={ingrPct} color="teal.6" />
-                      )}
-                      {faltaron > 0 && (
-                        <Progress.Section value={faltPct} color="red.4" />
-                      )}
-                    </Progress.Root>
-                    <Group justify="space-between" mt={5} wrap="nowrap">
-                      <Group gap={6} wrap="nowrap">
-                        <Box w={8} h={8} bg="teal.6" style={{ borderRadius: 999 }} />
-                        <Text size="xs" fw={600} c="teal.6">{ingresaron} ingresaron ({ingrPct}%)</Text>
-                      </Group>
-                      <Group gap={6} wrap="nowrap">
-                        <Box w={8} h={8} bg="red.4" style={{ borderRadius: 999 }} />
-                        <Text size="xs" fw={600} c="red.6">{faltaron} faltaron ({faltPct}%)</Text>
-                      </Group>
-                    </Group>
-                  </Box>
-                );
-              })}
-            </Stack>
+            <Badge variant="light" color="brand" size="sm" radius="xl">
+              Hoy · {activeCount} activos
+            </Badge>
+          }
+        >
+          {operariosActive.isLoading || attendances.isLoading ? (
+            <Skeleton height={220} radius="md" />
+          ) : operariosForbidden || attendancesForbidden ? (
+            <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          ) : cargoList.length === 0 ? (
+            <EmptyState title="Sin operarios registrados" />
+          ) : (
+            <CargoByRolePanel cargoList={cargoList} />
           )}
         </SectionCard>
       </div>

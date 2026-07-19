@@ -130,23 +130,142 @@
   min-inline-size: 0;
 }
 
-/* ── Cargo: operational workforce breakdown ─────────────────────────────── */
+/* ── Cargo: operational workforce breakdown (ingresaron / faltaron) ─────── */
 
-.fg-cargo-total-badge {
-  background: var(--mantine-color-teal-light);
-  color: var(--mantine-color-teal-light-color);
-  border-radius: var(--mantine-radius-xl);
-  padding: 2px 12px;
-  font-size: var(--mantine-font-size-xs);
-  font-weight: 600;
+.fg-cargo-summary {
+  display: grid;
+  gap: var(--mantine-spacing-md);
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    'in out'
+    'bar bar';
+  padding: var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-lg);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--mantine-color-brand-0) 70%, transparent) 0%,
+      color-mix(in srgb, var(--mantine-color-gray-0) 80%, transparent) 100%
+    );
+  border: 1px solid var(--mantine-color-default-border);
 }
 
-.fg-cargo-row {
-  padding-block: var(--mantine-spacing-xs);
+.fg-cargo-summary-stat--in { grid-area: in; }
+.fg-cargo-summary-stat--out { grid-area: out; }
+.fg-cargo-summary-bar { grid-area: bar; }
+
+.fg-cargo-summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-inline-size: 0;
 }
 
-.fg-cargo-row + .fg-cargo-row {
-  border-block-start: 1px solid var(--mantine-color-default-border);
+.fg-cargo-summary-value {
+  font-size: clamp(1.75rem, 2.5vw, 2.25rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.fg-cargo-grid {
+  display: grid;
+  gap: var(--mantine-spacing-md);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.fg-cargo-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-lg);
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  min-inline-size: 0;
+}
+
+.fg-cargo-card--ok {
+  border-color: color-mix(in srgb, var(--mantine-color-teal-4) 55%, var(--mantine-color-default-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mantine-color-teal-0) 55%, transparent) 0%,
+      var(--mantine-color-body) 55%
+    );
+}
+
+.fg-cargo-card--alert {
+  border-color: color-mix(in srgb, var(--mantine-color-red-4) 50%, var(--mantine-color-default-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mantine-color-red-0) 55%, transparent) 0%,
+      var(--mantine-color-body) 55%
+    );
+}
+
+.fg-cargo-stats {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: var(--mantine-spacing-xs);
+  flex: 1;
+}
+
+.fg-cargo-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+  text-align: center;
+}
+
+.fg-cargo-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+  line-height: 1.2;
+}
+
+.fg-cargo-stat-value {
+  font-size: clamp(1.35rem, 2vw, 1.65rem);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.fg-cargo-stat-divider {
+  inline-size: 1px;
+  background: var(--mantine-color-default-border);
+  margin-block: 2px;
+}
+
+.fg-cargo-ratio {
+  margin-block-start: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fg-cargo-card {
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+
+  .fg-cargo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--mantine-shadow-sm);
+  }
+}
+
+@media (max-width: 36em) {
+  .fg-cargo-summary {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'in'
+      'out'
+      'bar';
+  }
 }
 
 /* ── Open attendance list items ─────────────────────────────────────────── */

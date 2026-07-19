@@ -327,7 +327,7 @@ describe('orgApi area endpoints', () => {
   });
 
   it('listAreas GETs /org/areas and returns an array', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       jsonResponse(200, [
         { id: 'a-1', name: 'Patio Central', horaInicio: '06:00', horaFin: '14:00', zoneId: 'z-1', createdAt: '', updatedAt: '' },
       ]),
@@ -342,7 +342,7 @@ describe('orgApi area endpoints', () => {
   });
 
   it('createArea POSTs /org/areas with the body and returns { id }', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       jsonResponse(201, { id: 'a-new' }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -373,7 +373,7 @@ describe('orgApi area endpoints', () => {
   });
 
   it('updateArea PATCHes /org/areas/:id with partial body and returns AreaResponseDto', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       jsonResponse(200, { id: 'a-1', name: 'Almacén', horaInicio: '07:00', horaFin: '15:00', zoneId: 'z-1', createdAt: '', updatedAt: '' }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -399,7 +399,7 @@ describe('orgApi area endpoints', () => {
   });
 
   it('deleteArea DELETEs /org/areas/:id', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await orgApi.deleteArea('a-1');

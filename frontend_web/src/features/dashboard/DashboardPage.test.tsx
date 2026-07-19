@@ -319,6 +319,36 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Barrido')).toBeInTheDocument();
       expect(screen.getByText('Recolección')).toBeInTheDocument();
     });
+
+    it('shows ingresaron and faltaron per cargo for today', () => {
+      operariosActiveMock.mockReturnValue(
+        ok([
+          { id: 'o1', fullName: 'A', cargo: 'Barrido', active: true },
+          { id: 'o2', fullName: 'B', cargo: 'Barrido', active: true },
+          { id: 'o3', fullName: 'C', cargo: 'Recolección', active: true },
+        ]),
+      );
+      operariosAllMock.mockReturnValue(ok([]));
+      attendancesMock.mockReturnValue(
+        ok([makeAtt({ operarioId: 'o1', date: TODAY_STR })]),
+      );
+      novedadesMock.mockReturnValue(ok([]));
+      zonesMock.mockReturnValue(ok([]));
+      renderPage();
+
+      // Summary strip labels
+      expect(screen.getAllByText('Ingresaron').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Faltaron').length).toBeGreaterThanOrEqual(1);
+
+      // Barrido: 1 of 2 present → aria includes counts
+      expect(
+        screen.getByLabelText(/Barrido: 1 ingresaron, 1 faltaron de 2/),
+      ).toBeInTheDocument();
+      // Recolección: 0 of 1 present
+      expect(
+        screen.getByLabelText(/Recolección: 0 ingresaron, 1 faltaron de 1/),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('novedades approved hours', () => {
