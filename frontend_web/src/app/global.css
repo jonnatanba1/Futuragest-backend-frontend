@@ -21,8 +21,8 @@ body {
   mix-blend-mode: normal;
 }
 
-/* Page content fade-in + KPI hover lift — only when reduced motion is allowed.
-   Both use Mantine CSS variables so they adapt to the light/dark color scheme. */
+/* Page content fade-in — only when reduced motion is allowed.
+   Uses Mantine CSS variables so it adapts to the light/dark color scheme. */
 @media (prefers-reduced-motion: no-preference) {
   .mantine-AppShell-main > * {
     animation: fg-fade-in 180ms ease-out;
@@ -37,14 +37,5 @@ body {
       opacity: 1;
       transform: none;
     }
-  }
-
-  .fg-kpi-card {
-    transition: transform 150ms ease, box-shadow 150ms ease;
-  }
-
-  .fg-kpi-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--mantine-shadow-md);
   }
 }

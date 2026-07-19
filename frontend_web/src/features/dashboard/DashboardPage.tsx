@@ -8,14 +8,12 @@ import {
   Badge,
   Box,
   Card,
-  Grid,
   Group,
   Progress,
+  RingProgress,
   SegmentedControl,
-  SimpleGrid,
   Skeleton,
   Stack,
-  Table,
   Text,
   ThemeIcon,
   Title,
@@ -23,18 +21,18 @@ import {
 } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import {
+  IconAlarm,
   IconAlertTriangle,
   IconArrowDownRight,
   IconArrowUpRight,
-  IconCalendarStats,
+  IconChevronRight,
+  IconCircleCheck,
   IconClock,
   IconClockHour4,
   IconUserOff,
-  IconUsers,
-  IconUserPlus,
 } from '@tabler/icons-react';
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../components/EmptyState';
 import { VerificationBadge } from '../../components/VerificationBadge';
 import { ApiError } from '../../lib/api/client';
@@ -43,6 +41,7 @@ import { useAttendances } from '../asistencia/attendance-queries';
 import { useJornadaPoliciesQuery } from '../compensacion/compensacion-queries';
 import { useNovedades } from '../novedades/novedad-queries';
 import { useOperarios, useZones } from '../operarios/operario-queries';
+import './dashboard.css';
 import {
   type Period,
   absentToday,
@@ -83,7 +82,7 @@ function DeltaLine({ pct }: { pct: number | null }) {
   const color = pct > 0 ? 'teal.6' : pct < 0 ? 'red.6' : 'dimmed';
   const Icon = pct > 0 ? IconArrowUpRight : pct < 0 ? IconArrowDownRight : null;
   return (
-    <Group gap={4} mt={4} wrap="nowrap">
+    <Group gap={4} mt={4} wrap="nowrap" justify="flex-end">
       {Icon && (
         <Box component="span" c={color} lh={0}><Icon size={14} /></Box>
       )}
@@ -92,94 +91,168 @@ function DeltaLine({ pct }: { pct: number | null }) {
   );
 }
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
+// ── Page header ───────────────────────────────────────────────────────────────
 
-interface KpiCardProps {
-  label: string;
-  value: string | number | null;
-  secondary?: string;
-  icon: React.ReactNode;
-  iconColor?: string;
-  accentValue?: boolean;
-  accentColor?: string;
-  delta?: { pct: number | null };
-  sparkline?: number[];
+function formatHeaderDate(now: Date): string {
+  const label = new Intl.DateTimeFormat('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(now);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function DashboardHeader({
+  period,
+  onPeriodChange,
+  now,
+}: {
+  period: Period;
+  onPeriodChange: (p: Period) => void;
+  now: Date;
+}) {
+  const { user } = useAuth();
+  return (
+    <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+      <div>
+        <Title order={2}>Tablero</Title>
+        <Text c="dimmed" size="sm">{formatHeaderDate(now)}</Text>
+        <Text c="dimmed" size="sm">{user?.email} · {user?.role}</Text>
+      </div>
+      <SegmentedControl aria-label="Período del tablero" value={period}
+        onChange={(v) => onPeriodChange(v as Period)}
+        data={PERIOD_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
+        radius="md" />
+    </Group>
+  );
+}
+
+// ── Hero: today's attendance ring ─────────────────────────────────────────────
+
+interface HeroProps {
+  activeCount: number;
+  inactiveCount: number;
+  presentToday: number;
+  absentToday: number;
+  completedToday: number;
+  openToday: number;
+  policy: ReturnType<typeof activeJornadaPolicy>;
+  operarios: { id: string; fullName: string }[];
+  zones: { id: string; name: string }[];
+  policiesLoading: boolean;
   isLoading: boolean;
   isError: boolean;
-  onClick?: () => void;
 }
 
-function KpiCard({
-  label, value, secondary, icon, iconColor = 'brand',
-  accentValue, accentColor = 'brand.6', delta, sparkline,
-  isLoading, isError, onClick,
-}: KpiCardProps) {
-  const inner = (
-    <Card className="fg-kpi-card" padding="lg" radius="lg" withBorder h="100%">
-      <Group align="flex-start" justify="space-between" mb="sm">
-        <ThemeIcon variant="light" color={iconColor} size={42} radius="md">
-          {icon}
-        </ThemeIcon>
-      </Group>
-      <Text size="sm" c="dimmed" fw={500}>{label}</Text>
-      {isLoading ? (
-        <Skeleton height={36} width={72} mt={6} />
-      ) : isError ? (
-        <>
-          <Text size="1.9rem" fw={700} c="dimmed" mt={2}>—</Text>
-          <Text size="xs" c="dimmed" mt={4}>Sin acceso para su rol</Text>
-        </>
-      ) : (
-        <>
-          <Text size="1.9rem" fw={700} lh={1.15} mt={2}
-            c={accentValue && Number(value) > 0 ? accentColor : undefined}>
-            {value}
-          </Text>
-          {secondary && <Text size="xs" c="dimmed" mt={4}>{secondary}</Text>}
-          {delta && <DeltaLine pct={delta.pct} />}
-          {sparkline && sparkline.length > 1 && (
-            <Sparkline h={30} data={sparkline} color="brand.5" fillOpacity={0.2}
-              curveType="monotone" strokeWidth={1.5} mt="xs" />
-          )}
-        </>
-      )}
-    </Card>
-  );
-  return onClick ? (
-    <UnstyledButton onClick={onClick} aria-label={label} style={{ display: 'block', height: '100%' }}>
-      {inner}
-    </UnstyledButton>
-  ) : inner;
-}
+function HeroTodayCard({
+  activeCount, inactiveCount, presentToday, absentToday: absent,
+  completedToday, openToday, policy, operarios, zones,
+  policiesLoading, isLoading, isError,
+}: HeroProps) {
+  if (isLoading) {
+    return (
+      <Card className="fg-bento-hero" padding="lg" radius="lg" withBorder>
+        <Skeleton height={260} radius="md" />
+      </Card>
+    );
+  }
 
-// ── Section wrapper ─────────────────────────────────────────────────────────
+  const pct = activeCount > 0 ? Math.round((presentToday / activeCount) * 100) : 0;
+  const ringSections = activeCount > 0
+    ? [
+        { value: (completedToday / activeCount) * 100, color: 'var(--mantine-color-brand-2)' },
+        { value: (openToday / activeCount) * 100, color: 'var(--mantine-color-yellow-4)' },
+        { value: (absent / activeCount) * 100, color: 'rgb(255 255 255 / 0.25)' },
+      ]
+    : [];
 
-function SectionCard({
-  title, action, children, minH,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  minH?: number;
-}) {
   return (
-    <Card padding="lg" radius="lg" withBorder h="100%">
-      <Group justify="space-between" align="center" mb="md" wrap="nowrap">
-        <Text fw={600}>{title}</Text>
-        {action}
-      </Group>
-      <Box style={{ minHeight: minH }}>{children}</Box>
+    <Card className="fg-bento-hero fg-hero" padding="xl" radius="lg">
+      <Stack gap="md" h="100%" justify="space-between">
+        {isError ? (
+          <Stack align="center" justify="center" h="100%" mih={220}>
+            <Text className="fg-hero-dim" size="sm">Sin acceso para su rol</Text>
+          </Stack>
+        ) : (
+          <Group gap="xl" align="center" wrap="wrap">
+            <RingProgress
+              size={160}
+              thickness={14}
+              roundCaps
+              sections={ringSections}
+              rootColor="rgb(255 255 255 / 0.18)"
+              label={
+                <Stack gap={0} align="center">
+                  <Text c="white" fw={700} fz={28} lh={1} ta="center">{pct}%</Text>
+                  <Text className="fg-hero-dim" size="xs" ta="center">ingresaron</Text>
+                </Stack>
+              }
+            />
+            <Stack gap={6} style={{ flex: 1, minWidth: 180 }}>
+              <Text className="fg-hero-dim" size="xs" fw={600} tt="uppercase"
+                style={{ letterSpacing: '0.6px' }}>
+                Asistencia de hoy
+              </Text>
+              <Text c="white" fw={700} fz={26} lh={1.15}>
+                {presentToday} de {activeCount} operarios ficharon
+              </Text>
+              <Group gap="lg" mt={4} wrap="wrap">
+                <Group gap={6} wrap="nowrap">
+                  <Box component="span" c="brand.2" lh={0}><IconCircleCheck size={16} /></Box>
+                  <Text size="sm" className="fg-hero-dim">{completedToday} completadas hoy</Text>
+                </Group>
+                <Group gap={6} wrap="nowrap">
+                  <Box component="span" c="yellow.3" lh={0}><IconClockHour4 size={16} /></Box>
+                  <Text size="sm" className="fg-hero-dim">{openToday} abiertas hoy</Text>
+                </Group>
+              </Group>
+            </Stack>
+          </Group>
+        )}
+
+        <div>
+          <hr className="fg-hero-divider" />
+          <HeroJornada policy={policy} operarios={operarios} zones={zones}
+            isLoading={policiesLoading} />
+        </div>
+
+        {!isError && (
+          <div>
+            <hr className="fg-hero-divider" />
+            <Group gap="xl" wrap="wrap">
+              <Stack gap={2}>
+                <Text className="fg-hero-dim" size="xs" fw={600} tt="uppercase"
+                  style={{ letterSpacing: '0.6px' }}>
+                  Operarios activos
+                </Text>
+                <Group gap={8} align="baseline" wrap="nowrap">
+                  <Text c="white" fw={700} fz={22} lh={1}>{activeCount}</Text>
+                  <Text size="xs" className="fg-hero-dim">
+                    {inactiveCount} inactivo{inactiveCount !== 1 ? 's' : ''}
+                  </Text>
+                </Group>
+              </Stack>
+              <Stack gap={2}>
+                <Text className="fg-hero-dim" size="xs" fw={600} tt="uppercase"
+                  style={{ letterSpacing: '0.6px' }}>
+                  Ingresaron hoy
+                </Text>
+                <Group gap={8} align="baseline" wrap="nowrap">
+                  <Text c="white" fw={700} fz={22} lh={1}>{presentToday}</Text>
+                  <Text size="xs" className="fg-hero-dim">{pct}% del personal</Text>
+                </Group>
+              </Stack>
+            </Group>
+          </div>
+        )}
+      </Stack>
     </Card>
   );
 }
 
-// ── Jornada Vigente Panel ───────────────────────────────────────────────────
-
-function JornadaVigentePanel({
-  policy,
-  operarios,
-  zones,
-  isLoading,
+function HeroJornada({
+  policy, operarios, zones, isLoading,
 }: {
   policy: ReturnType<typeof activeJornadaPolicy>;
   operarios: { id: string; fullName: string }[];
@@ -187,21 +260,21 @@ function JornadaVigentePanel({
   isLoading: boolean;
 }) {
   if (isLoading) {
-    return <Skeleton height={100} radius="lg" />;
+    return <Skeleton height={44} radius="md" />;
   }
   if (!policy) {
     return (
-      <Card padding="lg" radius="lg" withBorder>
-        <Group gap="sm">
-          <ThemeIcon variant="light" color="orange" size={36} radius="md">
-            <IconClock size={20} />
-          </ThemeIcon>
-          <Stack gap={0}>
-            <Text fw={600}>Sin jornada vigente</Text>
-            <Text size="sm" c="dimmed">Configure una política de jornada en Configuración → Jornada.</Text>
-          </Stack>
-        </Group>
-      </Card>
+      <Group gap="sm" wrap="nowrap">
+        <ThemeIcon variant="white" color="white" size={34} radius="md">
+          <IconClock size={18} />
+        </ThemeIcon>
+        <Stack gap={0}>
+          <Text c="white" fw={600} size="sm">Sin jornada vigente</Text>
+          <Text size="xs" className="fg-hero-dim">
+            Configure una política de jornada en Configuración → Jornada.
+          </Text>
+        </Stack>
+      </Group>
     );
   }
 
@@ -214,34 +287,123 @@ function JornadaVigentePanel({
   const diasLabel = (policy.diasLaborales ?? []).map((d) => DAY_SHORT[d] ?? String(d)).join(', ') || '—';
 
   return (
-    <Card padding="lg" radius="lg" withBorder>
-      <Group justify="space-between" align="flex-start" wrap="wrap" gap="lg">
-        <Group gap="md" align="flex-start" wrap="wrap">
-          <ThemeIcon variant="light" color="brand" size={44} radius="md">
-            <IconClock size={24} />
-          </ThemeIcon>
-          <Stack gap={4}>
-            <Group gap="sm">
-              <Text fw={700} size="lg">{policy.horaInicio} – {policy.horaFin}</Text>
-              <Badge variant="light" color="brand" size="sm">{scope}</Badge>
-            </Group>
-          </Stack>
-        </Group>
-        <Group gap="xl" align="flex-start" wrap="wrap">
-          <Stack gap={2}>
-            <Text size="xs" c="dimmed">Días laborales</Text>
-            <Text size="sm" fw={500}>{diasLabel}</Text>
-          </Stack>
-          <Stack gap={2}>
-            <Text size="xs" c="dimmed">Horas</Text>
-            <Text size="sm" fw={500}>{policy.horasDiarias} h/día · {policy.horasSemanales} h/sem</Text>
-          </Stack>
-          <Stack gap={2}>
-            <Text size="xs" c="dimmed">Vigente desde</Text>
-            <Text size="sm" fw={500}>{policy.vigenteDesde?.slice(0, 10)}</Text>
-          </Stack>
-        </Group>
+    <Group justify="space-between" align="center" wrap="wrap" gap="md">
+      <Group gap="sm" wrap="nowrap">
+        <ThemeIcon variant="white" color="white" size={34} radius="md">
+          <IconClock size={18} />
+        </ThemeIcon>
+        <Stack gap={2}>
+          <Text className="fg-hero-dim" size="xs" fw={600} tt="uppercase"
+            style={{ letterSpacing: '0.6px' }}>
+            Jornada vigente
+          </Text>
+          <Group gap="sm" wrap="nowrap">
+            <Text c="white" fw={700} size="md">{policy.horaInicio} – {policy.horaFin}</Text>
+            <Badge variant="white" color="dark" size="sm">{scope}</Badge>
+          </Group>
+        </Stack>
       </Group>
+      <Text size="xs" className="fg-hero-dim">
+        {diasLabel} · {policy.horasDiarias} h/día · {policy.horasSemanales} h/sem · desde {policy.vigenteDesde?.slice(0, 10)}
+      </Text>
+    </Group>
+  );
+}
+
+// ── KPI tile ─────────────────────────────────────────────────────────────────
+
+interface KpiTileProps {
+  className: string;
+  label: string;
+  value: string | number | null;
+  secondary?: string;
+  icon: React.ReactNode;
+  iconColor: string;
+  accentValue?: boolean;
+  accentColor?: string;
+  isLoading: boolean;
+  isError: boolean;
+  onClick?: () => void;
+}
+
+function KpiTile({
+  className, label, value, secondary, icon, iconColor,
+  accentValue, accentColor = 'red.6', isLoading, isError, onClick,
+}: KpiTileProps) {
+  const body = (
+    <Group gap="md" align="flex-start" justify="space-between" wrap="nowrap">
+      <Group gap="md" align="flex-start" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+        <ThemeIcon variant="light" color={iconColor} size={40} radius="md">
+          {icon}
+        </ThemeIcon>
+        <Box className="fg-tile" style={{ minWidth: 0 }}>
+          <Text size="xs" c="dimmed" fw={600} tt="uppercase"
+            style={{ letterSpacing: '0.4px' }}>
+            {label}
+          </Text>
+          {isLoading ? (
+            <Skeleton height={30} width={56} mt={4} />
+          ) : isError ? (
+            <>
+              <Text fz={26} fw={700} c="dimmed" lh={1.2}>—</Text>
+              <Text size="xs" c="dimmed">Sin acceso para su rol</Text>
+            </>
+          ) : (
+            <>
+              <Text fz={26} fw={700} lh={1.2}
+                c={accentValue && Number(value) > 0 ? accentColor : undefined}>
+                {value ?? '—'}
+              </Text>
+              {secondary && <Text size="xs" c="dimmed">{secondary}</Text>}
+            </>
+          )}
+        </Box>
+      </Group>
+      {onClick && (
+        <Box component="span" c="dimmed" lh={0} mt={4}>
+          <IconChevronRight size={16} />
+        </Box>
+      )}
+    </Group>
+  );
+
+  const card = (clickable: boolean) => (
+    <Card className={clickable ? 'fg-tile-clickable' : undefined}
+      padding="md" radius="lg" withBorder h="100%">
+      {body}
+    </Card>
+  );
+
+  return onClick ? (
+    <UnstyledButton onClick={onClick} aria-label={label}
+      className={className} style={{ display: 'block', height: '100%' }}>
+      {card(true)}
+    </UnstyledButton>
+  ) : (
+    <Box className={className} component="div" style={{ height: '100%' }}>
+      {card(false)}
+    </Box>
+  );
+}
+
+// ── Section wrapper ─────────────────────────────────────────────────────────
+
+function SectionCard({
+  className, title, action, children, minH,
+}: {
+  className: string;
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  minH?: number;
+}) {
+  return (
+    <Card className={className} padding="lg" radius="lg" withBorder h="100%">
+      <Group justify="space-between" align="flex-start" mb="md" wrap="wrap" gap="sm">
+        <Text fw={600}>{title}</Text>
+        {action}
+      </Group>
+      <Box style={{ minHeight: minH }}>{children}</Box>
     </Card>
   );
 }
@@ -255,6 +417,22 @@ function formatHora(iso: string | null): string {
   } catch { return '—'; }
 }
 
+/**
+ * Human elapsed time since `iso` ("45m", "3h 20m", "2d").
+ * Returns null for missing/future timestamps. Used to surface forgotten check-outs.
+ */
+function elapsedSince(iso: string | null, now: Date): string | null {
+  if (!iso) return null;
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return 'ahora';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return mins % 60 > 0 ? `${hours}h ${mins % 60}m` : `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 function shortId(id: string): string { return id.slice(-6).toUpperCase(); }
 
 function donutFormatter(total: number) {
@@ -265,7 +443,6 @@ function donutFormatter(total: number) {
 
 export function DashboardPage() {
   useDocumentTitle('FuturaGest · Tablero');
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('7d');
   const now = useMemo(() => new Date(), []);
@@ -299,12 +476,16 @@ export function DashboardPage() {
     const activePolicyVal = activeJornadaPolicy(policies.data ?? [], now);
     const lateCount = lateArrivalsCount(allAttendances, activePolicyVal, todayRange.hasta);
     const absentCount = absentToday(activeOperarios, allAttendances, todayRange.hasta);
+    const completedToday = todayAttendances.filter((a) => a.completedAt != null).length;
 
     return {
       activeCount,
       inactiveCount: allCount - activeCount,
       periodAttendanceCount: periodAttendances.length,
       todayAttendanceCount: todayAttendances.length,
+      completedToday,
+      openToday: todayAttendances.length - completedToday,
+      presentToday: activeCount - absentCount,
       completedCount: periodAttendances.filter((a) => a.completedAt != null).length,
       attendanceDelta: percentDelta(periodAttendances.length, prevAttendances.length),
       openCount: allAttendances.filter((a) => a.completedAt == null).length,
@@ -335,7 +516,8 @@ export function DashboardPage() {
   );
 
   const {
-    activeCount, inactiveCount, periodAttendanceCount, todayAttendanceCount,
+    activeCount, inactiveCount, periodAttendanceCount,
+    completedToday, openToday, presentToday,
     completedCount, attendanceDelta, openCount, pendingNovedades,
     absentCount, absentPct, averageShift, lateCount,
     chartData, sparklineData, zoneChartData, novAgg,
@@ -363,243 +545,292 @@ export function DashboardPage() {
 
   return (
     <Stack gap="lg">
-      {/* ── Header ────────────────────────────────────────── */}
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
-        <div>
-          <Title order={2}>Tablero</Title>
-          <Text c="dimmed" size="sm">{user?.email} · {user?.role}</Text>
-        </div>
-        <SegmentedControl aria-label="Período del tablero" value={period}
-          onChange={(v) => setPeriod(v as Period)}
-          data={PERIOD_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
-          radius="md" />
-      </Group>
+      <DashboardHeader period={period} onPeriodChange={setPeriod} now={now} />
 
-      {/* ── Jornada Vigente Panel ─────────────────────────── */}
-      <JornadaVigentePanel
-        policy={activePolicy}
-        operarios={operariosActive.data ?? []}
-        zones={zones.data ?? []}
-        isLoading={policies.isLoading}
-      />
+      <div className="fg-bento">
+        {/* ── Hero: today's attendance ─────────────────────────────── */}
+        <HeroTodayCard
+          activeCount={operariosForbidden ? 0 : activeCount}
+          inactiveCount={inactiveCount}
+          presentToday={presentToday}
+          absentToday={absentCount}
+          completedToday={completedToday}
+          openToday={openToday}
+          policy={activePolicy}
+          operarios={operariosActive.data ?? []}
+          zones={zones.data ?? []}
+          policiesLoading={policies.isLoading}
+          isLoading={operariosActive.isLoading || attendances.isLoading}
+          isError={operariosForbidden || attendancesForbidden}
+        />
 
-      {/* ── KPI row ───────────────────────────────────────── */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 5 }}>
-        <KpiCard
-          label="Operarios activos" value={operariosForbidden ? null : activeCount}
-          secondary={operariosAll.isLoading || (operariosAll.isError && isApiError(operariosAll.error))
-            ? undefined : `${inactiveCount} inactivo${inactiveCount !== 1 ? 's' : ''}`}
-          icon={<IconUsers size={22} />} iconColor="brand"
-          isLoading={operariosActive.isLoading} isError={operariosForbidden}
-        />
-        <KpiCard
-          label="Asistencias en el período" value={attendancesForbidden ? null : periodAttendanceCount}
-          secondary={attendancesForbidden ? undefined : `${todayAttendanceCount} hoy · ${completionPct}% completadas`}
-          delta={attendancesForbidden ? undefined : { pct: attendanceDelta }}
-          sparkline={attendancesForbidden ? undefined : sparklineData}
-          icon={<IconCalendarStats size={22} />} iconColor="teal"
-          isLoading={attendances.isLoading} isError={attendancesForbidden}
-        />
-        <KpiCard
-          label="Sin fichaje hoy" value={attendancesForbidden || operariosForbidden ? null : absentCount}
+        {/* ── KPI tiles ────────────────────────────────────────────── */}
+        <KpiTile
+          className="fg-bento-t1"
+          label="Sin fichaje hoy"
+          value={attendancesForbidden || operariosForbidden ? null : absentCount}
           secondary={attendancesForbidden || operariosForbidden || activeCount === 0
             ? undefined : `${absentPct}% del personal activo`}
-          icon={<IconUserOff size={22} />} iconColor="red"
+          icon={<IconUserOff size={20} />} iconColor="red"
           accentValue={absentCount > 0} accentColor="red.6"
           isLoading={attendances.isLoading || operariosActive.isLoading}
           isError={attendancesForbidden || operariosForbidden}
+          onClick={() => navigate('/asistencia')}
         />
-        <KpiCard
+        <KpiTile
+          className="fg-bento-t2"
           label="Llegadas tarde hoy"
           value={attendancesForbidden || !activePolicy ? null : lateCount}
           secondary={attendancesForbidden || !activePolicy
             ? undefined : `Sobre ${activePolicy.horaInicio}`}
-          icon={<IconUserPlus size={22} />} iconColor="grape"
+          icon={<IconAlarm size={20} />} iconColor="grape"
           accentValue={lateCount > 0} accentColor="grape.6"
           isLoading={attendances.isLoading}
           isError={attendancesForbidden}
         />
-        <KpiCard
-          label="Novedades pendientes" value={novedadesForbidden ? null : pendingNovedades}
+        <KpiTile
+          className="fg-bento-t3"
+          label="Jornadas abiertas"
+          value={attendancesForbidden ? null : openCount}
+          secondary="Con ingreso, sin salida"
+          icon={<IconClockHour4 size={20} />} iconColor="orange"
+          accentValue={openCount > 0}
+          isLoading={attendances.isLoading} isError={attendancesForbidden}
+          onClick={() => navigate('/asistencia')}
+        />
+        <KpiTile
+          className="fg-bento-t4"
+          label="Novedades pendientes"
+          value={novedadesForbidden ? null : pendingNovedades}
           secondary="Pendientes de aprobación"
-          icon={<IconAlertTriangle size={22} />} iconColor="violet"
+          icon={<IconAlertTriangle size={20} />} iconColor="violet"
           accentValue={pendingNovedades > 0} accentColor="yellow.7"
           isLoading={novedades.isLoading} isError={novedadesForbidden}
           onClick={() => navigate('/novedades')}
         />
-      </SimpleGrid>
 
-      {/* ── Charts row 1 ──────────────────────────────────── */}
-      <Grid gutter="lg">
-        <Grid.Col span={{ base: 12, sm: 12, md: 12 }}>
-          <SectionCard title="Asistencias por día" minH={240}>
-            {attendances.isLoading ? <Skeleton height={240} radius="md" />
-            : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : periodAttendanceCount === 0 ? <EmptyState title="Sin asistencias en el período" />
-            : (
-              <>
-                <AreaChart h={240} data={chartData} dataKey="day"
-                  series={[
-                    { name: 'Completadas', color: 'brand.6' },
-                    { name: 'Abiertas', color: 'yellow.5' },
-                  ]}
-                  curveType="monotone" withLegend withDots={false} fillOpacity={0.15} />
-                <Group gap="md" mt="sm" wrap="wrap">
-                  {averageShift !== null && (
-                    <Text size="sm" fw={500} c={overtimePressure ? 'yellow.7' : 'dimmed'}>
-                      Jornada promedio: {averageShift.toFixed(1)} h
-                    </Text>
-                  )}
-                  {activePolicy && (
-                    <Text size="sm" c="dimmed">Política vigente: {activePolicy.horasDiarias} h</Text>
-                  )}
-                </Group>
-              </>
-            )}
-          </SectionCard>
-        </Grid.Col>
-      </Grid>
-
-      {/* ── Charts row 2 ──────────────────────────────────── */}
-      <Grid gutter="lg">
-        <Grid.Col span={{ base: 12, sm: 6 }}>
-          <SectionCard title="Asistencias por zona" minH={220}>
-            {attendances.isLoading ? <Skeleton height={220} radius="md" />
-            : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : zoneChartData.length === 0 ? <EmptyState title="Sin asistencias en el período" />
-            : (
-              <BarChart h={220} data={zoneChartData} dataKey="zone"
-                series={[{ name: 'Asistencias', color: 'brand.5' }]}
-                orientation="horizontal" withLegend={false} withBarValueLabel />
-            )}
-          </SectionCard>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, sm: 6 }}>
-          <SectionCard title="Novedades en el período" minH={220}>
-            {novedades.isLoading ? <Skeleton height={220} radius="md" />
-            : novedadesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : donutNovedadesData.length === 0 ? (
-              <>
-                <EmptyState title="Sin novedades en el período" />
-                <Text size="sm" c="dimmed" ta="center">Horas extra aprobadas: 0 h</Text>
-              </>
-            ) : (
-              <Stack gap="sm">
-                <DonutChart h={160} data={donutNovedadesData} withLabelsLine={false}
+        {/* ── Novedades ────────────────────────────────────────────── */}
+        <SectionCard className="fg-bento-nov" title="Novedades en el período"
+          action={
+            <Text component={Link} to="/novedades" size="xs" c="brand" fw={500}>
+              Ver todas
+            </Text>
+          }>
+          {novedades.isLoading ? <Skeleton height={180} radius="md" />
+          : novedadesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          : donutNovedadesData.length === 0 ? (
+            <>
+              <EmptyState title="Sin novedades en el período" />
+              <Text size="sm" c="dimmed" ta="center">Horas extra aprobadas: 0 h</Text>
+            </>
+          ) : (
+            <Group gap="xl" align="center" wrap="wrap" justify="space-evenly">
+              <Stack gap="xs" align="center">
+                <DonutChart h={185} data={donutNovedadesData} withLabelsLine={false}
                   withLabels={false} withTooltip tooltipDataSource="segment"
-                  valueFormatter={donutFormatter(donutNovedadesTotal)} mx="auto" />
-                <Group gap="sm" justify="center" wrap="wrap">
-                  {donutNovedadesData.map((d) => (
-                    <Badge key={d.name} variant="light" color={d.color.split('.')[0]} size="sm">
-                      {d.name}: {d.value}
-                    </Badge>
-                  ))}
-                </Group>
-                <Text size="sm" c="dimmed" ta="center">
-                  {`Horas extra aprobadas: ${novAgg.approvedHours.toFixed(1)} h`}
-                </Text>
+                  valueFormatter={donutFormatter(donutNovedadesTotal)} />
+                <Badge variant="light" color="teal" size="sm" radius="sm">
+                  {donutNovedadesTotal} novedades
+                </Badge>
               </Stack>
-            )}
-          </SectionCard>
-        </Grid.Col>
-      </Grid>
-
-      {/* ── KPI row 2 (secondary) ────────────────────────── */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-        <KpiCard
-          label="Jornadas abiertas" value={attendancesForbidden ? null : openCount}
-          secondary="Con ingreso, sin salida"
-          icon={<IconClockHour4 size={22} />} iconColor="orange"
-          accentValue={openCount > 0}
-          isLoading={attendances.isLoading} isError={attendancesForbidden}
-        />
-        <KpiCard
-          label="Tasa de finalización" value={attendancesForbidden ? null : `${completionPct}%`}
-          secondary={attendancesForbidden || periodAttendanceCount === 0 ? undefined : `${completedCount} de ${periodAttendanceCount}`}
-          icon={<IconCalendarStats size={22} />} iconColor="lime"
-          isLoading={attendances.isLoading} isError={attendancesForbidden}
-        />
-      </SimpleGrid>
-
-      {/* ── Bottom row ────────────────────────────────────── */}
-      <Grid gutter="lg">
-        <Grid.Col span={{ base: 12, md: 7 }}>
-          <SectionCard title="Jornadas abiertas">
-            {attendances.isLoading ? <Skeleton height={200} radius="md" />
-            : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : openList.length === 0 ? <EmptyState title="Sin jornadas abiertas" icon="✅" />
-            : (
-              <Table.ScrollContainer minWidth={420}>
-                <Table verticalSpacing="sm" highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Operario</Table.Th>
-                      <Table.Th>Fecha</Table.Th>
-                      <Table.Th>Ingreso</Table.Th>
-                      <Table.Th>Verificación</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {openList.map((a) => (
-                      <Table.Tr key={a.id}>
-                        <Table.Td>{operarioMap.get(a.operarioId) ?? shortId(a.operarioId)}</Table.Td>
-                        <Table.Td>{a.date}</Table.Td>
-                        <Table.Td>{formatHora(a.checkInCapturedAt)}</Table.Td>
-                        <Table.Td><VerificationBadge method={a.checkInVerification} /></Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
-            )}
-          </SectionCard>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, md: 5 }}>
-          <SectionCard title="Operarios por cargo">
-            {operariosActive.isLoading ? <Skeleton height={200} radius="md" />
-            : operariosForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
-            : cargoList.length === 0 ? <EmptyState title="Sin operarios registrados" />
-            : (
-              <Stack gap="sm">
-                <Group gap="md" mb={2}>
-                  <Group gap={6} wrap="nowrap">
-                    <Box w={10} h={10} bg="teal.6" style={{ borderRadius: 999 }} />
-                    <Text size="xs" c="dimmed">Ingresaron</Text>
-                  </Group>
-                  <Group gap={6} wrap="nowrap">
-                    <Box w={10} h={10} bg="red.4" style={{ borderRadius: 999 }} />
-                    <Text size="xs" c="dimmed">Faltaron (hoy)</Text>
-                  </Group>
-                </Group>
-                {cargoList.map(({ cargo, total, ingresaron, faltaron }) => (
-                  <Box key={cargo}>
-                    <Group justify="space-between" mb={4} wrap="nowrap">
-                      <Text size="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {cargo}
-                      </Text>
-                      <Group gap={6} wrap="nowrap">
-                        <Text size="xs" c="dimmed">{total}</Text>
-                        <Badge size="xs" color="teal" variant="light">{ingresaron} ing.</Badge>
-                        <Badge size="xs" color="red" variant="light">{faltaron} falt.</Badge>
-                      </Group>
+              <Stack gap="sm" style={{ flex: 1, minWidth: 180 }}>
+                {donutNovedadesData.map((d) => (
+                  <Group key={d.name} justify="space-between" wrap="nowrap">
+                    <Group gap={8} wrap="nowrap">
+                      <Box w={12} h={12} bg={d.color} style={{ borderRadius: 4, flexShrink: 0 }} />
+                      <Text size="sm" fw={500}>{d.name}</Text>
                     </Group>
-                    <Progress.Root size="sm" radius="xl">
+                    <Text size="sm" fw={600}>{d.value}</Text>
+                  </Group>
+                ))}
+                <Box className="fg-approved-hours">
+                  <Text size="md" fw={700}>
+                    {`Horas extra aprobadas: ${novAgg.approvedHours.toFixed(1)} h`}
+                  </Text>
+                </Box>
+              </Stack>
+            </Group>
+          )}
+        </SectionCard>
+
+        {/* ── Attendance by day ────────────────────────────────────── */}
+        <SectionCard className="fg-bento-day" title="Asistencias por día"
+          action={
+            <Group gap="xl" wrap="wrap">
+              <Box className="fg-section-stat">
+                <Text size="xs" c="dimmed" fw={600} tt="uppercase"
+                  style={{ letterSpacing: '0.4px' }}>
+                  Asistencias en el período
+                </Text>
+                {attendances.isLoading ? <Skeleton height={28} width={56} mt={4} ml="auto" />
+                : attendancesForbidden ? (
+                  <Text fz={22} fw={700} c="dimmed" lh={1.2}>—</Text>
+                ) : (
+                  <Group gap={8} justify="flex-end" align="center" wrap="nowrap">
+                    <Text fz={22} fw={700} lh={1.2}>{periodAttendanceCount}</Text>
+                    {sparklineData.length > 1 && (
+                      <Sparkline w={90} h={30} data={sparklineData} color="brand.5"
+                        fillOpacity={0.2} curveType="monotone" strokeWidth={1.5} />
+                    )}
+                  </Group>
+                )}
+                {!attendances.isLoading && !attendancesForbidden && (
+                  <DeltaLine pct={attendanceDelta} />
+                )}
+              </Box>
+              <Box className="fg-section-stat">
+                <Text size="xs" c="dimmed" fw={600} tt="uppercase"
+                  style={{ letterSpacing: '0.4px' }}>
+                  Tasa de finalización
+                </Text>
+                {attendances.isLoading ? <Skeleton height={28} width={56} mt={4} ml="auto" />
+                : attendancesForbidden ? (
+                  <Text fz={22} fw={700} c="dimmed" lh={1.2}>—</Text>
+                ) : (
+                  <Text fz={22} fw={700} lh={1.2}>{completionPct}%</Text>
+                )}
+                {!attendances.isLoading && !attendancesForbidden && periodAttendanceCount > 0 && (
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {completedCount} de {periodAttendanceCount}
+                  </Text>
+                )}
+              </Box>
+            </Group>
+          }>
+          {attendances.isLoading ? <Skeleton height={240} radius="md" />
+          : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          : periodAttendanceCount === 0 ? <EmptyState title="Sin asistencias en el período" />
+          : (
+            <>
+              <AreaChart h={240} data={chartData} dataKey="day"
+                series={[
+                  { name: 'Completadas', color: 'brand.6' },
+                  { name: 'Abiertas', color: 'yellow.5' },
+                ]}
+                curveType="monotone" withLegend withDots={false} fillOpacity={0.15} />
+              <Group gap="md" mt="sm" wrap="wrap">
+                {averageShift !== null && (
+                  <Text size="sm" fw={500} c={overtimePressure ? 'yellow.7' : 'dimmed'}>
+                    Jornada promedio: {averageShift.toFixed(1)} h
+                  </Text>
+                )}
+                {activePolicy && (
+                  <Text size="sm" c="dimmed">Política vigente: {activePolicy.horasDiarias} h</Text>
+                )}
+              </Group>
+            </>
+          )}
+        </SectionCard>
+
+        {/* ── Attendance by zone ───────────────────────────────────── */}
+        <SectionCard className="fg-bento-zone" title="Asistencias por zona">
+          {attendances.isLoading ? <Skeleton height={220} radius="md" />
+          : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          : zoneChartData.length === 0 ? <EmptyState title="Sin asistencias en el período" />
+          : (
+            <BarChart h={220} data={zoneChartData} dataKey="zone"
+              series={[{ name: 'Asistencias', color: 'brand.5' }]}
+              orientation="horizontal" withLegend={false} withBarValueLabel />
+          )}
+        </SectionCard>
+
+        {/* ── Open attendances list ───────────────────────────────── */}
+        <SectionCard className="fg-bento-open" title="Jornadas abiertas"
+          action={
+            <Text component={Link} to="/asistencia" size="xs" c="brand" fw={500}>
+              Ver todas
+            </Text>
+          }>
+          {attendances.isLoading ? <Skeleton height={200} radius="md" />
+          : attendancesForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          : openList.length === 0 ? <EmptyState title="Sin jornadas abiertas" icon="✅" />
+          : (
+            <Stack gap={0}>
+              {openList.map((a) => (
+                <Group key={a.id} className="fg-open-item" justify="space-between"
+                  wrap="nowrap" gap="sm">
+                  <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                    <Box
+                      w={36} h={36}
+                      bg="brand.1" c="brand.8"
+                      style={{ borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 600, fontSize: 14 }}
+                    >
+                      {(operarioMap.get(a.operarioId) ?? shortId(a.operarioId)).charAt(0).toUpperCase()}
+                    </Box>
+                    <Box style={{ minWidth: 0 }}>
+                      <Text size="sm" fw={500} truncate>
+                        {operarioMap.get(a.operarioId) ?? shortId(a.operarioId)}
+                      </Text>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text size="xs" c="dimmed">Ingreso {formatHora(a.checkInCapturedAt)}</Text>
+                        <Text size="xs" c="dimmed">·</Text>
+                        <Text size="xs" c="dimmed">{a.date}</Text>
+                      </Group>
+                    </Box>
+                  </Group>
+                  <VerificationBadge method={a.checkInVerification} />
+                </Group>
+              ))}
+            </Stack>
+          )}
+        </SectionCard>
+
+        {/* ── Operarios by cargo ───────────────────────────────────── */}
+        <SectionCard className="fg-bento-cargo" title="Operarios por cargo"
+          action={
+            <Group gap="md" wrap="nowrap">
+              <Badge variant="light" color="brand" size="sm" radius="xl">
+                Total: {activeCount}
+              </Badge>
+              <Group gap={6} wrap="nowrap">
+                <Box w={10} h={10} bg="teal.6" style={{ borderRadius: 999 }} />
+                <Text size="xs" c="dimmed">Ingresaron</Text>
+              </Group>
+              <Group gap={6} wrap="nowrap">
+                <Box w={10} h={10} bg="red.4" style={{ borderRadius: 999 }} />
+                <Text size="xs" c="dimmed">Faltaron (hoy)</Text>
+              </Group>
+            </Group>
+          }>
+          {operariosActive.isLoading ? <Skeleton height={200} radius="md" />
+          : operariosForbidden ? <Text size="sm" c="dimmed">Sin acceso para su rol</Text>
+          : cargoList.length === 0 ? <EmptyState title="Sin operarios registrados" />
+          : (
+            <Stack gap={0}>
+              {cargoList.map(({ cargo, total, ingresaron, faltaron }) => {
+                const ingrPct = Math.round((ingresaron / total) * 100);
+                const faltPct = 100 - ingrPct;
+                return (
+                  <Box key={cargo} className="fg-cargo-row">
+                    <Group justify="space-between" align="flex-end" mb={6} wrap="nowrap">
+                      <Text fw={600} size="sm">{cargo}</Text>
+                      <Text size="xs" c="dimmed" fw={500}>{total} operarios</Text>
+                    </Group>
+                    <Progress.Root size="xl" radius="xl">
                       {ingresaron > 0 && (
-                        <Progress.Section value={(ingresaron / total) * 100} color="teal.6" />
+                        <Progress.Section value={ingrPct} color="teal.6" />
                       )}
                       {faltaron > 0 && (
-                        <Progress.Section value={(faltaron / total) * 100} color="red.4" />
+                        <Progress.Section value={faltPct} color="red.4" />
                       )}
                     </Progress.Root>
+                    <Group justify="space-between" mt={5} wrap="nowrap">
+                      <Group gap={6} wrap="nowrap">
+                        <Box w={8} h={8} bg="teal.6" style={{ borderRadius: 999 }} />
+                        <Text size="xs" fw={600} c="teal.6">{ingresaron} ingresaron ({ingrPct}%)</Text>
+                      </Group>
+                      <Group gap={6} wrap="nowrap">
+                        <Box w={8} h={8} bg="red.4" style={{ borderRadius: 999 }} />
+                        <Text size="xs" fw={600} c="red.6">{faltaron} faltaron ({faltPct}%)</Text>
+                      </Group>
+                    </Group>
                   </Box>
-                ))}
-              </Stack>
-            )}
-          </SectionCard>
-        </Grid.Col>
-      </Grid>
+                );
+              })}
+            </Stack>
+          )}
+        </SectionCard>
+      </div>
     </Stack>
   );
 }

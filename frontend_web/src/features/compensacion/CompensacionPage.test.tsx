@@ -22,7 +22,12 @@ vi.mock('../config/config-queries', () => ({
 }));
 
 vi.mock('../operarios/operario-queries', () => ({
-  useOperarios: () => ({ data: [], isLoading: false }),
+  useOperarios: () => ({
+    data: [
+      { id: 'op-1', documento: '12345', fullName: 'Carlos Restrepo', active: true },
+    ],
+    isLoading: false,
+  }),
   useZones: () => ({ data: [], isLoading: false }),
 }));
 
