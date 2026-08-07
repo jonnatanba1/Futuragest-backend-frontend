@@ -21,10 +21,7 @@ import { ProvisionManagementUserUseCase } from './provision-management-user.use-
 import type { OrgRepositoryPort } from '../domain/ports/org-repository.port';
 import type { PasswordHasherPort } from '../../auth/domain/password-hasher.port';
 import type { ScopeContextHolder, ScopeContext } from '../../auth/domain/scope-context';
-import {
-  UnsupportedProvisionRoleError,
-  EmailInUseError,
-} from '../domain/org.errors';
+import { UnsupportedProvisionRoleError, EmailInUseError } from '../domain/org.errors';
 import type { Role } from '@prisma/client';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
@@ -36,10 +33,25 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     findZones: jest.fn().mockResolvedValue([]),
     findMunicipios: jest.fn().mockResolvedValue([]),
     createZone: jest.fn().mockResolvedValue({ id: 'zone-id' }),
-    updateZone: jest.fn().mockResolvedValue({ id: 'zone-id', name: 'Zone', createdAt: new Date(), updatedAt: new Date() }),
+    updateZone: jest
+      .fn()
+      .mockResolvedValue({
+        id: 'zone-id',
+        name: 'Zone',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
     deleteZone: jest.fn().mockResolvedValue(undefined),
     createMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id' }),
-    updateMunicipio: jest.fn().mockResolvedValue({ id: 'muni-id', name: 'Muni', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
+    updateMunicipio: jest
+      .fn()
+      .mockResolvedValue({
+        id: 'muni-id',
+        name: 'Muni',
+        zoneId: 'zone-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
     deleteMunicipio: jest.fn().mockResolvedValue(undefined),
     findUsers: jest.fn().mockResolvedValue([]),
     updateUser: jest.fn().mockResolvedValue({
@@ -53,7 +65,17 @@ function makeRepo(): jest.Mocked<OrgRepositoryPort> {
     }),
     findAreas: jest.fn().mockResolvedValue([]),
     createArea: jest.fn().mockResolvedValue({ id: 'area-id' }),
-    updateArea: jest.fn().mockResolvedValue({ id: 'area-id', name: 'Area', horaInicio: '08:00', horaFin: '16:00', zoneId: 'zone-id', createdAt: new Date(), updatedAt: new Date() }),
+    updateArea: jest
+      .fn()
+      .mockResolvedValue({
+        id: 'area-id',
+        name: 'Area',
+        horaInicio: '08:00',
+        horaFin: '16:00',
+        zoneId: 'zone-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
     deleteArea: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -83,7 +105,11 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     const holder = makeHolder('SYSTEM_ADMIN');
     const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
 
-    const result = await useCase.execute({ email: 'gerencia@test.co', password: 'Temp1234!', role: 'GERENCIA' });
+    const result = await useCase.execute({
+      email: 'gerencia@test.co',
+      password: 'Temp1234!',
+      role: 'GERENCIA',
+    });
 
     expect(result).toHaveProperty('id');
     expect(repo.createManagementUser).toHaveBeenCalledTimes(1);
@@ -108,6 +134,19 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
 
     await expect(
       useCase.execute({ email: 'lo@test.co', password: 'Temp1234!', role: 'LIDER_OPERATIVO' }),
+    ).resolves.toHaveProperty('id');
+  });
+
+  it('can provision COMPRAS', async () => {
+    const repo = makeRepo();
+    const useCase = new ProvisionManagementUserUseCase(
+      repo,
+      makeHasher(),
+      makeHolder('SYSTEM_ADMIN'),
+    );
+
+    await expect(
+      useCase.execute({ email: 'compras@test.co', password: 'Temp1234!', role: 'COMPRAS' }),
     ).resolves.toHaveProperty('id');
   });
 
@@ -149,7 +188,11 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
     const useCase = new ProvisionManagementUserUseCase(repo, hasher, holder);
 
     await expect(
-      useCase.execute({ email: 'coord@test.co', password: 'Temp1234!', role: 'COORDINADOR' as Role }),
+      useCase.execute({
+        email: 'coord@test.co',
+        password: 'Temp1234!',
+        role: 'COORDINADOR' as Role,
+      }),
     ).rejects.toThrow(UnsupportedProvisionRoleError);
   });
 
@@ -168,6 +211,20 @@ describe('ProvisionManagementUserUseCase — SYSTEM_ADMIN caller', () => {
 // ─── TALENTO_HUMANO caller ─────────────────────────────────────────────────────
 
 describe('ProvisionManagementUserUseCase — TALENTO_HUMANO caller', () => {
+  it('cannot provision COMPRAS', async () => {
+    const repo = makeRepo();
+    const useCase = new ProvisionManagementUserUseCase(
+      repo,
+      makeHasher(),
+      makeHolder('TALENTO_HUMANO'),
+    );
+
+    await expect(
+      useCase.execute({ email: 'compras@test.co', password: 'Temp1234!', role: 'COMPRAS' }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(repo.createManagementUser).not.toHaveBeenCalled();
+  });
+
   it('can provision TALENTO_HUMANO (same rank)', async () => {
     const repo = makeRepo();
     const hasher = makeHasher();
@@ -215,7 +272,7 @@ describe('ProvisionManagementUserUseCase — actor role from ScopeContextHolder'
 
     await useCase.execute({ email: 'lo3@test.co', password: 'Temp1234!', role: 'LIDER_OPERATIVO' });
 
-    expect((holder.current as jest.Mock)).toHaveBeenCalled();
+    expect(holder.current as jest.Mock).toHaveBeenCalled();
   });
 });
 

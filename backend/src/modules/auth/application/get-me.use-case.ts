@@ -71,11 +71,12 @@ export class GetMeUseCase {
       };
     }
 
-    // Global roles: SYSTEM_ADMIN | GERENCIA | TALENTO_HUMANO | LIDER_OPERATIVO
+    // Roles without org scope blocks. Access remains domain-specific; COMPRAS
+    // is intentionally not a global IAM/attendance role.
     return {
       ...base,
       role: profile.role as Exclude<
-        'SYSTEM_ADMIN' | 'GERENCIA' | 'TALENTO_HUMANO' | 'LIDER_OPERATIVO',
+        'SYSTEM_ADMIN' | 'GERENCIA' | 'TALENTO_HUMANO' | 'LIDER_OPERATIVO' | 'COMPRAS',
         'COORDINADOR' | 'SUPERVISOR'
       >,
       coordinatedZone: null,

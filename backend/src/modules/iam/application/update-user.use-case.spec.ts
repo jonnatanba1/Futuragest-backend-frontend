@@ -14,10 +14,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { UpdateUserUseCase } from './update-user.use-case';
 import type { OrgRepositoryPort } from '../domain/ports/org-repository.port';
 import type { ScopeContextHolder, ScopeContext } from '../../auth/domain/scope-context';
-import {
-  UnsupportedProvisionRoleError,
-  UserNotFoundError,
-} from '../domain/org.errors';
+import { UnsupportedProvisionRoleError, UserNotFoundError } from '../domain/org.errors';
 import type { Role } from '@prisma/client';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
@@ -90,6 +87,27 @@ describe('UpdateUserUseCase — happy path', () => {
     });
   });
 
+  it('allows only SYSTEM_ADMIN to assign COMPRAS', async () => {
+    const adminRepo = makeRepo();
+    await new UpdateUserUseCase(adminRepo, makeHolder('SYSTEM_ADMIN')).execute({
+      id: 'user-1',
+      role: 'COMPRAS',
+    });
+    expect(adminRepo.updateUser).toHaveBeenCalledWith('user-1', {
+      displayName: undefined,
+      role: 'COMPRAS',
+    });
+
+    const hrRepo = makeRepo();
+    await expect(
+      new UpdateUserUseCase(hrRepo, makeHolder('TALENTO_HUMANO')).execute({
+        id: 'user-1',
+        role: 'COMPRAS',
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(hrRepo.updateUser).not.toHaveBeenCalled();
+  });
+
   it('updates both displayName and role', async () => {
     const repo = makeRepo();
     const holder = makeHolder('SYSTEM_ADMIN');
@@ -113,9 +131,9 @@ describe('UpdateUserUseCase — not found', () => {
     const holder = makeHolder('SYSTEM_ADMIN');
     const useCase = new UpdateUserUseCase(repo, holder);
 
-    await expect(
-      useCase.execute({ id: 'bad-id', displayName: 'X' }),
-    ).rejects.toThrow(UserNotFoundError);
+    await expect(useCase.execute({ id: 'bad-id', displayName: 'X' })).rejects.toThrow(
+      UserNotFoundError,
+    );
   });
 });
 
@@ -127,9 +145,9 @@ describe('UpdateUserUseCase — role validation', () => {
     const holder = makeHolder('SYSTEM_ADMIN');
     const useCase = new UpdateUserUseCase(repo, holder);
 
-    await expect(
-      useCase.execute({ id: 'user-1', role: 'SUPERVISOR' as Role }),
-    ).rejects.toThrow(UnsupportedProvisionRoleError);
+    await expect(useCase.execute({ id: 'user-1', role: 'SUPERVISOR' as Role })).rejects.toThrow(
+      UnsupportedProvisionRoleError,
+    );
 
     expect(repo.updateUser).not.toHaveBeenCalled();
   });
@@ -139,9 +157,9 @@ describe('UpdateUserUseCase — role validation', () => {
     const holder = makeHolder('SYSTEM_ADMIN');
     const useCase = new UpdateUserUseCase(repo, holder);
 
-    await expect(
-      useCase.execute({ id: 'user-1', role: 'SYSTEM_ADMIN' as Role }),
-    ).rejects.toThrow(UnsupportedProvisionRoleError);
+    await expect(useCase.execute({ id: 'user-1', role: 'SYSTEM_ADMIN' as Role })).rejects.toThrow(
+      UnsupportedProvisionRoleError,
+    );
   });
 
   it('allows COORDINADOR role change', async () => {
@@ -166,9 +184,9 @@ describe('UpdateUserUseCase — privilege escalation', () => {
     const holder = makeHolder('TALENTO_HUMANO');
     const useCase = new UpdateUserUseCase(repo, holder);
 
-    await expect(
-      useCase.execute({ id: 'user-1', role: 'GERENCIA' }),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(useCase.execute({ id: 'user-1', role: 'GERENCIA' })).rejects.toThrow(
+      ForbiddenException,
+    );
 
     expect(repo.updateUser).not.toHaveBeenCalled();
   });
@@ -205,6 +223,6 @@ describe('UpdateUserUseCase — privilege escalation', () => {
 
     await useCase.execute({ id: 'user-1', role: 'LIDER_OPERATIVO' });
 
-    expect((holder.current as jest.Mock)).toHaveBeenCalled();
+    expect(holder.current as jest.Mock).toHaveBeenCalled();
   });
 });

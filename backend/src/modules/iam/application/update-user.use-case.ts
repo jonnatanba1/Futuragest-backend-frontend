@@ -21,7 +21,13 @@ import { UnsupportedProvisionRoleError, UserNotFoundError } from '../domain/org.
 import type { Role } from '@prisma/client';
 
 /** Roles that may be targeted by this use-case. */
-const UPDATEABLE_ROLES = new Set<Role>(['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATIVO', 'COORDINADOR']);
+const UPDATEABLE_ROLES = new Set<Role>([
+  'GERENCIA',
+  'TALENTO_HUMANO',
+  'LIDER_OPERATIVO',
+  'COMPRAS',
+  'COORDINADOR',
+]);
 
 /**
  * Management hierarchy rank.
@@ -65,6 +71,10 @@ export class UpdateUserUseCase {
 
       // Privilege-escalation guard
       const actorRole = this.scopeHolder.current().role;
+
+      if (input.role === 'COMPRAS' && actorRole !== 'SYSTEM_ADMIN') {
+        throw new ForbiddenException('[org] Only SYSTEM_ADMIN can assign the COMPRAS role.');
+      }
 
       if (actorRole !== 'SYSTEM_ADMIN') {
         const actorRank = RANK[actorRole as Role] ?? 0;

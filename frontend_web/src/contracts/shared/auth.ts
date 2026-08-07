@@ -10,6 +10,7 @@ export type RoleName =
   | 'GERENCIA'
   | 'TALENTO_HUMANO'
   | 'LIDER_OPERATIVO'
+  | 'COMPRAS'
   | 'COORDINADOR'
   | 'SUPERVISOR';
 
@@ -56,7 +57,7 @@ export interface MeSupervisor extends MeBase {
 }
 
 /**
- * Global roles: SYSTEM_ADMIN | GERENCIA | TALENTO_HUMANO | LIDER_OPERATIVO.
+ * Roles without org scope fields. Domain permissions remain explicit.
  * Both scoped fields are null.
  */
 export interface MeGlobalRole extends MeBase {

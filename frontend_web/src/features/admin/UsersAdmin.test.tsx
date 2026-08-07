@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UsersAdmin } from './UsersAdmin';
 
 const {
@@ -12,6 +12,7 @@ const {
   updateUserMock,
   updateSupMock,
   supsMock,
+  useAuthMock,
 } = vi.hoisted(() => ({
   usersMock: vi.fn(),
   provisionMock: vi.fn(),
@@ -19,14 +20,15 @@ const {
   updateUserMock: vi.fn(),
   updateSupMock: vi.fn(),
   supsMock: vi.fn(),
+  useAuthMock: vi.fn(),
 }));
+
+vi.mock('../../lib/auth/auth-context', () => ({ useAuth: useAuthMock }));
 
 vi.mock('../operarios/operario-queries', () => ({
   useSupervisors: supsMock,
   useZones: () => ({
-    data: [
-      { id: 'z1', name: 'Zona A', createdAt: '', updatedAt: '' },
-    ],
+    data: [{ id: 'z1', name: 'Zona A', createdAt: '', updatedAt: '' }],
   }),
   useMunicipios: () => ({
     data: [
@@ -53,6 +55,9 @@ function renderAdmin() {
   );
 }
 
+beforeEach(() => {
+  useAuthMock.mockReturnValue({ user: { role: 'SYSTEM_ADMIN' } });
+});
 afterEach(() => vi.clearAllMocks());
 
 describe('UsersAdmin', () => {
@@ -204,6 +209,23 @@ describe('UsersAdmin', () => {
         displayName: undefined,
       }),
     );
+  });
+
+  it('offers COMPRAS only to SYSTEM_ADMIN', async () => {
+    supsMock.mockReturnValue({ data: [], isLoading: false, isError: false });
+    usersMock.mockReturnValue({ data: [], isLoading: false, isError: false });
+    const user = userEvent.setup();
+    const firstRender = renderAdmin();
+    await user.click(screen.getByRole('button', { name: /crear usuario/i }));
+    await user.click(within(await screen.findByRole('dialog')).getByLabelText(/^rol/i));
+    expect(await screen.findByRole('option', { name: 'COMPRAS' })).toBeInTheDocument();
+
+    useAuthMock.mockReturnValue({ user: { role: 'TALENTO_HUMANO' } });
+    firstRender.unmount();
+    renderAdmin();
+    await user.click(screen.getByRole('button', { name: /crear usuario/i }));
+    await user.click(within(await screen.findByRole('dialog')).getByLabelText(/^rol/i));
+    expect(screen.queryByRole('option', { name: 'COMPRAS' })).not.toBeInTheDocument();
   });
 
   // --- Supervisor merge tests ---

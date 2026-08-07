@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "windows", "linux-musl-openssl-3.0.x"]
 }
 
@@ -19,6 +19,7 @@ enum Role {
   GERENCIA
   TALENTO_HUMANO
   LIDER_OPERATIVO
+  COMPRAS
   COORDINADOR
   SUPERVISOR
 }
@@ -47,16 +48,18 @@ enum TipoNovedad {
 /// Geographic zone (e.g. Zona Urabá, Zona Bajo Cauca).
 /// Montería is the central office and operates with global scope (no zone).
 model Zone {
-  id              String          @id @default(uuid())
-  name            String          @unique
-  municipios      Municipio[]
-  supervisors     Supervisor[]
+  id                 String              @id @default(uuid())
+  name               String              @unique
+  municipios         Municipio[]
+  supervisors        Supervisor[]
   /// One COORDINADOR per zone (enforced by @unique on User.coordinatedZoneId)
-  coordinador     User?           @relation("ZoneCoordinador")
-  areas          Area[]
-  jornadaPolicies JornadaPolicy[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @default(now()) @updatedAt
+  coordinador        User?               @relation("ZoneCoordinador")
+  areas              Area[]
+  jornadaPolicies    JornadaPolicy[]
+  inventoryLocations InventoryLocation[]
+  inventoryCommands  InventoryCommand[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @default(now()) @updatedAt
 }
 
 /// Área within a zone — scoped to zone, name unique per zone.
@@ -64,8 +67,8 @@ model Zone {
 model Area {
   id         String     @id @default(uuid())
   name       String
-  horaInicio String     // "HH:MM"
-  horaFin    String     // "HH:MM"
+  horaInicio String // "HH:MM"
+  horaFin    String // "HH:MM"
   zoneId     String
   zone       Zone       @relation(fields: [zoneId], references: [id])
   operarios  Operario[]
@@ -77,15 +80,17 @@ model Area {
 
 /// Municipality belonging to a zone.
 model Municipio {
-  id          String       @id @default(uuid())
-  name        String
-  zoneId      String
-  zone        Zone         @relation(fields: [zoneId], references: [id])
-  supervisors Supervisor[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @default(now()) @updatedAt
+  id                 String              @id @default(uuid())
+  name               String
+  zoneId             String
+  zone               Zone                @relation(fields: [zoneId], references: [id])
+  supervisors        Supervisor[]
+  inventoryLocations InventoryLocation[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @default(now()) @updatedAt
 
   @@unique([zoneId, name])
+  @@unique([id, zoneId])
 }
 
 // ---------------------------------------------------------------------------
@@ -94,65 +99,70 @@ model Municipio {
 
 /// Application user. One row per human actor.
 model User {
-  id                String         @id @default(uuid())
-  email             String         @unique
-  passwordHash      String
-  role              Role
-  mustChangePassword Boolean       @default(true)
+  id                          String                        @id @default(uuid())
+  email                       String                        @unique
+  passwordHash                String
+  role                        Role
+  mustChangePassword          Boolean                       @default(true)
   /// Human-readable display name (optional — falls back to email when null).
-  displayName       String?
+  displayName                 String?
   /// Set only for COORDINADOR. @unique enforces one coordinador per zone.
-  coordinatedZoneId String?        @unique
-  coordinatedZone   Zone?          @relation("ZoneCoordinador", fields: [coordinatedZoneId], references: [id])
-  supervisor        Supervisor?
-  sessions          DeviceSession[]
-  approvedNovedades Novedad[]      @relation("NovedadApprover")
+  coordinatedZoneId           String?                       @unique
+  coordinatedZone             Zone?                         @relation("ZoneCoordinador", fields: [coordinatedZoneId], references: [id])
+  supervisor                  Supervisor?
+  sessions                    DeviceSession[]
+  approvedNovedades           Novedad[]                     @relation("NovedadApprover")
   /// Compensation periods this user approved (TALENTO_HUMANO / SYSTEM_ADMIN)
-  compensationPeriodsApproved CompensationPeriod[] @relation("CompensationApprover")
-  createdAt         DateTime       @default(now())
+  compensationPeriodsApproved CompensationPeriod[]          @relation("CompensationApprover")
+  inventoryAssignments        InventoryLocationAssignment[]
+  inventoryCommands           InventoryCommand[]            @relation("InventoryCommandActor")
+  inventoryCommandsResolved   InventoryCommand[]            @relation("InventoryCommandResolver")
+  createdAt                   DateTime                      @default(now())
 }
 
 /// Supervisor entity — linked to a User, scoped to a zone + municipio.
 model Supervisor {
-  id           String         @id @default(uuid())
-  userId       String         @unique
-  user         User           @relation(fields: [userId], references: [id])
-  municipioId  String
-  municipio    Municipio      @relation(fields: [municipioId], references: [id])
+  id                   String                        @id @default(uuid())
+  userId               String                        @unique
+  user                 User                          @relation(fields: [userId], references: [id])
+  municipioId          String
+  municipio            Municipio                     @relation(fields: [municipioId], references: [id])
   /// Denormalized zone for efficient scope filtering
-  zoneId       String
-  zone         Zone           @relation(fields: [zoneId], references: [id])
-  area         SupervisorArea
-  operarios    Operario[]
-  assignments  Assignment[]
-  attendances  Attendance[]
-  novedades    Novedad[]
-  createdAt    DateTime       @default(now())
+  zoneId               String
+  zone                 Zone                          @relation(fields: [zoneId], references: [id])
+  area                 SupervisorArea
+  operarios            Operario[]
+  assignments          Assignment[]
+  attendances          Attendance[]
+  novedades            Novedad[]
+  inventoryAssignments InventoryLocationAssignment[]
+  inventoryCommands    InventoryCommand[]
+  createdAt            DateTime                      @default(now())
 }
 
 /// Field operario (worker assigned to a supervisor).
 model Operario {
-  id            String       @id @default(uuid())
-  fullName      String
+  id                  String               @id @default(uuid())
+  fullName            String
   /// National document number — must be unique across all operarios
-  documento     String       @unique
+  documento           String               @unique
   /// Current supervisor (scope key → zone via supervisor.zoneId)
-  supervisorId  String
-  supervisor    Supervisor   @relation(fields: [supervisorId], references: [id])
+  supervisorId        String
+  supervisor          Supervisor           @relation(fields: [supervisorId], references: [id])
   /// Free-text job position (e.g. "Barrido", "Recolección"). Defaults to empty string.
-  cargo         String       @default("")
-  assignments   Assignment[]
-  attendances   Attendance[]
+  cargo               String               @default("")
+  assignments         Assignment[]
+  attendances         Attendance[]
   compensationPeriods CompensationPeriod[]
   compensatoryRests   CompensatoryRest[]
   jornadaPolicies     JornadaPolicy[]
   /// Optional FK to Area — operario may be assigned to an área within the zone.
-  areaId       String?
-  area         Area?        @relation(fields: [areaId], references: [id])
+  areaId              String?
+  area                Area?                @relation(fields: [areaId], references: [id])
   /// Soft-deactivation timestamp. null = active; non-null = deactivated.
-  deactivatedAt DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @default(now()) @updatedAt
+  deactivatedAt       DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @default(now()) @updatedAt
 
   @@index([updatedAt])
 }
@@ -179,40 +189,40 @@ model Assignment {
 /// Attendance record — one per operario per Colombia calendar day.
 /// Created on check-in; completed (locked) on check-out.
 model Attendance {
-  id                  String     @id @default(uuid())
-  supervisorId        String
-  supervisor          Supervisor @relation(fields: [supervisorId], references: [id])
-  operarioId          String
-  operario            Operario   @relation(fields: [operarioId], references: [id])
+  id                   String               @id @default(uuid())
+  supervisorId         String
+  supervisor           Supervisor           @relation(fields: [supervisorId], references: [id])
+  operarioId           String
+  operario             Operario             @relation(fields: [operarioId], references: [id])
   /// Denormalized zone for O(1) COORDINADOR scope filtering (same pattern as Assignment)
-  zoneId              String
-  date                String     // YYYY-MM-DD, client-computed Colombia local
-  checkInCapturedAt   DateTime   // client device clock
-  checkInReceivedAt   DateTime   @default(now()) // server clock
-  checkInLat          Float
-  checkInLng          Float
-  checkInAccuracy     Float?
-  checkOutCapturedAt  DateTime?
-  checkOutReceivedAt  DateTime?
-  checkOutLat         Float?
-  checkOutLng         Float?
-  checkOutAccuracy    Float?
-  checkInPhotoKey     String?    // MinIO object key for INGRESO (check-in) photo; null until uploaded
-  checkOutPhotoKey    String?    // MinIO object key for SALIDA (check-out) photo; null until uploaded
+  zoneId               String
+  date                 String // YYYY-MM-DD, client-computed Colombia local
+  checkInCapturedAt    DateTime // client device clock
+  checkInReceivedAt    DateTime             @default(now()) // server clock
+  checkInLat           Float
+  checkInLng           Float
+  checkInAccuracy      Float?
+  checkOutCapturedAt   DateTime?
+  checkOutReceivedAt   DateTime?
+  checkOutLat          Float?
+  checkOutLng          Float?
+  checkOutAccuracy     Float?
+  checkInPhotoKey      String? // MinIO object key for INGRESO (check-in) photo; null until uploaded
+  checkOutPhotoKey     String? // MinIO object key for SALIDA (check-out) photo; null until uploaded
   /// Audit label: how the supervisor verified identity at check-in. Null = legacy / old app version.
   /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
   checkInVerification  VerificationMethod?
   /// Audit label: how the supervisor verified identity at check-out. Null = legacy / old app version.
   /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
   checkOutVerification VerificationMethod?
-  clientRef           String     @unique // client idempotency token (required)
-  checkOutClientRef   String?    // optional checkout idempotency token (not globally unique)
-  completedAt         DateTime?  // non-null = record locked/immutable
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-  novedades           Novedad[]
-  breakdown           AttendanceBreakdown?
-  compensatoryRest    CompensatoryRest?
+  clientRef            String               @unique // client idempotency token (required)
+  checkOutClientRef    String? // optional checkout idempotency token (not globally unique)
+  completedAt          DateTime? // non-null = record locked/immutable
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  novedades            Novedad[]
+  breakdown            AttendanceBreakdown?
+  compensatoryRest     CompensatoryRest?
 
   @@unique([operarioId, date])
   @@index([supervisorId])
@@ -230,37 +240,37 @@ model Attendance {
 /// by a partial unique index hand-authored in the migration SQL.
 /// REJECTED rows do not count toward the limit (partial unique excludes them).
 model Novedad {
-  id               String        @id @default(uuid())
-  attendanceId     String
-  attendance       Attendance    @relation(fields: [attendanceId], references: [id])
+  id                   String              @id @default(uuid())
+  attendanceId         String
+  attendance           Attendance          @relation(fields: [attendanceId], references: [id])
   /// Denormalized creator — scope key for SUPERVISOR filter
-  supervisorId     String
-  supervisor       Supervisor    @relation(fields: [supervisorId], references: [id])
+  supervisorId         String
+  supervisor           Supervisor          @relation(fields: [supervisorId], references: [id])
   /// Denormalized zone — scope key for COORDINADOR filter
-  zoneId           String
+  zoneId               String
   /// Type of novelty — LLEGADA_TARDE (auto-generated) or HORAS_EXTRA (supervisor-requested)
-  tipoNovedad      TipoNovedad   @default(HORAS_EXTRA)
-  horasExtra       Decimal       @db.Decimal(5, 2)
-  tipoHoraExtra    TipoHoraExtra?
+  tipoNovedad          TipoNovedad         @default(HORAS_EXTRA)
+  horasExtra           Decimal             @db.Decimal(5, 2)
+  tipoHoraExtra        TipoHoraExtra?
   /// Only set when tipoNovedad = LLEGADA_TARDE
-  minutosTarde     Int?
+  minutosTarde         Int?
   /// true = system-created (late arrival); false = supervisor-requested
-  autoGenerada     Boolean       @default(false)
-  motivo           String?
-  status           NovedadStatus @default(PENDING)
-  clientRef        String?       @unique // optional idempotency token for offline sync
-  approvedByUserId String?
-  approvedBy       User?         @relation("NovedadApprover", fields: [approvedByUserId], references: [id])
-  decidedAt        DateTime?
+  autoGenerada         Boolean             @default(false)
+  motivo               String?
+  status               NovedadStatus       @default(PENDING)
+  clientRef            String?             @unique // optional idempotency token for offline sync
+  approvedByUserId     String?
+  approvedBy           User?               @relation("NovedadApprover", fields: [approvedByUserId], references: [id])
+  decidedAt            DateTime?
   /// Audit label: how the líder operativo verified identity when approving/rejecting.
   /// Null = web admin decision (no biometrics) or legacy row.
   /// AUDIT LABEL ONLY — no authorization logic may depend on this field.
   decisionVerification VerificationMethod?
   /// Optional reason provided by the líder when REJECTING the novedad.
   /// Captured from a dialog in the Flutter app; stored for audit/transparency.
-  rejectionReason  String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  rejectionReason      String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   // No @@unique([attendanceId]) — partial unique index added by hand in migration:
   // CREATE UNIQUE INDEX "Novedad_attendanceId_active_key"
@@ -285,40 +295,40 @@ model Novedad {
 ///   2. zoneId      → per-zone default
 ///   3. null/null   → global default (lowest priority)
 model JornadaPolicy {
-  id              String    @id @default(uuid())
+  id String @id @default(uuid())
 
   // ── Scope (jerárquico: operario → zona → global) ──
-  operarioId      String?   // null = no per-operario override
-  operario        Operario? @relation(fields: [operarioId], references: [id])
-  zoneId          String?   // null = no per-zone override (combined with operarioId null = global)
-  zone            Zone?     @relation(fields: [zoneId], references: [id])
+  operarioId String? // null = no per-operario override
+  operario   Operario? @relation(fields: [operarioId], references: [id])
+  zoneId     String? // null = no per-zone override (combined with operarioId null = global)
+  zone       Zone?     @relation(fields: [zoneId], references: [id])
 
   // ── Horario ──
-  horaInicio      String    // "07:00" (HH:mm, hora Colombia UTC-5)
-  horaFin         String    // "17:00"
-  diasLaborales   Int[]     // ISO weekday: [1,2,3,4,5] = Lun-Vie
+  horaInicio    String // "07:00" (HH:mm, hora Colombia UTC-5)
+  horaFin       String // "17:00"
+  diasLaborales Int[] // ISO weekday: [1,2,3,4,5] = Lun-Vie
 
   // ── Almuerzo ──
-  almuerzoInicio  String?   // null = auto-calculated at shift midpoint
-  almuerzoFin     String?   // null = auto (almuerzoInicio + 60 min)
+  almuerzoInicio String? // null = auto-calculated at shift midpoint
+  almuerzoFin    String? // null = auto (almuerzoInicio + 60 min)
 
   // ── Desayuno ──
-  desayunoInicio  String?   // null = auto-calculated (horaInicio + 2h)
-  desayunoFin     String?   // null = auto (desayunoInicio + 30 min)
+  desayunoInicio String? // null = auto-calculated (horaInicio + 2h)
+  desayunoFin    String? // null = auto (desayunoInicio + 30 min)
 
   // ── Tolerancia ──
-  toleranciaMin   Int       @default(5) // late arrival tolerance in minutes
+  toleranciaMin Int @default(5) // late arrival tolerance in minutes
 
   // ── Horas ──
-  horasDiarias    Decimal   @db.Decimal(4, 2)
-  horasSemanales  Decimal   @db.Decimal(4, 2)
+  horasDiarias   Decimal @db.Decimal(4, 2)
+  horasSemanales Decimal @db.Decimal(4, 2)
 
   // ── Vigencia ──
-  vigenteDesde    DateTime
-  createdAt       DateTime  @default(now())
+  vigenteDesde DateTime
+  createdAt    DateTime @default(now())
 
   // ── Relations ──
-  breakdowns      AttendanceBreakdown[]
+  breakdowns AttendanceBreakdown[]
 
   @@unique([operarioId, zoneId, vigenteDesde])
   @@index([vigenteDesde])
@@ -355,46 +365,46 @@ enum CompensationDisposition {
 /// Uniqueness: one period per operario+periodKey enforced by a partial unique index
 /// hand-authored in the migration SQL (Novedad pattern).
 model CompensationPeriod {
-  id               String                  @id @default(uuid())
-  operarioId       String
-  operario         Operario                @relation(fields: [operarioId], references: [id])
+  id           String   @id @default(uuid())
+  operarioId   String
+  operario     Operario @relation(fields: [operarioId], references: [id])
   /// Denormalized zone for COORDINADOR scope filtering (same pattern as Attendance.zoneId)
-  zoneId           String
+  zoneId       String
   /// Denormalized supervisor for SUPERVISOR scope filtering
-  supervisorId     String
+  supervisorId String
   /// Canonical fortnight id: "YYYY-MM-Q1" (days 1-15) | "YYYY-MM-Q2" (days 16-end)
-  periodKey        String
-  desde            String                  // YYYY-MM-DD Colombia local (inclusive)
-  hasta            String                  // YYYY-MM-DD Colombia local (inclusive)
-  creditos         Decimal                 @db.Decimal(7, 2) // Σ positive deltas
-  debitos          Decimal                 @db.Decimal(7, 2) // Σ |negative deltas|
-  carryIn          Decimal                 @db.Decimal(7, 2) // negative saldo from previous CARRY_OVER (≤ 0)
-  
+  periodKey    String
+  desde        String // YYYY-MM-DD Colombia local (inclusive)
+  hasta        String // YYYY-MM-DD Colombia local (inclusive)
+  creditos     Decimal  @db.Decimal(7, 2) // Σ positive deltas
+  debitos      Decimal  @db.Decimal(7, 2) // Σ |negative deltas|
+  carryIn      Decimal  @db.Decimal(7, 2) // negative saldo from previous CARRY_OVER (≤ 0)
+
   // ── Desglose de horas (nullable para períodos pre-migración) ──
-  horasOrdinariasDiurnas    Decimal?       @db.Decimal(7, 2)
-  horasOrdinariasNocturnas  Decimal?       @db.Decimal(7, 2)
-  horasExtraDiurnas         Decimal?       @db.Decimal(7, 2)
-  horasExtraNocturnas       Decimal?       @db.Decimal(7, 2)
-  horasDominicalesFestivas  Decimal?       @db.Decimal(7, 2)
+  horasOrdinariasDiurnas   Decimal? @db.Decimal(7, 2)
+  horasOrdinariasNocturnas Decimal? @db.Decimal(7, 2)
+  horasExtraDiurnas        Decimal? @db.Decimal(7, 2)
+  horasExtraNocturnas      Decimal? @db.Decimal(7, 2)
+  horasDominicalesFestivas Decimal? @db.Decimal(7, 2)
 
   // ── Valor monetario ──
-  valorRecargos             Decimal?       @db.Decimal(12, 2)
-  tasaDominicalAplicada     Decimal?       @db.Decimal(5, 2) // Snapshot
-  saldo            Decimal                 @db.Decimal(7, 2) // carryIn + creditos - debitos
-  disposition      CompensationDisposition?                  // null until decided at close
-  approvedByUserId String?                                   // who decided (audit trail)
-  approvedBy       User?                   @relation("CompensationApprover", fields: [approvedByUserId], references: [id])
-  decidedAt        DateTime?
-  closedAt         DateTime                @default(now())   // immutability lock (mirrors completedAt)
-  clientRef        String?                 @unique           // idempotency token for close replay
+  valorRecargos         Decimal?                 @db.Decimal(12, 2)
+  tasaDominicalAplicada Decimal?                 @db.Decimal(5, 2) // Snapshot
+  saldo                 Decimal                  @db.Decimal(7, 2) // carryIn + creditos - debitos
+  disposition           CompensationDisposition? // null until decided at close
+  approvedByUserId      String? // who decided (audit trail)
+  approvedBy            User?                    @relation("CompensationApprover", fields: [approvedByUserId], references: [id])
+  decidedAt             DateTime?
+  closedAt              DateTime                 @default(now()) // immutability lock (mirrors completedAt)
+  clientRef             String?                  @unique // idempotency token for close replay
   /// Set once when HR confirms the payout. Immutable after set (guarded UPDATE WHERE paidAt IS NULL).
-  paidAt           DateTime?
+  paidAt                DateTime?
   /// Server-generated UUID set alongside paidAt — idempotency key for confirm-payout calls.
-  payoutRef        String?
+  payoutRef             String?
   /// Set when attendance data changes inside an already-closed period (snapshot diverged from live data).
-  divergedAt       DateTime?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
+  divergedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   // Unique constraint mirrors the hand-authored migration index exactly.
   // map: name must match the existing DB index so prisma migrate dev generates NO new migration.
@@ -403,6 +413,229 @@ model CompensationPeriod {
   @@index([zoneId])
   @@index([supervisorId])
   @@index([periodKey])
+}
+
+// ---------------------------------------------------------------------------
+// Inventory domain
+// ---------------------------------------------------------------------------
+
+enum InventoryLocationType {
+  CENTRAL_WAREHOUSE
+  MUNICIPAL_WAREHOUSE
+  SUPERVISOR_CUSTODY
+  IN_TRANSIT
+}
+
+enum InventoryAssignmentRole {
+  CUSTODIAN
+  RECEIVER
+  COUNTER
+}
+
+enum InventoryCommandType {
+  OPENING_BALANCE
+  FIELD_ISSUE
+  FIELD_RETURN
+  DAMAGE_OR_LOSS
+  REVERSAL
+  TRANSFER_DISPATCH
+  TRANSFER_RECEIPT
+  COUNT_ADJUSTMENT
+  RESOLUTION
+}
+
+enum InventoryCommandStatus {
+  RECEIVED
+  APPLIED
+  NEEDS_REVIEW
+  RESOLVED_APPLIED
+  RESOLVED_DISMISSED
+  REJECTED_CLIENT_ACTION
+}
+
+enum InventoryMovementType {
+  OPENING_BALANCE
+  FIELD_ISSUE
+  FIELD_RETURN
+  TRANSFER_OUT
+  TRANSFER_IN
+  COUNT_ADJUSTMENT_IN
+  COUNT_ADJUSTMENT_OUT
+  DAMAGE_OR_LOSS
+  IN_TRANSIT_LOSS
+  IN_TRANSIT_DAMAGE
+  REVERSAL
+}
+
+model Product {
+  id            String               @id @default(uuid())
+  sku           String               @unique
+  name          String
+  baseUnitCode  String
+  active        Boolean              @default(true)
+  deactivatedAt DateTime?
+  unitVersions  ProductUnitVersion[]
+  movements     InventoryMovement[]
+  balances      InventoryBalance[]
+  stockMinimums StockMinimum[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([updatedAt])
+}
+
+model ProductUnitVersion {
+  id           String              @id @default(uuid())
+  productId    String
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitCode     String
+  factorToBase Decimal             @db.Decimal(20, 6)
+  isBase       Boolean             @default(false)
+  validFrom    DateTime
+  validUntil   DateTime?
+  movements    InventoryMovement[]
+  createdAt    DateTime            @default(now())
+
+  @@unique([productId, unitCode, validFrom])
+  @@index([productId, validUntil])
+}
+
+model InventoryLocation {
+  id          String                        @id @default(uuid())
+  code        String                        @unique
+  name        String
+  type        InventoryLocationType
+  zoneId      String?
+  zone        Zone?                         @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  municipioId String?
+  municipio   Municipio?                    @relation(fields: [municipioId, zoneId], references: [id, zoneId], onDelete: Restrict)
+  active      Boolean                       @default(true)
+  assignments InventoryLocationAssignment[]
+  commands    InventoryCommand[]
+  movements   InventoryMovement[]
+  balances    InventoryBalance[]
+  minimums    StockMinimum[]
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  @@index([type])
+  @@index([zoneId])
+  @@index([municipioId])
+  @@index([updatedAt])
+}
+
+model InventoryLocationAssignment {
+  id           String                  @id @default(uuid())
+  locationId   String
+  location     InventoryLocation       @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  userId       String
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  supervisorId String?
+  supervisor   Supervisor?             @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  role         InventoryAssignmentRole
+  validFrom    DateTime
+  validUntil   DateTime?
+  version      Int                     @default(1)
+  deviceId     String?
+  createdAt    DateTime                @default(now())
+
+  @@unique([locationId, userId, validFrom])
+  @@index([userId, validFrom, validUntil])
+  @@index([supervisorId, validFrom, validUntil])
+}
+
+model InventoryCommand {
+  id                  String                 @id @default(uuid())
+  clientCommandId     String                 @unique
+  actorUserId         String
+  actor               User                   @relation("InventoryCommandActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  deviceId            String?
+  locationId          String?
+  location            InventoryLocation?     @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  zoneId              String?
+  zone                Zone?                  @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  supervisorId        String?
+  supervisor          Supervisor?            @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  schemaVersion       Int
+  type                InventoryCommandType
+  payload             Json
+  requestHash         String
+  status              InventoryCommandStatus @default(RECEIVED)
+  result              Json?
+  reviewCode          String?
+  reviewReason        String?
+  capturedAtUtc       DateTime
+  capturedOffsetMin   Int
+  businessDate        String
+  clockSkewSeconds    Int?
+  receivedAt          DateTime               @default(now())
+  appliedAt           DateTime?
+  resolvedAt          DateTime?
+  resolvedByUserId    String?
+  resolvedBy          User?                  @relation("InventoryCommandResolver", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  resolutionCommandId String?                @unique
+  resolutionCommand   InventoryCommand?      @relation("InventoryCommandResolution", fields: [resolutionCommandId], references: [id], onDelete: Restrict)
+  resolvedCommand     InventoryCommand?      @relation("InventoryCommandResolution")
+  movements           InventoryMovement[]
+  createdAt           DateTime               @default(now())
+
+  @@index([actorUserId, receivedAt])
+  @@index([locationId, receivedAt])
+  @@index([zoneId, receivedAt])
+  @@index([supervisorId, receivedAt])
+  @@index([status, receivedAt])
+  @@index([businessDate])
+}
+
+model InventoryMovement {
+  id               String                @id @default(uuid())
+  commandId        String
+  command          InventoryCommand      @relation(fields: [commandId], references: [id], onDelete: Restrict)
+  productId        String
+  product          Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitVersionId    String
+  unitVersion      ProductUnitVersion    @relation(fields: [unitVersionId], references: [id], onDelete: Restrict)
+  locationId       String
+  location         InventoryLocation     @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  type             InventoryMovementType
+  quantityBase     Decimal               @db.Decimal(20, 6)
+  sourceMovementId String?               @unique
+  sourceMovement   InventoryMovement?    @relation("InventoryMovementReversal", fields: [sourceMovementId], references: [id], onDelete: Restrict)
+  reversalMovement InventoryMovement?    @relation("InventoryMovementReversal")
+  capturedAtUtc    DateTime
+  businessDate     String
+  createdAt        DateTime              @default(now())
+
+  @@index([locationId, productId, createdAt])
+  @@index([productId, businessDate])
+  @@index([commandId])
+}
+
+model InventoryBalance {
+  id           String            @id @default(uuid())
+  locationId   String
+  location     InventoryLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityBase Decimal           @default(0) @db.Decimal(20, 6)
+  version      Int               @default(0)
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([locationId, productId])
+  @@index([productId])
+}
+
+model StockMinimum {
+  id           String            @id @default(uuid())
+  locationId   String
+  location     InventoryLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityBase Decimal           @db.Decimal(20, 6)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([locationId, productId])
 }
 
 /// Device session for soft revocation and refresh token storage.
@@ -441,13 +674,13 @@ enum TipoHoraExtra {
 }
 
 model Holiday {
-  id          String      @id @default(uuid())
-  date        String      // "YYYY-MM-DD"
-  name        String      // "Día de la Independencia"
-  type        HolidayType
-  year        Int
-  isManual    Boolean     @default(false)
-  createdAt   DateTime    @default(now())
+  id        String      @id @default(uuid())
+  date      String // "YYYY-MM-DD"
+  name      String // "Día de la Independencia"
+  type      HolidayType
+  year      Int
+  isManual  Boolean     @default(false)
+  createdAt DateTime    @default(now())
 
   @@unique([date])
   @@index([year])
@@ -461,13 +694,13 @@ enum HolidayType {
 }
 
 model SurchargeRate {
-  id              String            @id @default(uuid())
-  category        SurchargeCategory
-  percentage      Decimal           @db.Decimal(5, 2)
-  vigenteDesde    DateTime
-  creadoPor       String?
-  legalRef        String?
-  createdAt       DateTime          @default(now())
+  id           String            @id @default(uuid())
+  category     SurchargeCategory
+  percentage   Decimal           @db.Decimal(5, 2)
+  vigenteDesde DateTime
+  creadoPor    String?
+  legalRef     String?
+  createdAt    DateTime          @default(now())
 
   @@unique([category, vigenteDesde])
   @@index([category])
@@ -482,62 +715,62 @@ enum SurchargeCategory {
 }
 
 model AttendanceBreakdown {
-  id              String      @id @default(uuid())
-  attendanceId    String      @unique
-  attendance      Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  attendanceId String     @unique
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
 
-  horasOrdinariasDiurnas    Decimal @db.Decimal(5, 2) @default(0)
-  horasOrdinariasNocturnas  Decimal @db.Decimal(5, 2) @default(0)
-  horasExtraDiurnas         Decimal @db.Decimal(5, 2) @default(0)
-  horasExtraNocturnas       Decimal @db.Decimal(5, 2) @default(0)
-  totalHoras                Decimal @db.Decimal(5, 2) @default(0)
+  horasOrdinariasDiurnas   Decimal @default(0) @db.Decimal(5, 2)
+  horasOrdinariasNocturnas Decimal @default(0) @db.Decimal(5, 2)
+  horasExtraDiurnas        Decimal @default(0) @db.Decimal(5, 2)
+  horasExtraNocturnas      Decimal @default(0) @db.Decimal(5, 2)
+  totalHoras               Decimal @default(0) @db.Decimal(5, 2)
 
-  esDominical     Boolean @default(false)
-  esFestivo       Boolean @default(false)
-  esDiaLaboral    Boolean @default(true)
+  esDominical  Boolean @default(false)
+  esFestivo    Boolean @default(false)
+  esDiaLaboral Boolean @default(true)
 
-  jornadaPolicyId String
-  jornadaPolicy   JornadaPolicy @relation(fields: [jornadaPolicyId], references: [id])
-  horaInicioAplicada  String
-  horaFinAplicada     String
-  horasDiariasAplicada Decimal @db.Decimal(4, 2)
-  
+  jornadaPolicyId      String
+  jornadaPolicy        JornadaPolicy @relation(fields: [jornadaPolicyId], references: [id])
+  horaInicioAplicada   String
+  horaFinAplicada      String
+  horasDiariasAplicada Decimal       @db.Decimal(4, 2)
+
   // ── Tramos horarios por categoría (PSL) ──
-  tramoInicioOrdNocturno    String?
-  tramoFinOrdNocturno       String?
-  tramoInicioExtraDiurna    String?
-  tramoFinExtraDiurna       String?
-  tramoInicioExtraNocturna  String?
-  tramoFinExtraNocturna     String?
-  tramoInicioOrdDiurna      String?
-  tramoFinOrdDiurna         String?
+  tramoInicioOrdNocturno   String?
+  tramoFinOrdNocturno      String?
+  tramoInicioExtraDiurna   String?
+  tramoFinExtraDiurna      String?
+  tramoInicioExtraNocturna String?
+  tramoFinExtraNocturna    String?
+  tramoInicioOrdDiurna     String?
+  tramoFinOrdDiurna        String?
 
-  classifiedAt    DateTime @default(now())
-  recalculatedAt  DateTime?
-  version         Int      @default(1)
+  classifiedAt   DateTime  @default(now())
+  recalculatedAt DateTime?
+  version        Int       @default(1)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([attendanceId])
 }
 
 model CompensatoryRest {
-  id                String              @id @default(uuid())
-  operarioId        String
-  operario          Operario            @relation(fields: [operarioId], references: [id])
-  attendanceId      String              @unique
-  attendance        Attendance          @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  month             String              // "YYYY-MM"
-  type              CompensatoryType
-  status            CompensatoryStatus  @default(PENDING)
-  scheduledDate     String?
-  takenDate         String?
-  resolvedAt        DateTime?
-  resolvedByUserId  String?
-  notes             String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id               String             @id @default(uuid())
+  operarioId       String
+  operario         Operario           @relation(fields: [operarioId], references: [id])
+  attendanceId     String             @unique
+  attendance       Attendance         @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  month            String // "YYYY-MM"
+  type             CompensatoryType
+  status           CompensatoryStatus @default(PENDING)
+  scheduledDate    String?
+  takenDate        String?
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@index([operarioId, month])
   @@index([status])

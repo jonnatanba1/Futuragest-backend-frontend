@@ -41,7 +41,7 @@ export interface AssignCoordinadorDto {
 
 /**
  * Body for POST /org/users.
- * role must be one of: GERENCIA | TALENTO_HUMANO | LIDER_OPERATIVO
+ * role must be one of: GERENCIA | TALENTO_HUMANO | LIDER_OPERATIVO | COMPRAS
  * (validated by the use-case; contracts package stays framework-agnostic).
  */
 export interface ProvisionUserDto {

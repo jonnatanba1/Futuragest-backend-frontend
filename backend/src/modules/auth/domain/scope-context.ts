@@ -14,6 +14,7 @@ export type Role =
   | 'GERENCIA'
   | 'TALENTO_HUMANO'
   | 'LIDER_OPERATIVO'
+  | 'COMPRAS'
   | 'COORDINADOR'
   | 'SUPERVISOR';
 

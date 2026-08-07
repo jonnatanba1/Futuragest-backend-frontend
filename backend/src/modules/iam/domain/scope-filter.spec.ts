@@ -48,22 +48,38 @@ describe('applyScopeFilter — global roles (pass-through)', () => {
 
 describe('applyScopeFilter — COORDINADOR', () => {
   it('Supervisor model + zoneId → filters by zoneId', () => {
-    const result = applyScopeFilter(ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }), 'Supervisor', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }),
+      'Supervisor',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { zoneId: ZONE_ID }] });
   });
 
   it('Operario model + zoneId → filters via supervisor.zoneId', () => {
-    const result = applyScopeFilter(ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }), 'Operario', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }),
+      'Operario',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { supervisor: { zoneId: ZONE_ID } }] });
   });
 
   it('Assignment model + zoneId → filters by zoneId', () => {
-    const result = applyScopeFilter(ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }), 'Assignment', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR', zoneId: ZONE_ID }),
+      'Assignment',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { zoneId: ZONE_ID }] });
   });
 
   it('Supervisor model + missing zoneId → fail-closed (S1: impossible predicate)', () => {
-    const result = applyScopeFilter(ctx({ role: 'COORDINADOR' /* no zoneId */ }), 'Supervisor', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR' /* no zoneId */ }),
+      'Supervisor',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
   });
 
@@ -109,7 +125,11 @@ describe('applyScopeFilter — SUPERVISOR', () => {
   });
 
   it('Supervisor model + missing supervisorId → fail-closed (S1: impossible predicate)', () => {
-    const result = applyScopeFilter(ctx({ role: 'SUPERVISOR' /* no supervisorId */ }), 'Supervisor', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'SUPERVISOR' /* no supervisorId */ }),
+      'Supervisor',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
   });
 
@@ -164,12 +184,20 @@ describe('applyScopeFilter — empty base where', () => {
 
 describe('applyScopeFilter — Novedad model (NV-53, NV-54, NV-55)', () => {
   it('NV-53 — SUPERVISOR missing supervisorId → DENY_PREDICATE (fail-closed)', () => {
-    const result = applyScopeFilter(ctx({ role: 'SUPERVISOR' /* no supervisorId */ }), 'Novedad', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'SUPERVISOR' /* no supervisorId */ }),
+      'Novedad',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
   });
 
   it('NV-54 — COORDINADOR missing zoneId → DENY_PREDICATE (fail-closed)', () => {
-    const result = applyScopeFilter(ctx({ role: 'COORDINADOR' /* no zoneId */ }), 'Novedad', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'COORDINADOR' /* no zoneId */ }),
+      'Novedad',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
   });
 
@@ -203,9 +231,18 @@ describe('applyScopeFilter — Novedad model (NV-53, NV-54, NV-55)', () => {
 // This covers future roles or corrupted JWT claims.
 
 describe('applyScopeFilter — unknown/unmapped role (W5: fail-closed)', () => {
+  it('COMPRAS is not a global role outside the inventory module', () => {
+    const result = applyScopeFilter(ctx({ role: 'COMPRAS' }), 'Operario', BASE_WHERE);
+    expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
+  });
+
   it('completely unknown role + Supervisor model → fail-closed impossible predicate', () => {
     // Cast to Role to simulate a future role not yet in the union type
-    const result = applyScopeFilter(ctx({ role: 'FUTURE_ROLE' as never }), 'Supervisor', BASE_WHERE);
+    const result = applyScopeFilter(
+      ctx({ role: 'FUTURE_ROLE' as never }),
+      'Supervisor',
+      BASE_WHERE,
+    );
     expect(result).toEqual({ AND: [BASE_WHERE, { id: { in: [] } }] });
   });
 

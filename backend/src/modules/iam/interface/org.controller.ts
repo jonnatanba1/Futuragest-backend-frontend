@@ -43,7 +43,12 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiProperty, ApiPropertyOptional, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiOkResponse,
+  ApiCreatedResponse,
+} from '@nestjs/swagger';
 import {
   ZoneResponseDtoClass,
   MunicipioResponseDtoClass,
@@ -110,7 +115,12 @@ export const ORG_WRITE_ROLES = ['SYSTEM_ADMIN', 'TALENTO_HUMANO'] as const;
  * GERENCIA stays valid here — the privilege-escalation guard (use-case) is what
  * blocks a TALENTO_HUMANO actor from provisioning it (403), not input validation.
  */
-export const PROVISIONABLE_ROLES = ['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATIVO'] as const;
+export const PROVISIONABLE_ROLES = [
+  'GERENCIA',
+  'TALENTO_HUMANO',
+  'LIDER_OPERATIVO',
+  'COMPRAS',
+] as const;
 
 // ─── Request DTOs (NestJS-side — minimal, framework-aware) ───────────────────
 // @IsString() decorators are required for ValidationPipe whitelist mode:
@@ -421,7 +431,9 @@ export class OrgController {
     @Body() body: UpdateZoneBody,
   ): Promise<ZoneResponseDtoClass> {
     try {
-      return await this.orgRepo.updateZone(id, { name: body.name }) as unknown as ZoneResponseDtoClass;
+      return (await this.orgRepo.updateZone(id, {
+        name: body.name,
+      })) as unknown as ZoneResponseDtoClass;
     } catch (err) {
       if (err instanceof ZoneNotFoundError) {
         throw new NotFoundException(err.message);
@@ -499,10 +511,10 @@ export class OrgController {
     @Body() body: UpdateMunicipioBody,
   ): Promise<MunicipioResponseDtoClass> {
     try {
-      return await this.orgRepo.updateMunicipio(id, {
+      return (await this.orgRepo.updateMunicipio(id, {
         name: body.name,
         zoneId: body.zoneId,
-      }) as unknown as MunicipioResponseDtoClass;
+      })) as unknown as MunicipioResponseDtoClass;
     } catch (err) {
       if (err instanceof MunicipioNotFoundError) {
         throw new NotFoundException(err.message);
@@ -596,11 +608,11 @@ export class OrgController {
     @Body() body: UpdateAreaBody,
   ): Promise<AreaResponseDto> {
     try {
-      return await this.orgRepo.updateArea(id, {
+      return (await this.orgRepo.updateArea(id, {
         name: body.name,
         horaInicio: body.horaInicio,
         horaFin: body.horaFin,
-      }) as unknown as AreaResponseDto;
+      })) as unknown as AreaResponseDto;
     } catch (err) {
       if (err instanceof AreaNotFoundError) {
         throw new NotFoundException(err.message);

@@ -15,6 +15,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CompensacionModule } from './modules/compensacion/compensacion.module';
 import { JornadaModule } from './modules/jornada/jornada.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
+import { InventarioModule } from './modules/inventario/inventario.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     CompensacionModule,
     JornadaModule,
     ReportesModule,
+    InventarioModule,
   ],
   controllers: [AppController],
   providers: [

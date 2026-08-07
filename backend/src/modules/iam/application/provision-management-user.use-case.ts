@@ -27,7 +27,12 @@ import { UnsupportedProvisionRoleError } from '../domain/org.errors';
 import type { Role } from '@prisma/client';
 
 /** Roles that may be provisioned via this use-case. */
-const PROVISIONABLE_ROLES = new Set<Role>(['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATIVO']);
+const PROVISIONABLE_ROLES = new Set<Role>([
+  'GERENCIA',
+  'TALENTO_HUMANO',
+  'LIDER_OPERATIVO',
+  'COMPRAS',
+]);
 
 /**
  * Management hierarchy rank.
@@ -66,6 +71,12 @@ export class ProvisionManagementUserUseCase {
 
     // 2. Privilege-escalation guard — actor role from VERIFIED JWT claim, never from body
     const actorRole = this.scopeHolder.current().role;
+
+    // COMPRAS can mutate global inventory configuration. Creating that role
+    // therefore requires SYSTEM_ADMIN and is never delegated to HR.
+    if (input.role === 'COMPRAS' && actorRole !== 'SYSTEM_ADMIN') {
+      throw new ForbiddenException('[org] Only SYSTEM_ADMIN can provision a COMPRAS account.');
+    }
 
     if (actorRole !== 'SYSTEM_ADMIN') {
       // Actor is in the management hierarchy — apply rank check

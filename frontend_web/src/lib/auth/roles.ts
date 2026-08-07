@@ -6,6 +6,7 @@ export const OFFICE_ROLES: RoleName[] = [
   'GERENCIA',
   'TALENTO_HUMANO',
   'LIDER_OPERATIVO',
+  'COMPRAS',
   'COORDINADOR',
 ];
 

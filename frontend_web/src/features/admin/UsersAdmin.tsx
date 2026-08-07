@@ -28,10 +28,10 @@ import {
   useUpdateUser,
   useUsers,
 } from './admin-queries';
+import { useAuth } from '../../lib/auth/auth-context';
 
-const PROVISIONABLE_ROLES = ['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATIVO'];
+const DELEGATED_PROVISIONABLE_ROLES = ['GERENCIA', 'TALENTO_HUMANO', 'LIDER_OPERATIVO'];
 const SUPERVISOR_ROLE = 'SUPERVISOR';
-const ALL_CREATE_ROLES = [...PROVISIONABLE_ROLES, SUPERVISOR_ROLE];
 const AREAS = ['BARRIDO', 'RECOLECCION', 'SUPERNUMERARIO'];
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -46,6 +46,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function UsersAdmin() {
+  const { user } = useAuth();
   const users = useUsers();
   const supervisors = useSupervisors();
   const zones = useZones();
@@ -55,6 +56,11 @@ export function UsersAdmin() {
   const updateSupervisor = useUpdateSupervisor();
   const assign = useAssignCoordinador();
   const updateUser = useUpdateUser();
+  const provisionableRoles =
+    user?.role === 'SYSTEM_ADMIN'
+      ? [...DELEGATED_PROVISIONABLE_ROLES, 'COMPRAS']
+      : DELEGATED_PROVISIONABLE_ROLES;
+  const allCreateRoles = [...provisionableRoles, SUPERVISOR_ROLE];
 
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [provisionError, setProvisionError] = useState<string | null>(null);
@@ -280,19 +286,13 @@ export function UsersAdmin() {
             {(users.data ?? []).map((u) => {
               const sup = u.role === SUPERVISOR_ROLE ? supervisorByUserId.get(u.id) : null;
               return (
-                <Table.Tr
-                  key={u.id}
-                  onClick={() => setSelected(u)}
-                  style={{ cursor: 'pointer' }}
-                >
+                <Table.Tr key={u.id} onClick={() => setSelected(u)} style={{ cursor: 'pointer' }}>
                   <Table.Td>{u.displayName || '—'}</Table.Td>
                   <Table.Td>{u.email}</Table.Td>
                   <Table.Td>
                     <Badge variant="light">{u.role}</Badge>
                   </Table.Td>
-                  <Table.Td>
-                    {sup ? <Badge variant="light">{sup.area}</Badge> : '—'}
-                  </Table.Td>
+                  <Table.Td>{sup ? <Badge variant="light">{sup.area}</Badge> : '—'}</Table.Td>
                   <Table.Td>
                     {sup ? (muniName.get(sup.municipioId) ?? sup.municipioId) : '—'}
                   </Table.Td>
@@ -331,17 +331,21 @@ export function UsersAdmin() {
             <Field label="Correo electrónico" value={selected.email} />
             <Field label="Nombre visible" value={selected.displayName || '—'} />
             <Field label="Rol" value={selected.role} />
-            {selected.role === SUPERVISOR_ROLE && (() => {
-              const sup = supervisorByUserId.get(selected.id);
-              if (!sup) return null;
-              return (
-                <>
-                  <Field label="Área" value={sup.area} />
-                  <Field label="Zona" value={zoneName.get(sup.zoneId) ?? sup.zoneId} />
-                  <Field label="Municipio" value={muniName.get(sup.municipioId) ?? sup.municipioId} />
-                </>
-              );
-            })()}
+            {selected.role === SUPERVISOR_ROLE &&
+              (() => {
+                const sup = supervisorByUserId.get(selected.id);
+                if (!sup) return null;
+                return (
+                  <>
+                    <Field label="Área" value={sup.area} />
+                    <Field label="Zona" value={zoneName.get(sup.zoneId) ?? sup.zoneId} />
+                    <Field
+                      label="Municipio"
+                      value={muniName.get(sup.municipioId) ?? sup.municipioId}
+                    />
+                  </>
+                );
+              })()}
             <Field
               label="Zona (coordinador)"
               value={
@@ -406,7 +410,7 @@ export function UsersAdmin() {
             <Select
               label="Rol"
               placeholder="Seleccione un rol"
-              data={ALL_CREATE_ROLES}
+              data={allCreateRoles}
               required
               key={createForm.key('role')}
               {...createForm.getInputProps('role')}
@@ -536,7 +540,7 @@ export function UsersAdmin() {
                 <Select
                   label="Rol"
                   placeholder="Seleccione un rol"
-                  data={PROVISIONABLE_ROLES}
+                  data={provisionableRoles}
                   required
                   key={editUserForm.key('role')}
                   {...editUserForm.getInputProps('role')}
