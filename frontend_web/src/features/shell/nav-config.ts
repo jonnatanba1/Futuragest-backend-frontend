@@ -6,11 +6,12 @@ import {
   IconCalendarTime,
   IconClockDollar,
   IconCoin,
+  IconFileSpreadsheet,
   IconLayoutDashboard,
+  IconPackage,
   IconSettings,
   IconSun,
   IconUsers,
-  IconFileSpreadsheet,
 } from '@tabler/icons-react';
 import React from 'react';
 import { ADMIN_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../../lib/auth/roles';
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Tablero', path: '/', icon: IconLayoutDashboard },
   { label: 'Asistencia', path: '/asistencia', icon: IconCalendarTime, roles: OFFICE_ROLES },
   { label: 'Novedades', path: '/novedades', icon: IconBellExclamation, roles: OFFICE_ROLES },
+  { label: 'Inventario', path: '/inventario', icon: IconPackage, roles: ['COMPRAS', 'SUPERVISOR', 'COORDINADOR', 'GERENCIA', 'SYSTEM_ADMIN'] },
   { label: 'Compensación', path: '/compensacion', icon: IconClockDollar, roles: OFFICE_ROLES },
   { label: 'Reportes', path: '/reportes', icon: IconFileSpreadsheet, roles: ['SYSTEM_ADMIN', 'TALENTO_HUMANO'] },
   { label: 'Configuración', path: '/config/jornada', icon: IconSettings, roles: ADMIN_ROLES },

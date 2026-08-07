@@ -136,7 +136,7 @@ function refresh(): Promise<string | null> {
   return refreshPromise;
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const auth = opts.auth ?? true;
   const url = `${config.apiBaseUrl}${path}`;
   const hasBody = opts.body !== undefined;
@@ -527,4 +527,9 @@ export const reportesApi = {
     }
     return res.blob();
   }
+};
+
+export const api = {
+  get: <T>(path: string): Promise<T> => request<T>('GET', path),
+  post: <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, { body }),
 };

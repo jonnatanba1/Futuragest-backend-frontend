@@ -29,6 +29,9 @@ const CompensacionPage = lazy(() =>
 const ReportesPage = lazy(() =>
   import('../features/reportes/ReportesPage').then((m) => ({ default: m.ReportesPage })),
 );
+const InventarioPage = lazy(() =>
+  import('../features/inventario/InventarioPage').then((m) => ({ default: m.InventarioPage })),
+);
 
 const ConfigJornadaPage = lazy(() =>
   import('../features/config/ConfigJornadaPage').then((m) => ({ default: m.ConfigJornadaPage })),
@@ -89,6 +92,14 @@ export function AppRoutes() {
           element={
             <RequireAuth roles={OFFICE_ROLES}>
               <NovedadesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="inventario"
+          element={
+            <RequireAuth roles={['COMPRAS', 'SUPERVISOR', 'COORDINADOR', 'GERENCIA', 'SYSTEM_ADMIN']}>
+              <InventarioPage />
             </RequireAuth>
           }
         />
