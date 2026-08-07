@@ -104,6 +104,7 @@ function makeMockAttendanceRepo(overrides: Partial<AttendanceRepositoryPort> = {
 function makeMockNotificationPort(overrides: Partial<NotificationPort> = {}): NotificationPort {
   return {
     notifyNovedadCreated: jest.fn().mockResolvedValue(undefined),
+    notifyShipmentDispatched: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

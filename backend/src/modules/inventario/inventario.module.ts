@@ -3,6 +3,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { SCOPE_CONTEXT_HOLDER, type ScopeContextHolder } from '../auth/domain/scope-context';
 import { IamModule } from '../iam/iam.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { NOTIFICATION_PORT, type NotificationPort } from '../notifications/domain/notification.port';
 import { SyncInventoryUseCase } from './application/sync-inventory.use-case';
 import { GetInventoryContextUseCase } from './application/get-inventory-context.use-case';
 import { InventoryOperationsUseCase } from './application/inventory-operations.use-case';
@@ -32,7 +34,7 @@ import {
 } from './interface/inventory-operations.controller';
 
 @Module({
-  imports: [AuthModule, IamModule],
+  imports: [AuthModule, IamModule, NotificationsModule],
   controllers: [InventoryController, InventoryOperationsController],
   providers: [
     {
@@ -47,8 +49,9 @@ import {
     },
     {
       provide: INVENTORY_OPERATIONS_REPOSITORY,
-      useFactory: (prisma: PrismaService) => new ScopedInventoryOperationsRepository(prisma),
-      inject: [PrismaService],
+      useFactory: (prisma: PrismaService, notifications: NotificationPort) =>
+        new ScopedInventoryOperationsRepository(prisma, notifications),
+      inject: [PrismaService, NOTIFICATION_PORT],
     },
     {
       provide: SYNC_INVENTORY_USE_CASE,

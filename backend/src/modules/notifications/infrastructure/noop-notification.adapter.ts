@@ -7,7 +7,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import type { NotificationPort, NovedadCreatedPayload } from '../domain/notification.port';
+import type { NotificationPort, NovedadCreatedPayload, ShipmentDispatchedPayload } from '../domain/notification.port';
 
 @Injectable()
 export class NoOpNotificationAdapter implements NotificationPort {
@@ -16,6 +16,12 @@ export class NoOpNotificationAdapter implements NotificationPort {
   async notifyNovedadCreated(payload: NovedadCreatedPayload): Promise<void> {
     this.logger.debug(
       `[NoOp] notifyNovedadCreated — no-op (Firebase not enabled). novedadId=${payload.novedadId}`,
+    );
+  }
+
+  async notifyShipmentDispatched(payload: ShipmentDispatchedPayload): Promise<void> {
+    this.logger.debug(
+      `[NoOp] notifyShipmentDispatched — no-op (Firebase not enabled). shipmentId=${payload.shipmentId}`,
     );
   }
 }

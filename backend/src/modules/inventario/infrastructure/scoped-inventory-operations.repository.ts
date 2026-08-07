@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import type { PrismaService } from '../../../database/prisma.service';
 import type { ScopeContext } from '../../auth/domain/scope-context';
+import type { NotificationPort } from '../../notifications/domain/notification.port';
 import { redactOpenInventoryCount } from '../domain/blind-inventory-count';
 import { hashInventoryPayload } from '../domain/canonical-inventory-event';
 import {
@@ -172,7 +173,10 @@ function shipmentInclude() {
 }
 
 export class ScopedInventoryOperationsRepository implements InventoryOperationsRepositoryPort {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationPort,
+  ) {}
 
   private transaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(work, SERIALIZABLE_OPTIONS);
@@ -997,7 +1001,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     id: string,
     input: ShipmentCommandInput,
   ): Promise<unknown> {
-    return this.transaction(async (tx) => {
+    const outcome = await this.transaction(async (tx) => {
       const shipment = await tx.shipment.findFirst({
         where: applyInventoryScope(actor, 'Shipment', { id }),
         include: {
@@ -1018,7 +1022,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       if (shipment.status !== 'DRAFT') {
         if (shipment.dispatchCommandId) {
           const command = await tx.inventoryCommand.findUnique({ where: { id: shipment.dispatchCommandId } });
-          if (command?.clientCommandId === input.clientCommandId) return command.result;
+          if (command?.clientCommandId === input.clientCommandId) return { result: command.result };
         }
         throw new InventoryOperationError('INVALID_STATE', 'Only draft shipments can be dispatched.');
       }
@@ -1044,7 +1048,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         shipment.originLocationId,
         shipment.originLocation.zoneId,
       );
-      if (reserved.existingResult) return reserved.existingResult;
+      if (reserved.existingResult) return { result: reserved.existingResult };
 
       const movementIds: string[] = [];
       const now = new Date();
@@ -1096,8 +1100,20 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           dispatchedAt: now,
         },
       });
-      return result;
+      return {
+        result,
+        notification: {
+          shipmentId: shipment.id,
+          shipmentCode: shipment.code,
+          receiverUserId: shipment.receiverUserId!,
+          destinationName: shipment.destinationLocation.name,
+        },
+      };
     });
+    if (outcome.notification) {
+      void this.notifications.notifyShipmentDispatched(outcome.notification);
+    }
+    return outcome.result;
   }
 
   async cancelShipment(actor: ScopeContext, id: string): Promise<unknown> {

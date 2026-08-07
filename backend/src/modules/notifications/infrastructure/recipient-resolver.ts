@@ -68,4 +68,15 @@ export class RecipientResolver {
       .filter((r): r is { userId: string; deviceId: string; pushToken: string } => r.pushToken !== null)
       .map((r) => ({ userId: r.userId, deviceId: r.deviceId, pushToken: r.pushToken }));
   }
+
+  /** Returns every active push-enabled device belonging to one explicit recipient. */
+  async getActivePushTokensForUser(userId: string): Promise<PushRecipient[]> {
+    const rows = await this.prisma.deviceSession.findMany({
+      where: { userId, revokedAt: null, pushToken: { not: null } },
+      select: { userId: true, deviceId: true, pushToken: true },
+    });
+    return rows
+      .filter((r): r is { userId: string; deviceId: string; pushToken: string } => r.pushToken !== null)
+      .map((r) => ({ userId: r.userId, deviceId: r.deviceId, pushToken: r.pushToken }));
+  }
 }

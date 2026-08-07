@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { NotificationPort, NovedadCreatedPayload } from '../domain/notification.port';
+import type { NotificationPort, NovedadCreatedPayload, ShipmentDispatchedPayload } from '../domain/notification.port';
 import { FcmNotificationAdapter } from './fcm-notification.adapter';
 import { SseNotificationAdapter } from './sse-notification.adapter';
 
@@ -18,6 +18,18 @@ export class CompositeNotificationAdapter implements NotificationPort {
       this.sse.notifyNovedadCreated(payload),
     ]);
 
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error('[CompositeAdapter] One notification adapter failed', result.reason);
+      }
+    }
+  }
+
+  async notifyShipmentDispatched(payload: ShipmentDispatchedPayload): Promise<void> {
+    const results = await Promise.allSettled([
+      this.fcm.notifyShipmentDispatched(payload),
+      this.sse.notifyShipmentDispatched(payload),
+    ]);
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error('[CompositeAdapter] One notification adapter failed', result.reason);

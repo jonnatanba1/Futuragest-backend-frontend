@@ -23,6 +23,14 @@ export interface NovedadCreatedPayload {
   zoneId: string;
 }
 
+/** Payload emitted only to the person assigned to receive a municipal shipment. */
+export interface ShipmentDispatchedPayload {
+  shipmentId: string;
+  shipmentCode: string;
+  receiverUserId: string;
+  destinationName: string;
+}
+
 export interface NotificationPort {
   /**
    * Notify eligible approvers (LIDER_OPERATIVO by default) that a new novedad was created.
@@ -31,4 +39,5 @@ export interface NotificationPort {
    * (CreateNovedadUseCase) catches and logs the error — the novedad is already persisted.
    */
   notifyNovedadCreated(payload: NovedadCreatedPayload): Promise<void>;
+  notifyShipmentDispatched(payload: ShipmentDispatchedPayload): Promise<void>;
 }

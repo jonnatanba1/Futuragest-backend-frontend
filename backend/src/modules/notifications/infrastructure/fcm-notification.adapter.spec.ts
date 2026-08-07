@@ -18,7 +18,7 @@ import { Logger } from '@nestjs/common';
 import { FcmNotificationAdapter } from './fcm-notification.adapter';
 import type { RecipientResolver, PushRecipient } from './recipient-resolver';
 import type { AuthRepositoryPort } from '../../auth/domain/auth-repository.port';
-import type { NovedadCreatedPayload } from '../domain/notification.port';
+import type { NovedadCreatedPayload, ShipmentDispatchedPayload } from '../domain/notification.port';
 import { PrismaService } from '../../../database/prisma.service';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +74,13 @@ const LATE_PAYLOAD: NovedadCreatedPayload = {
 
 const SERVICE_ACCOUNT_OBJ = { type: 'service_account', project_id: 'test-project' };
 
+const SHIPMENT_PAYLOAD: ShipmentDispatchedPayload = {
+  shipmentId: 'shipment-1',
+  shipmentCode: 'SHP-20260808-TEST',
+  receiverUserId: 'receiver-1',
+  destinationName: 'Bodega Apartadó',
+};
+
 /** Build PushRecipient tuples from a list of token strings (deterministic ids). */
 function toRecipients(tokens: string[]): PushRecipient[] {
   return tokens.map((pushToken, i) => ({
@@ -104,6 +111,7 @@ function makeAdapterWithRepo(
 
   const resolver = {
     getActivePushTokens: jest.fn().mockResolvedValue(recipients),
+    getActivePushTokensForUser: jest.fn().mockResolvedValue(recipients),
   } as unknown as RecipientResolver;
 
   const mockPrisma = {
@@ -271,6 +279,22 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
       type: 'NOVEDAD_CREATED',
     });
     expect(sentMessage.tokens).toEqual(['token-1', 'token-2']);
+  });
+
+  it('sends a shipment notification only to the assigned receiver devices', async () => {
+    const adapter = makeAdapter(['receiver-token']);
+
+    await adapter.notifyShipmentDispatched(SHIPMENT_PAYLOAD);
+
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+    expect(mockSendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
+      tokens: ['receiver-token'],
+      notification: {
+        title: 'Nuevo envío de inventario',
+        body: 'SHP-20260808-TEST está en camino a Bodega Apartadó. Confirma la recepción con biometría.',
+      },
+      data: { type: 'SHIPMENT_DISPATCHED', shipmentId: 'shipment-1' },
+    }));
   });
 
   it('PN-13b — LLEGADA_TARDE payload → late-arrival title/body and tipoNovedad in data', async () => {

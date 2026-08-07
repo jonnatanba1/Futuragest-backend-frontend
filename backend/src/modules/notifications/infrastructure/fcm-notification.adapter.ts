@@ -22,7 +22,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { NotificationPort, NovedadCreatedPayload } from '../domain/notification.port';
+import type { NotificationPort, NovedadCreatedPayload, ShipmentDispatchedPayload } from '../domain/notification.port';
 import type { AuthRepositoryPort } from '../../auth/domain/auth-repository.port';
 import { RecipientResolver } from './recipient-resolver';
 import { PrismaService } from '../../../database/prisma.service';
@@ -224,6 +224,57 @@ export class FcmNotificationAdapter implements NotificationPort {
     } catch (err) {
       // Never rethrow — fire-and-forget invariant
       this.logger.error('[FcmNotificationAdapter] Failed to send push notification', err);
+    }
+  }
+
+  async notifyShipmentDispatched(payload: ShipmentDispatchedPayload): Promise<void> {
+    if (process.env.FIREBASE_ENABLED !== 'true') {
+      this.logger.debug('[FcmAdapter] FIREBASE_ENABLED is not true — skipping shipment push.');
+      return;
+    }
+
+    try {
+      const recipients = await this.recipientResolver.getActivePushTokensForUser(payload.receiverUserId);
+      if (recipients.length === 0) {
+        this.logger.debug(`[FcmAdapter] No active push tokens for shipment receiver ${payload.receiverUserId}.`);
+        return;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let admin: any;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        admin = require('firebase-admin');
+      } catch {
+        this.logger.warn('[FcmAdapter] firebase-admin could not be loaded — skipping shipment push.');
+        return;
+      }
+      if (!admin.apps?.length) {
+        const serviceAccount = this.loadServiceAccount();
+        if (!serviceAccount) {
+          this.logger.warn('[FcmAdapter] Firebase credentials are not configured — skipping shipment push.');
+          return;
+        }
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+      }
+
+      for (let start = 0; start < recipients.length; start += FCM_MULTICAST_LIMIT) {
+        const batchRecipients = recipients.slice(start, start + FCM_MULTICAST_LIMIT);
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: batchRecipients.map((recipient) => recipient.pushToken),
+          notification: {
+            title: 'Nuevo envío de inventario',
+            body: `${payload.shipmentCode} está en camino a ${payload.destinationName}. Confirma la recepción con biometría.`,
+          },
+          data: {
+            type: 'SHIPMENT_DISPATCHED',
+            shipmentId: payload.shipmentId,
+          },
+        });
+        await this.purgeDeadTokens(response.responses ?? [], batchRecipients);
+      }
+    } catch (err) {
+      this.logger.error('[FcmNotificationAdapter] Failed to send shipment push notification', err);
     }
   }
 
