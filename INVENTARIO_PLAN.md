@@ -88,10 +88,12 @@ Muestra:
 
 No debe mostrar un cero falso mientras una consulta esté cargando o haya fallado.
 
-### 2. Productos
+### 2. Inventario
 
 Permite:
 
+- buscar productos por SKU o nombre y abrir su detalle;
+- registrar un nuevo ingreso desde la tabla o el detalle del producto;
 - crear productos con SKU, nombre y unidad base seleccionada de un catalogo controlado;
 - ver stock central y total municipal por cada producto;
 - activar o desactivar productos;
