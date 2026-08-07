@@ -1,0 +1,15 @@
+export const INVENTORY_UNIT_OPTIONS = [
+  { value: 'UND', label: 'Unidad' },
+  { value: 'BOLSA', label: 'Bolsa' },
+  { value: 'CAJA', label: 'Caja' },
+  { value: 'BULTO', label: 'Bulto' },
+  { value: 'PAQUETE', label: 'Paquete' },
+  { value: 'ROLLO', label: 'Rollo' },
+  { value: 'CANASTILLA', label: 'Canastilla' },
+  { value: 'PAR', label: 'Par' },
+  { value: 'KG', label: 'Kilogramo (kg)' },
+  { value: 'G', label: 'Gramo (g)' },
+  { value: 'L', label: 'Litro (L)' },
+  { value: 'ML', label: 'Mililitro (ml)' },
+  { value: 'M', label: 'Metro (m)' },
+] as const;

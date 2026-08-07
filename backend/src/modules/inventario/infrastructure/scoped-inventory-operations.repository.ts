@@ -34,12 +34,14 @@ import {
   type ResolveCommandInput,
   type ReverseMovementInput,
   type SetStockMinimumInput,
+  type StockEntryInput,
   type ShipmentCommandInput,
   type ShipmentLineInput,
   type UpdateProductInput,
   type UpdateLocationInput,
   type UpdateShipmentInput,
 } from '../domain/inventory-operations';
+import { normalizeInventoryUnitCode } from '../domain/inventory-unit-catalog';
 import { applyInventoryScope } from '../domain/inventory-scope-policy';
 
 const SERIALIZABLE_OPTIONS = {
@@ -287,7 +289,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
   async createProduct(actor: ScopeContext, input: CreateProductInput): Promise<unknown> {
     const sku = nonEmpty(input.sku, 'sku').toUpperCase();
     const name = nonEmpty(input.name, 'name');
-    const baseUnitCode = nonEmpty(input.baseUnitCode, 'baseUnitCode').toUpperCase();
+    const baseUnitCode = normalizeInventoryUnitCode(input.baseUnitCode);
     const product = await this.prisma.product.create({
       data: {
         sku,
@@ -324,7 +326,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     id: string,
     input: AddProductUnitInput,
   ): Promise<unknown> {
-    const unitCode = nonEmpty(input.unitCode, 'unitCode').toUpperCase();
+    const unitCode = normalizeInventoryUnitCode(input.unitCode);
     const factorToBase = decimal(input.factorToBase);
     const validFrom = input.validFrom ? new Date(input.validFrom) : new Date();
     if (Number.isNaN(validFrom.getTime())) {
@@ -458,6 +460,68 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       create: { locationId: input.locationId, productId: input.productId, quantityBase },
       update: { quantityBase },
       include: { location: true, product: true },
+    });
+  }
+
+  async recordStockEntry(actor: ScopeContext, input: StockEntryInput): Promise<unknown> {
+    const quantity = decimal(input.quantity);
+    const note = input.note?.trim() || undefined;
+    return this.transaction(async (tx) => {
+      const location = await tx.inventoryLocation.findFirst({
+        where: applyInventoryScope(actor, 'InventoryLocation', {
+          id: input.locationId,
+          active: true,
+          inventoryEnabled: true,
+          type: 'CENTRAL_WAREHOUSE',
+        }),
+      });
+      if (!location) {
+        throw new InventoryOperationError('INVALID_LOCATION', 'Stock entries can only be recorded in an active central warehouse.');
+      }
+      const product = await tx.product.findFirst({
+        where: applyInventoryScope(actor, 'Product', { id: input.productId, active: true }),
+        include: { unitVersions: { where: { id: input.unitVersionId, validUntil: null }, take: 1 } },
+      });
+      const unitVersion = product?.unitVersions[0];
+      if (!product || !unitVersion) {
+        throw new InventoryOperationError('INVALID_PRODUCT', 'Product and active unit version are required.');
+      }
+      const quantityBase = quantity.mul(unitVersion.factorToBase);
+      const payload = {
+        locationId: location.id,
+        productId: product.id,
+        unitVersionId: unitVersion.id,
+        quantity: quantity.toString(),
+        quantityBase: quantityBase.toString(),
+        note,
+      };
+      const reserved = await this.reserveCommand(
+        tx,
+        actor,
+        input.clientCommandId,
+        'STOCK_ENTRY',
+        payload,
+        location.id,
+        location.zoneId,
+      );
+      if (reserved.existingResult) return reserved.existingResult;
+      await this.applyBalanceDelta(tx, location.id, product.id, quantityBase);
+      const now = new Date();
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          commandId: reserved.id,
+          productId: product.id,
+          unitVersionId: unitVersion.id,
+          locationId: location.id,
+          type: 'STOCK_ENTRY',
+          quantityBase,
+          capturedAtUtc: now,
+          businessDate: colombiaBusinessDate(now),
+        },
+      });
+      const result = commandResult(reserved.id, 'STOCK_ENTRY_APPLIED', [movement.id]);
+      await this.finishCommand(tx, reserved.id, result);
+      return result;
     });
   }
 

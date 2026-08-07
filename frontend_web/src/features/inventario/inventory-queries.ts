@@ -105,6 +105,7 @@ export function useAssignLocation() {
   });
 }
 export function useSetMinimum() { return useInventoryMutation(inventoryApi.setMinimum); }
+export function useRecordStockEntry() { return useInventoryMutation(inventoryApi.recordStockEntry); }
 export function useResolveCommand() {
   return useInventoryMutation((input: {
     id: string;

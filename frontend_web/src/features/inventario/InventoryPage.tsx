@@ -58,12 +58,15 @@ import {
   useResolveShipmentDiscrepancy,
   useReturnShipment,
   useReverseMovement,
+  useRecordStockEntry,
   useSaveCountLines,
   useSetMinimum,
   useSubmitCount,
   useUpdateProduct,
 } from './inventory-queries';
 import { clearInventoryCommandId, stableInventoryCommandId } from './inventory-command-id';
+import { INVENTORY_UNIT_OPTIONS } from './inventory-unit-options';
+import { availableProductIdsAtLocation, stockByProduct } from './inventory-stock';
 import {
   eligibleShipmentReceivers,
   isOperationalInventoryLocation,
@@ -135,22 +138,60 @@ function EmptyTableRow({ columns, message }: { columns: number; message: string 
   return <Table.Tr><Table.Td colSpan={columns}><Text ta="center" c="dimmed" py="md">{message}</Text></Table.Td></Table.Tr>;
 }
 
-function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canReview: boolean }) {
+function CentralStockEntryPanel() {
+  const locations = useInventoryLocations();
+  const products = useInventoryProducts();
+  const entry = useRecordStockEntry();
+  const form = useForm({ initialValues: { locationId: '', productId: '', unitVersionId: '', quantity: '', note: '' } });
+  const product = products.data?.find((item) => item.id === form.values.productId);
+
+  return (
+    <QueryBoundary queries={[locations, products]}>
+      <Card withBorder>
+        <Title order={3} size="h4" mb="xs">Registrar entrada de compras</Title>
+        <Text size="sm" c="dimmed" mb="md">Registra una compra o reposicion sin costo. La cantidad aumenta el saldo de la bodega central y queda auditada como movimiento.</Text>
+        <form onSubmit={form.onSubmit((values) => {
+          const operationKey = 'stock-entry:' + values.locationId + ':' + values.productId + ':' + values.unitVersionId + ':' + values.quantity + ':' + values.note.trim();
+          entry.mutate({
+            ...values,
+            note: values.note.trim() || undefined,
+            clientCommandId: stableInventoryCommandId(operationKey, values),
+          }, {
+            onSuccess: () => { clearInventoryCommandId(operationKey); success('Entrada de stock registrada.'); form.reset(); },
+            onError: failure,
+          });
+        })}>
+          <Stack>
+            <Select searchable required label="Bodega central" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} ? ${item.name}` }))} {...form.getInputProps('locationId')} />
+            <Select searchable required label="Producto" data={(products.data ?? []).filter((item) => item.active).map((item) => ({ value: item.id, label: `${item.sku} ? ${item.name}` }))} {...form.getInputProps('productId')} onChange={(value) => { form.setFieldValue('productId', value ?? ''); form.setFieldValue('unitVersionId', ''); }} />
+            <Select required disabled={!product} label="Unidad" data={(product?.unitVersions ?? []).filter((unit) => !unit.validUntil).map((unit) => ({ value: unit.id, label: unit.unitCode }))} {...form.getInputProps('unitVersionId')} />
+            <TextInput required label="Cantidad" inputMode="decimal" {...form.getInputProps('quantity')} />
+            <TextInput label="Nota" description="Opcional: proveedor, remision u observacion." {...form.getInputProps('note')} />
+            <Button type="submit" loading={entry.isPending}>Registrar entrada</Button>
+          </Stack>
+        </form>
+      </Card>
+    </QueryBoundary>
+  );
+}
+
+function InventoryOverview({ canManageStock, canReconcile, canReview }: { canManageStock: boolean; canReconcile: boolean; canReview: boolean }) {
   const balances = useInventoryBalances();
   const alerts = useInventoryAlerts();
   const shipments = useInventoryShipments();
   const reviews = useInventoryReviews(canReview);
-  const reconciliation = useInventoryReconciliation(canAdmin);
+  const reconciliation = useInventoryReconciliation(canReconcile);
 
   const activeShipments = shipments.data?.filter((shipment) =>
     ['DISPATCHED', 'PARTIALLY_RECEIVED', 'DISCREPANCY_REVIEW'].includes(shipment.status),
   ).length ?? 0;
 
-  const overviewQueries = [balances, alerts, shipments, ...(canReview ? [reviews] : []), ...(canAdmin ? [reconciliation] : [])];
+  const overviewQueries = [balances, alerts, shipments, ...(canReview ? [reviews] : []), ...(canReconcile ? [reconciliation] : [])];
 
   return (
     <QueryBoundary queries={overviewQueries}>
     <Stack gap="lg">
+      {canManageStock && <CentralStockEntryPanel />}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: canReview ? 4 : 3 }}>
         <Card withBorder>
           <Text c="dimmed" size="sm">Combinaciones con saldo</Text>
@@ -170,7 +211,7 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
         </Card>}
       </SimpleGrid>
 
-      {canAdmin && reconciliation.data && (
+      {canReconcile && reconciliation.data && (
         <Alert
           color={reconciliation.data.mismatches.length ? 'red' : 'green'}
           icon={<IconScale size={18} />}
@@ -235,6 +276,7 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
 function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
+  const balances = useInventoryBalances();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const addUnit = useAddProductUnit();
@@ -245,8 +287,11 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
   const minimumForm = useForm({ initialValues: { locationId: '', productId: '', quantityBase: '0' } });
 
+  const centralStock = stockByProduct(balances.data ?? [], 'CENTRAL_WAREHOUSE');
+  const municipalStock = stockByProduct(balances.data ?? [], 'MUNICIPAL_WAREHOUSE');
+
   return (
-    <QueryBoundary queries={canAdmin ? [products, locations] : [products]}>
+    <QueryBoundary queries={canAdmin ? [products, locations, balances] : [products, balances]}>
       <Stack gap="lg">
         {canAdmin && (
           <Group>
@@ -259,15 +304,17 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           <ScrollArea>
             <Table striped miw={680}>
               <Table.Thead>
-                <Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th>Estado</Table.Th><Table.Th /></Table.Tr>
+                <Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th ta="right">Central</Table.Th><Table.Th ta="right">Municipios</Table.Th><Table.Th>Estado</Table.Th><Table.Th /></Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {products.data?.length === 0 && <EmptyTableRow columns={5} message="No hay productos registrados." />}
+                {products.data?.length === 0 && <EmptyTableRow columns={7} message="No hay productos registrados." />}
                 {products.data?.map((product) => (
                   <Table.Tr key={product.id}>
                     <Table.Td>{product.sku}</Table.Td>
                     <Table.Td>{product.name}</Table.Td>
                     <Table.Td>{product.unitVersions.filter((unit) => !unit.validUntil).map((unit) => unit.unitCode + ' × ' + unit.factorToBase).join(', ')}</Table.Td>
+                    <Table.Td ta="right">{quantity(centralStock[product.id] ?? 0)}</Table.Td>
+                    <Table.Td ta="right">{quantity(municipalStock[product.id] ?? 0)}</Table.Td>
                     <Table.Td><Badge color={product.active ? 'green' : 'gray'}>{product.active ? 'Activo' : 'Inactivo'}</Badge></Table.Td>
                     <Table.Td>
                       {canAdmin && (
@@ -329,7 +376,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             <Stack>
               <TextInput label="SKU" required {...productForm.getInputProps('sku')} />
               <TextInput label="Nombre" required {...productForm.getInputProps('name')} />
-              <TextInput label="Unidad base" required {...productForm.getInputProps('baseUnitCode')} />
+              <Select label="Unidad base" required data={INVENTORY_UNIT_OPTIONS} {...productForm.getInputProps('baseUnitCode')} />
               <Button type="submit" loading={createProduct.isPending}>Crear</Button>
             </Stack>
           </form>
@@ -343,7 +390,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             });
           })}>
             <Stack>
-              <TextInput label="Código de unidad" required {...unitForm.getInputProps('unitCode')} />
+              <Select label="Codigo de unidad" required data={INVENTORY_UNIT_OPTIONS} {...unitForm.getInputProps('unitCode')} />
               <TextInput label="Factor a unidad base" inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
               <Button type="submit" loading={addUnit.isPending}>Agregar versión</Button>
             </Stack>
@@ -358,6 +405,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   const shipments = useInventoryShipments();
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
+  const balances = useInventoryBalances();
   const assignees = useInventoryAssignees(canAdmin);
   const createShipment = useCreateShipment();
   const dispatchShipment = useDispatchShipment();
@@ -380,6 +428,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   });
   const destination = locations.data?.find((location) => location.id === form.values.destinationLocationId);
   const receivers = eligibleShipmentReceivers(destination, assignees.data ?? []);
+  const availableProducts = availableProductIdsAtLocation(balances.data ?? [], form.values.originLocationId);
 
   const runConfirmedAction = () => {
     if (!confirmAction) return;
@@ -426,7 +475,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   };
 
   return (
-    <QueryBoundary queries={[shipments, products, locations, ...(canAdmin ? [assignees] : [])]}>
+    <QueryBoundary queries={[shipments, products, locations, balances, ...(canAdmin ? [assignees] : [])]}>
     <Stack>
       {canAdmin && <Button leftSection={<IconPlus size={16} />} onClick={createModal.open} w="fit-content">Asignar productos a un municipio</Button>}
       <Card withBorder style={tableContainment}>
@@ -466,7 +515,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
           onSuccess: () => { success('Asignación creada. Confirma el envío cuando salga de compras.'); form.reset(); createModal.close(); }, onError: failure,
         }))}>
           <Stack>
-            <Select searchable required label="Bodega central" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} />
+            <Select searchable required label="Bodega central" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} onChange={(value) => { form.setFieldValue('originLocationId', value ?? ''); form.setFieldValue('items', [{ productId: '', unitVersionId: '', quantity: '' }]); }} />
             <Select
               searchable
               required
@@ -492,7 +541,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
             {form.values.items.map((line, index) => {
               const product = products.data?.find((item) => item.id === line.productId);
               return <Grid key={index} align="end">
-                <Grid.Col span={{ base: 12, sm: 5 }}><Select searchable label="Producto" data={(products.data ?? []).filter((item) => item.active).map((item) => ({ value: item.id, label: `${item.sku} · ${item.name}` }))} {...form.getInputProps(`items.${index}.productId`)} onChange={(value) => { form.setFieldValue(`items.${index}.productId`, value ?? ''); form.setFieldValue(`items.${index}.unitVersionId`, ''); }} /></Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 5 }}><Select searchable label="Producto" disabled={!form.values.originLocationId} nothingFoundMessage={form.values.originLocationId ? 'No hay productos con saldo disponible en esta bodega.' : 'Selecciona primero la bodega central.'} data={(products.data ?? []).filter((item) => item.active && availableProducts.has(item.id)).map((item) => ({ value: item.id, label: `${item.sku} ? ${item.name}` }))} {...form.getInputProps(`items.${index}.productId`)} onChange={(value) => { form.setFieldValue(`items.${index}.productId`, value ?? ''); form.setFieldValue(`items.${index}.unitVersionId`, ''); }} /></Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 3 }}><Select label="Unidad" data={(product?.unitVersions ?? []).filter((unit) => !unit.validUntil).map((unit) => ({ value: unit.id, label: unit.unitCode }))} {...form.getInputProps(`items.${index}.unitVersionId`)} /></Grid.Col>
                 <Grid.Col span={{ base: 9, sm: 3 }}><TextInput label="Cantidad" inputMode="decimal" {...form.getInputProps(`items.${index}.quantity`)} /></Grid.Col>
                 <Grid.Col span={{ base: 3, sm: 1 }}><Button color="red" variant="subtle" disabled={form.values.items.length === 1} onClick={() => form.removeListItem('items', index)}>×</Button></Grid.Col>
@@ -789,7 +838,7 @@ export function InventoryPage() {
             </>}
           </Tabs.List>
         </ScrollArea>
-        <Tabs.Panel value="overview" pt="lg"><InventoryOverview canAdmin={!isPurchasing && canAdmin} canReview={!isPurchasing && canReview} /></Tabs.Panel>
+        <Tabs.Panel value="overview" pt="lg"><InventoryOverview canManageStock={canAdmin} canReconcile={!isPurchasing && canAdmin} canReview={!isPurchasing && canReview} /></Tabs.Panel>
         <Tabs.Panel value="catalog" pt="lg"><MasterDataPanel canAdmin={canAdmin} /></Tabs.Panel>
         <Tabs.Panel value="shipments" pt="lg"><ShipmentsPanel canAdmin={canAdmin} /></Tabs.Panel>
         {!isPurchasing && <>

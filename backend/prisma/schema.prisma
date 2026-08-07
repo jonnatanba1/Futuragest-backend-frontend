@@ -440,6 +440,7 @@ enum InventoryAssignmentRole {
 
 enum InventoryCommandType {
   OPENING_BALANCE
+  STOCK_ENTRY
   FIELD_ISSUE
   FIELD_RETURN
   DAMAGE_OR_LOSS
@@ -461,6 +462,7 @@ enum InventoryCommandStatus {
 
 enum InventoryMovementType {
   OPENING_BALANCE
+  STOCK_ENTRY
   FIELD_ISSUE
   FIELD_RETURN
   TRANSFER_OUT

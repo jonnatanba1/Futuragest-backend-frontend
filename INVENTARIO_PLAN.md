@@ -29,11 +29,12 @@ flowchart LR
 
 ### Compras
 
-1. Mantiene el catálogo de productos.
-2. Consulta existencias y alertas por bodega municipal.
-3. Crea un envío indicando bodega central, municipio, responsable y cantidades.
-4. Revisa el borrador y lo despacha.
-5. Supervisa envíos pendientes de recepción o con diferencias.
+1. Mantiene el catalogo de productos y selecciona unidades estandarizadas.
+2. Registra entradas de compras o reposiciones sin costo en la bodega central; el movimiento aumenta el stock y queda auditado.
+3. Consulta existencias y alertas por bodega municipal.
+4. Crea un envio indicando bodega central, municipio, responsable y cantidades.
+5. Revisa el borrador y lo despacha.
+6. Supervisa envios pendientes de recepcion o con diferencias.
 
 ### Supervisor o coordinador receptor
 
@@ -60,6 +61,7 @@ flowchart LR
 | Supervisor elegible | Su municipio y su zona deben coincidir con los de la bodega destino. |
 | Coordinador elegible | Su `coordinatedZoneId` debe coincidir con la zona de la bodega destino. |
 | Cambio de responsable | Solo se permite mientras el envío esté en borrador. |
+| Entrada de compras | Solo COMPRAS o SYSTEM_ADMIN la registra en una bodega central activa. No tiene costo; genera un comando idempotente y un movimiento `STOCK_ENTRY` positivo. |
 | Despacho | Reduce la bodega central y registra las cantidades como inventario en tránsito. |
 | Recepción | Solo la puede confirmar el usuario asignado al envío. |
 | Biometría | La recepción requiere biometría real; el PIN o patrón del teléfono no son sustitutos. |
@@ -78,6 +80,7 @@ La interfaz de Compras debe tener solo tres áreas principales:
 Muestra:
 
 - stock actual por municipio y producto;
+- formulario de entrada de compras o reposiciones sin costo para la bodega central;
 - mínimo configurado;
 - faltante frente al mínimo;
 - envíos despachados aún no recibidos;
@@ -89,7 +92,8 @@ No debe mostrar un cero falso mientras una consulta esté cargando o haya fallad
 
 Permite:
 
-- crear productos con SKU, nombre y unidad base;
+- crear productos con SKU, nombre y unidad base seleccionada de un catalogo controlado;
+- ver stock central y total municipal por cada producto;
 - activar o desactivar productos;
 - agregar versiones de unidad cuando sea necesario.
 
@@ -102,7 +106,7 @@ El formulario solicita, en este orden:
 1. bodega central de origen;
 2. municipio o bodega municipal destino;
 3. responsable de recepción elegible;
-4. productos y cantidades;
+4. productos con saldo disponible en la bodega central elegida y sus cantidades;
 5. observaciones opcionales.
 
 Al cambiar el municipio, la lista de responsables se vuelve a filtrar. No se puede guardar ni despachar sin un responsable válido.
@@ -167,6 +171,7 @@ El backend vuelve a comprobar la identidad y la elegibilidad. Ocultar opciones e
 | Editar borrador | `PATCH /inventario/shipments/:id` |
 | Despachar | `POST /inventario/shipments/:id/dispatch` |
 | Confirmar recepción | `POST /inventario/shipments/:id/receipts` con biometría y `clientCommandId` |
+| Registrar entrada sin costo | `POST /inventario/stock/entries` con `clientCommandId`, bodega central, producto, unidad y cantidad |
 | Consultar stock | `GET /inventario/balances` |
 | Consultar alertas | `GET /inventario/alerts` |
 
@@ -187,6 +192,9 @@ El backend vuelve a comprobar la identidad y la elegibilidad. Ocultar opciones e
 
 ```text
 stock disponible = suma de movimientos aplicados en la ubicación
+
+al registrar entrada de compras o reposicion:
+  bodega central += cantidad recibida
 
 al despachar:
   bodega central -= cantidad enviada

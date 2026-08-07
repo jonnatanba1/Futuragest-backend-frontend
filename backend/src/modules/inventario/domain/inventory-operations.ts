@@ -93,6 +93,14 @@ export interface ShipmentCommandInput {
   reason?: string;
 }
 
+export interface StockEntryInput extends ShipmentCommandInput {
+  locationId: string;
+  productId: string;
+  unitVersionId: string;
+  quantity: string;
+  note?: string;
+}
+
 export interface ShipmentReceiptLineInput {
   shipmentItemId: string;
   receivedBase: string;
@@ -143,6 +151,7 @@ export interface InventoryOperationsRepositoryPort {
   updateLocation(actor: ScopeContext, id: string, input: UpdateLocationInput): Promise<unknown>;
   assignLocation(actor: ScopeContext, id: string, input: AssignLocationInput): Promise<unknown>;
   setStockMinimum(actor: ScopeContext, input: SetStockMinimumInput): Promise<unknown>;
+  recordStockEntry(actor: ScopeContext, input: StockEntryInput): Promise<unknown>;
   listBalances(actor: ScopeContext): Promise<unknown>;
   listMovements(actor: ScopeContext, cursor?: string): Promise<unknown>;
   listAlerts(actor: ScopeContext): Promise<unknown>;

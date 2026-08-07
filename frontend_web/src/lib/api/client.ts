@@ -371,6 +371,15 @@ export const inventoryApi = {
     request('PUT', '/inventario/stock/minimum', { body }),
   listBalances: (): Promise<InventoryBalance[]> =>
     request<InventoryBalance[]>('GET', '/inventario/balances'),
+  recordStockEntry: (body: {
+    clientCommandId: string;
+    locationId: string;
+    productId: string;
+    unitVersionId: string;
+    quantity: string;
+    note?: string;
+  }): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', '/inventario/stock/entries', { body }),
   listMovements: (cursor?: string): Promise<{ items: InventoryMovement[]; nextCursor: string | null }> =>
     request('GET', `/inventario/movements${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   listAlerts: (): Promise<InventoryAlert[]> =>

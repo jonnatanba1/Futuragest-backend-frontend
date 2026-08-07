@@ -22,6 +22,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsOptional,
   IsString,
   Max,
@@ -31,6 +32,7 @@ import {
 import { Roles } from '../../iam/interface/roles.decorator';
 import type { InventoryOperationsUseCase } from '../application/inventory-operations.use-case';
 import { InventoryOperationError } from '../domain/inventory-operations';
+import { INVENTORY_UNIT_CODES } from '../domain/inventory-unit-catalog';
 
 export const INVENTORY_OPERATIONS_USE_CASE = Symbol('InventoryOperationsUseCase');
 
@@ -67,7 +69,7 @@ function translateInventoryError(error: unknown): never {
 class CreateProductBody {
   @IsString() sku!: string;
   @IsString() name!: string;
-  @IsString() baseUnitCode!: string;
+  @IsString() @IsIn(INVENTORY_UNIT_CODES) baseUnitCode!: string;
 }
 
 class UpdateProductBody {
@@ -76,7 +78,7 @@ class UpdateProductBody {
 }
 
 class AddProductUnitBody {
-  @IsString() unitCode!: string;
+  @IsString() @IsIn(INVENTORY_UNIT_CODES) unitCode!: string;
   @IsString() factorToBase!: string;
   @IsOptional() @IsString() validFrom?: string;
 }
@@ -136,6 +138,14 @@ class ResolveCommandBody {
 class CommandBody {
   @IsString() clientCommandId!: string;
   @IsOptional() @IsString() reason?: string;
+}
+
+class StockEntryBody extends CommandBody {
+  @IsString() locationId!: string;
+  @IsString() productId!: string;
+  @IsString() unitVersionId!: string;
+  @IsString() quantity!: string;
+  @IsOptional() @IsString() note?: string;
 }
 
 class RequiredReasonCommandBody extends CommandBody {

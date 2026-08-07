@@ -14,6 +14,7 @@ import type {
   ResolveCommandInput,
   ReverseMovementInput,
   SetStockMinimumInput,
+  StockEntryInput,
   ShipmentCommandInput,
   UpdateProductInput,
   UpdateLocationInput,
@@ -40,6 +41,7 @@ export class InventoryOperationsUseCase {
   updateLocation(id: string, input: UpdateLocationInput) { return this.repository.updateLocation(this.actor(), id, input); }
   assignLocation(id: string, input: AssignLocationInput) { return this.repository.assignLocation(this.actor(), id, input); }
   setStockMinimum(input: SetStockMinimumInput) { return this.repository.setStockMinimum(this.actor(), input); }
+  recordStockEntry(input: StockEntryInput) { return this.repository.recordStockEntry(this.actor(), input); }
   listBalances() { return this.repository.listBalances(this.actor()); }
   listMovements(cursor?: string) { return this.repository.listMovements(this.actor(), cursor); }
   listAlerts() { return this.repository.listAlerts(this.actor()); }
