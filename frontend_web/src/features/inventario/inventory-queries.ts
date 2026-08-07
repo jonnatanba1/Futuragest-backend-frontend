@@ -8,7 +8,7 @@ export const inventoryKeys = {
   assignees: ['inventory', 'assignees'] as const,
   balances: ['inventory', 'balances'] as const,
   alerts: ['inventory', 'alerts'] as const,
-  movements: ['inventory', 'movements'] as const,
+  movements: (productId?: string) => ['inventory', 'movements', productId ?? 'all'] as const,
   reviews: ['inventory', 'reviews'] as const,
   shipments: ['inventory', 'shipments'] as const,
   counts: ['inventory', 'counts'] as const,
@@ -43,15 +43,15 @@ export function useInventoryAlerts() {
   return useQuery({ queryKey: inventoryKeys.alerts, queryFn: inventoryApi.listAlerts });
 }
 
-export function useInventoryMovements() {
+export function useInventoryMovements(productId?: string) {
   return useInfiniteQuery({
-    queryKey: inventoryKeys.movements,
-    queryFn: ({ pageParam }) => inventoryApi.listMovements(pageParam),
+    queryKey: inventoryKeys.movements(productId),
+    queryFn: ({ pageParam }) => inventoryApi.listMovements(pageParam, productId),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: productId === undefined || Boolean(productId),
   });
 }
-
 export function useInventoryReviews(enabled = true) {
   return useQuery({ queryKey: inventoryKeys.reviews, queryFn: inventoryApi.listReviews, enabled, retry: false });
 }

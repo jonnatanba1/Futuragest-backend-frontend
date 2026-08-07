@@ -153,7 +153,7 @@ export interface InventoryOperationsRepositoryPort {
   setStockMinimum(actor: ScopeContext, input: SetStockMinimumInput): Promise<unknown>;
   recordStockEntry(actor: ScopeContext, input: StockEntryInput): Promise<unknown>;
   listBalances(actor: ScopeContext): Promise<unknown>;
-  listMovements(actor: ScopeContext, cursor?: string): Promise<unknown>;
+  listMovements(actor: ScopeContext, cursor?: string, productId?: string): Promise<unknown>;
   listAlerts(actor: ScopeContext): Promise<unknown>;
   listReviewCommands(actor: ScopeContext): Promise<unknown>;
   resolveCommand(actor: ScopeContext, id: string, input: ResolveCommandInput): Promise<unknown>;

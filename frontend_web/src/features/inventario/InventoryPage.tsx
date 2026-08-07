@@ -107,6 +107,22 @@ function stockLocationLabel(location: InventoryLocation) {
   return location.name;
 }
 
+function movementTraceLabel(type: string) {
+  const labels: Record<string, string> = {
+    STOCK_ENTRY: 'Ingreso de compra',
+    OPENING_BALANCE: 'Saldo inicial',
+    TRANSFER_IN: 'Ingreso por traslado',
+    TRANSFER_OUT: 'Salida por envío',
+    FIELD_ISSUE: 'Salida de campo',
+    FIELD_RETURN: 'Retorno de campo',
+    DAMAGE_OR_LOSS: 'Daño o pérdida',
+    COUNT_ADJUSTMENT_IN: 'Ajuste positivo',
+    COUNT_ADJUSTMENT_OUT: 'Ajuste negativo',
+    REVERSAL: 'Reverso',
+  };
+  return labels[type] ?? type;
+}
+
 interface QueryState {
   isLoading: boolean;
   isError: boolean;
@@ -290,6 +306,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
   const balances = useInventoryBalances();
+  const shipments = useInventoryShipments();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const addUnit = useAddProductUnit();
@@ -304,6 +321,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const productForm = useForm({ initialValues: { sku: '', name: '', baseUnitCode: 'UND' } });
   const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
   const minimumForm = useForm({ initialValues: { locationId: '', productId: '', quantityBase: '0' } });
+  const productMovements = useInventoryMovements(detailProductId ?? undefined);
 
   const centralStock = stockByProduct(balances.data ?? [], 'CENTRAL_WAREHOUSE');
   const municipalStock = stockByProduct(balances.data ?? [], 'MUNICIPAL_WAREHOUSE');
@@ -313,6 +331,8 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   });
   const detailProduct = products.data?.find((product) => product.id === detailProductId) ?? null;
   const unitProduct = products.data?.find((product) => product.id === unitProductId) ?? null;
+  const traceRows = productMovements.data?.pages.flatMap((page) => page.items) ?? [];
+  const productShipments = (shipments.data ?? []).filter((shipment) => shipment.items.some((item) => item.productId === detailProductId));
   const automaticUnitFactor = unitProduct ? automaticFactorToBase(unitProduct.baseUnitCode, unitForm.values.unitCode) : null;
 
   return (
@@ -383,7 +403,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           </Modal>
         )}
 
-        <Modal opened={detailProduct !== null} onClose={() => setDetailProductId(null)} title={detailProduct ? `${detailProduct.sku} - ${detailProduct.name}` : 'Detalle del producto'} zIndex={200}>
+        <Modal opened={detailProduct !== null} onClose={() => setDetailProductId(null)} title={detailProduct ? `${detailProduct.sku} - ${detailProduct.name}` : 'Detalle del producto'} size="xl" zIndex={200}>
           <Stack>
             <Text size="sm">Unidad base: {detailProduct?.baseUnitCode}</Text>
             <Text size="sm">Unidades vigentes: {detailProduct?.unitVersions.filter((unit) => !unit.validUntil).map((unit) => unit.unitCode).join(', ')}</Text>
@@ -391,6 +411,32 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               <Card withBorder><Text size="xs" c="dimmed">Stock central</Text><Text fw={700}>{quantity(detailProduct ? centralStock[detailProduct.id] ?? 0 : 0)}</Text></Card>
               <Card withBorder><Text size="xs" c="dimmed">Stock municipios</Text><Text fw={700}>{quantity(detailProduct ? municipalStock[detailProduct.id] ?? 0 : 0)}</Text></Card>
             </SimpleGrid>
+            <Divider label="Trazabilidad" />
+            <Card withBorder>
+              <Group justify="space-between" mb="xs"><Text fw={600}>Entradas y salidas</Text>{productMovements.isLoading && <Loader size="xs" />}</Group>
+              <ScrollArea mah={220}>
+                <Table striped miw={620}>
+                  <Table.Thead><Table.Tr><Table.Th>Fecha</Table.Th><Table.Th>Movimiento</Table.Th><Table.Th>Ubicación</Table.Th><Table.Th ta="right">Cantidad</Table.Th></Table.Tr></Table.Thead>
+                  <Table.Tbody>
+                    {!productMovements.isLoading && traceRows.length === 0 && <EmptyTableRow columns={4} message="Aún no hay movimientos para este producto." />}
+                    {traceRows.map((movement) => <Table.Tr key={movement.id}><Table.Td>{new Date(movement.createdAt).toLocaleString('es-CO')}</Table.Td><Table.Td><Badge variant="light" color={movement.type.includes('OUT') || movement.type === 'FIELD_ISSUE' || movement.type === 'DAMAGE_OR_LOSS' ? 'red' : 'green'}>{movementTraceLabel(movement.type)}</Badge></Table.Td><Table.Td>{stockLocationLabel(movement.location)}</Table.Td><Table.Td ta="right">{quantity(movement.quantityBase)}</Table.Td></Table.Tr>)}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+              {productMovements.hasNextPage && <Button mt="sm" size="xs" variant="default" loading={productMovements.isFetchingNextPage} onClick={() => void productMovements.fetchNextPage()}>Cargar más movimientos</Button>}
+            </Card>
+            <Card withBorder>
+              <Group justify="space-between" mb="xs"><Text fw={600}>Envíos a municipios</Text>{shipments.isLoading && <Loader size="xs" />}</Group>
+              <ScrollArea mah={200}>
+                <Table striped miw={560}>
+                  <Table.Thead><Table.Tr><Table.Th>Fecha</Table.Th><Table.Th>Municipio destino</Table.Th><Table.Th ta="right">Enviado</Table.Th><Table.Th ta="right">Recibido</Table.Th><Table.Th>Estado</Table.Th></Table.Tr></Table.Thead>
+                  <Table.Tbody>
+                    {!shipments.isLoading && productShipments.length === 0 && <EmptyTableRow columns={5} message="Este producto aún no tiene envíos municipales." />}
+                    {productShipments.flatMap((shipment) => shipment.items.filter((item) => item.productId === detailProduct?.id).map((item) => <Table.Tr key={item.id}><Table.Td>{new Date(shipment.createdAt).toLocaleString('es-CO')}</Table.Td><Table.Td>{shipment.destinationLocation.municipio?.name ?? shipment.destinationLocation.name}</Table.Td><Table.Td ta="right">{quantity(item.quantityBase)}</Table.Td><Table.Td ta="right">{quantity(item.receivedBase)}</Table.Td><Table.Td><Badge variant="light">{shipment.status.replace(/_/g, ' ')}</Badge></Table.Td></Table.Tr>))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            </Card>
             {canAdmin && detailProduct && <Group grow>
               <Button onClick={() => { setEntryProductId(detailProduct.id); setEntryOpened(true); }}>Registrar ingreso</Button>
               <Button variant="default" onClick={() => setUnitProductId(detailProduct.id)}>Agregar unidad</Button>

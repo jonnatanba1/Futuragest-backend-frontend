@@ -276,7 +276,7 @@ export class InventoryOperationsController {
   balances() { return this.run(() => this.operations.listBalances()); }
 
   @Get('movements') @Roles(...READ_ROLES)
-  movements(@Query('cursor') cursor?: string) { return this.run(() => this.operations.listMovements(cursor)); }
+  movements(@Query('cursor') cursor?: string, @Query('productId') productId?: string) { return this.run(() => this.operations.listMovements(cursor, productId)); }
 
   @Get('stock/alerts') @Roles(...READ_ROLES)
   alerts() { return this.run(() => this.operations.listAlerts()); }

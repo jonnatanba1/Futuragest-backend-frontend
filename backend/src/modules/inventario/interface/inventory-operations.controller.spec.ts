@@ -83,6 +83,14 @@ describe('InventoryOperationsController', () => {
     expect(service.recordStockEntry).toHaveBeenCalledWith(body);
   });
 
+  it('passes a product filter when listing movements', async () => {
+    const service = operations();
+
+    await new InventoryOperationsController(service).movements('cursor-1', 'product-1');
+
+    expect(service.listMovements).toHaveBeenCalledWith('cursor-1', 'product-1');
+  });
+
   it.each([
     ['NOT_FOUND', NotFoundException],
     ['SEPARATION_OF_DUTIES', ForbiddenException],

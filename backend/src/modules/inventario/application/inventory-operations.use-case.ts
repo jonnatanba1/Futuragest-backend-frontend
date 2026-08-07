@@ -43,7 +43,7 @@ export class InventoryOperationsUseCase {
   setStockMinimum(input: SetStockMinimumInput) { return this.repository.setStockMinimum(this.actor(), input); }
   recordStockEntry(input: StockEntryInput) { return this.repository.recordStockEntry(this.actor(), input); }
   listBalances() { return this.repository.listBalances(this.actor()); }
-  listMovements(cursor?: string) { return this.repository.listMovements(this.actor(), cursor); }
+  listMovements(cursor?: string, productId?: string) { return this.repository.listMovements(this.actor(), cursor, productId); }
   listAlerts() { return this.repository.listAlerts(this.actor()); }
   listReviewCommands() { return this.repository.listReviewCommands(this.actor()); }
   resolveCommand(id: string, input: ResolveCommandInput) { return this.repository.resolveCommand(this.actor(), id, input); }

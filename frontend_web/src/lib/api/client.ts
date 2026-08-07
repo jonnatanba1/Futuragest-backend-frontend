@@ -380,8 +380,13 @@ export const inventoryApi = {
     note?: string;
   }): Promise<InventoryCommandResult> =>
     request<InventoryCommandResult>('POST', '/inventario/stock/entries', { body }),
-  listMovements: (cursor?: string): Promise<{ items: InventoryMovement[]; nextCursor: string | null }> =>
-    request('GET', `/inventario/movements${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  listMovements: (cursor?: string, productId?: string): Promise<{ items: InventoryMovement[]; nextCursor: string | null }> => {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', cursor);
+    if (productId) params.set('productId', productId);
+    const query = params.toString();
+    return request('GET', `/inventario/movements${query ? `?${query}` : ''}`);
+  },
   listAlerts: (): Promise<InventoryAlert[]> =>
     request<InventoryAlert[]>('GET', '/inventario/stock/alerts'),
   listReviews: (): Promise<InventoryReviewCommand[]> =>

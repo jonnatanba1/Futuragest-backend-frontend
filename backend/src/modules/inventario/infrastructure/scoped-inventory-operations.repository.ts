@@ -538,9 +538,9 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     }));
   }
 
-  async listMovements(actor: ScopeContext, cursor?: string): Promise<unknown> {
+  async listMovements(actor: ScopeContext, cursor?: string, productId?: string): Promise<unknown> {
     const movements = await this.prisma.inventoryMovement.findMany({
-      where: applyInventoryScope(actor, 'InventoryMovement'),
+      where: applyInventoryScope(actor, 'InventoryMovement', productId ? { productId } : {}),
       include: {
         location: true,
         product: true,
