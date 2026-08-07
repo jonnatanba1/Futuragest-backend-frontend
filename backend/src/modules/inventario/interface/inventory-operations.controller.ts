@@ -270,6 +270,8 @@ export class InventoryOperationsController {
   @Put('stock/minimum') @Roles(...ADMIN_ROLES)
   stockMinimum(@Body() body: StockMinimumBody) { return this.run(() => this.operations.setStockMinimum(body)); }
 
+  @Post('stock/entries') @Roles(...ADMIN_ROLES)
+  recordStockEntry(@Body() body: StockEntryBody) { return this.run(() => this.operations.recordStockEntry(body)); }
   @Get('balances') @Roles(...READ_ROLES)
   balances() { return this.run(() => this.operations.listBalances()); }
 

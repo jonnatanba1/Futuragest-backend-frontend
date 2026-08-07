@@ -17,6 +17,7 @@ const HANDLERS = [
   'createLocation',
   'assignLocation',
   'stockMinimum',
+  'recordStockEntry',
   'balances',
   'movements',
   'alerts',
@@ -71,6 +72,15 @@ describe('InventoryOperationsController', () => {
     expect(
       Reflect.getMetadata(ROLES_KEY, InventoryOperationsController.prototype.createProduct),
     ).toEqual(['COMPRAS', 'SYSTEM_ADMIN']);
+  });
+
+  it('records central stock entries through the use case', async () => {
+    const service = operations();
+    const body = { clientCommandId: 'stock-entry-1', locationId: 'central-1', productId: 'product-1', unitVersionId: 'unit-1', quantity: '1.5', note: 'Supplier delivery' };
+
+    await new InventoryOperationsController(service).recordStockEntry(body);
+
+    expect(service.recordStockEntry).toHaveBeenCalledWith(body);
   });
 
   it.each([
