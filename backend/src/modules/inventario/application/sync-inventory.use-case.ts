@@ -61,6 +61,15 @@ function parseEvent(value: unknown): MobileInventoryEvent {
   if (event.verificationReason !== undefined && typeof event.verificationReason !== 'string') {
     throw new Error('verificationReason must be a string.');
   }
+  if (event.reason !== undefined && typeof event.reason !== 'string') {
+    throw new Error('reason must be a string.');
+  }
+  if (
+    (event.type === 'FIELD_RETURN' || event.type === 'DAMAGE_OR_LOSS') &&
+    !event.reason?.trim()
+  ) {
+    throw new Error('reason is required for returns and damage or loss.');
+  }
   if (
     !isFiniteOptionalNumber(event.latitude) ||
     !isFiniteOptionalNumber(event.longitude) ||

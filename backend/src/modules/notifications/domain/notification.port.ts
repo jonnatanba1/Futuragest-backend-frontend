@@ -29,6 +29,7 @@ export interface ShipmentDispatchedPayload {
   shipmentCode: string;
   receiverUserId: string;
   destinationName: string;
+  productNames: string[];
 }
 
 export interface NotificationPort {

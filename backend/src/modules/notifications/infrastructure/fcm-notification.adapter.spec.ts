@@ -79,6 +79,7 @@ const SHIPMENT_PAYLOAD: ShipmentDispatchedPayload = {
   shipmentCode: 'SHP-20260808-TEST',
   receiverUserId: 'receiver-1',
   destinationName: 'Bodega Apartadó',
+  productNames: ['Escoba industrial'],
 };
 
 /** Build PushRecipient tuples from a list of token strings (deterministic ids). */
@@ -291,7 +292,7 @@ describe('FcmNotificationAdapter (FIREBASE_ENABLED=true)', () => {
       tokens: ['receiver-token'],
       notification: {
         title: 'Nuevo envío de inventario',
-        body: 'SHP-20260808-TEST está en camino a Bodega Apartadó. Confirma la recepción con biometría.',
+        body: 'Escoba industrial est\u00e1 en camino a Bodega Apartad\u00f3. Confirma la recepci\u00f3n con biometr\u00eda.',
       },
       data: { type: 'SHIPMENT_DISPATCHED', shipmentId: 'shipment-1' },
     }));

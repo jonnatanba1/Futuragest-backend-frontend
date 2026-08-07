@@ -40,6 +40,7 @@ export function canonicalInventoryPayload(event: MobileInventoryEvent): Record<s
     capturedOffsetMin: event.capturedOffsetMin,
     verificationMethod: event.verificationMethod,
     verificationReason: event.verificationReason,
+    reason: event.reason?.trim() || undefined,
     latitude: event.latitude,
     longitude: event.longitude,
     accuracyMeters: event.accuracyMeters,

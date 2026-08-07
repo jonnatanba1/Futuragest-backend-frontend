@@ -18,6 +18,7 @@ export interface MobileInventoryEvent {
   capturedOffsetMin: number;
   verificationMethod: VerificationMethod;
   verificationReason?: string;
+  reason?: string;
   latitude?: number;
   longitude?: number;
   accuracyMeters?: number;

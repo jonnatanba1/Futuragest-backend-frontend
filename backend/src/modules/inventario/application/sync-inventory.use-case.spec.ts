@@ -87,6 +87,16 @@ describe('SyncInventoryUseCase', () => {
     expect(repo.process).not.toHaveBeenCalled();
   });
 
+  it('rejects returns and damage reports without an audit justification', async () => {
+    const repo = repository();
+    const [result] = await new SyncInventoryUseCase(repo, holder()).execute([
+      { ...EVENT, type: 'FIELD_RETURN' },
+    ]);
+
+    expect(result).toMatchObject({ status: 'REJECTED_CLIENT_ACTION', code: 'INVALID_EVENT' });
+    expect(repo.process).not.toHaveBeenCalled();
+  });
+
   it('propagates idempotency-key reuse as a security conflict', async () => {
     const repo = repository();
     repo.process.mockRejectedValue(new InventoryIdempotencyConflictError(EVENT.clientEventId));

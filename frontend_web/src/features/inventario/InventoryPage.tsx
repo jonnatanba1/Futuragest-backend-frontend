@@ -318,6 +318,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [minimumOpened, setMinimumOpened] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+  const [inventoryFilter, setInventoryFilter] = useState('ALL');
   const productForm = useForm({ initialValues: { sku: '', name: '', baseUnitCode: 'UND' } });
   const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
   const minimumForm = useForm({ initialValues: { locationId: '', productId: '', quantityBase: '0' } });
@@ -327,7 +328,16 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const municipalStock = stockByProduct(balances.data ?? [], 'MUNICIPAL_WAREHOUSE');
   const visibleProducts = (products.data ?? []).filter((product) => {
     const query = productSearch.trim().toLocaleLowerCase('es-CO');
-    return !query || product.sku.toLocaleLowerCase('es-CO').includes(query) || product.name.toLocaleLowerCase('es-CO').includes(query);
+    const matchesSearch = !query || product.sku.toLocaleLowerCase('es-CO').includes(query) || product.name.toLocaleLowerCase('es-CO').includes(query);
+    if (!matchesSearch) return false;
+    const central = centralStock[product.id] ?? 0;
+    const municipal = municipalStock[product.id] ?? 0;
+    if (inventoryFilter === 'CENTRAL_STOCK') return central > 0;
+    if (inventoryFilter === 'MUNICIPAL_STOCK') return municipal > 0;
+    if (inventoryFilter === 'OUT_OF_STOCK') return central <= 0 && municipal <= 0;
+    if (inventoryFilter === 'ACTIVE') return product.active;
+    if (inventoryFilter === 'INACTIVE') return !product.active;
+    return true;
   });
   const detailProduct = products.data?.find((product) => product.id === detailProductId) ?? null;
   const unitProduct = products.data?.find((product) => product.id === unitProductId) ?? null;
@@ -350,7 +360,22 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
 
         <Card withBorder style={tableContainment}>
           <Group justify="space-between" mb="md"><Title order={3} size="h4">Inventario</Title><Text size="sm" c="dimmed">Selecciona un producto para ver su detalle.</Text></Group>
-          <TextInput label="Buscar producto" placeholder="SKU o nombre" value={productSearch} onChange={(event) => setProductSearch(event.currentTarget.value)} mb="md" />
+          <Group align="end" grow mb="md">
+            <TextInput label="Buscar producto" placeholder="SKU o nombre" value={productSearch} onChange={(event) => setProductSearch(event.currentTarget.value)} />
+            <Select
+              label="Filtrar inventario"
+              value={inventoryFilter}
+              onChange={(value) => setInventoryFilter(value ?? 'ALL')}
+              data={[
+                { value: 'ALL', label: 'Todos los productos' },
+                { value: 'CENTRAL_STOCK', label: 'Con stock central' },
+                { value: 'MUNICIPAL_STOCK', label: 'Con stock en municipios' },
+                { value: 'OUT_OF_STOCK', label: 'Sin existencias' },
+                { value: 'ACTIVE', label: 'Activos' },
+                { value: 'INACTIVE', label: 'Inactivos' },
+              ]}
+            />
+          </Group>
           <ScrollArea>
             <Table striped miw={680}>
               <Table.Thead>
@@ -512,6 +537,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   const [createOpened, createModal] = useDisclosure(false);
   const [confirmAction, setConfirmAction] = useState<{ kind: 'dispatch' | 'cancel'; shipment: InventoryShipment } | null>(null);
   const [reasonAction, setReasonAction] = useState<{ kind: 'return' | 'discrepancy'; shipment: InventoryShipment } | null>(null);
+  const [shipmentDetail, setShipmentDetail] = useState<InventoryShipment | null>(null);
   const [actionReason, setActionReason] = useState('');
 
   const form = useForm({
@@ -583,7 +609,19 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
             <Table.Tbody>
               {shipments.data?.length === 0 && <EmptyTableRow columns={8} message="No hay asignaciones registradas." />}
               {shipments.data?.map((shipment) => (
-                <Table.Tr key={shipment.id}>
+                <Table.Tr
+                  key={shipment.id}
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShipmentDetail(shipment)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setShipmentDetail(shipment);
+                    }
+                  }}
+                >
                   <Table.Td fw={600}>{shipment.code}</Table.Td>
                   <Table.Td>{stockLocationLabel(shipment.originLocation)}</Table.Td>
                   <Table.Td>{shipment.destinationLocation.municipio?.name ?? shipment.destinationLocation.name}</Table.Td>
@@ -594,11 +632,11 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
                       {canAdmin && shipment.status === 'DRAFT' && <>
-                        <Button size="xs" onClick={() => setConfirmAction({ kind: 'dispatch', shipment })}>Despachar</Button>
-                        <Button size="xs" variant="subtle" color="red" onClick={() => setConfirmAction({ kind: 'cancel', shipment })}>Cancelar</Button>
+                        <Button size="xs" onClick={(event) => { event.stopPropagation(); setConfirmAction({ kind: 'dispatch', shipment }); }}>Despachar</Button>
+                        <Button size="xs" variant="subtle" color="red" onClick={(event) => { event.stopPropagation(); setConfirmAction({ kind: 'cancel', shipment }); }}>Cancelar</Button>
                       </>}
-                      {canAdmin && ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status) && <Button size="xs" variant="subtle" onClick={() => { setActionReason(''); setReasonAction({ kind: 'return', shipment }); }}>Retornar</Button>}
-                      {canAdmin && shipment.status === 'DISCREPANCY_REVIEW' && <Button size="xs" color="orange" onClick={() => { setActionReason(''); setReasonAction({ kind: 'discrepancy', shipment }); }}>Resolver</Button>}
+                      {canAdmin && ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status) && <Button size="xs" variant="subtle" onClick={(event) => { event.stopPropagation(); setActionReason(''); setReasonAction({ kind: 'return', shipment }); }}>Retornar</Button>}
+                      {canAdmin && shipment.status === 'DISCREPANCY_REVIEW' && <Button size="xs" color="orange" onClick={(event) => { event.stopPropagation(); setActionReason(''); setReasonAction({ kind: 'discrepancy', shipment }); }}>Resolver</Button>}
                     </Group>
                   </Table.Td>
                 </Table.Tr>
@@ -607,6 +645,33 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
           </Table>
         </ScrollArea>
       </Card>
+
+      <Modal
+        opened={shipmentDetail !== null}
+        onClose={() => setShipmentDetail(null)}
+        title={shipmentDetail ? `Detalle del envío ${shipmentDetail.code}` : 'Detalle del envío'}
+        size="xl"
+      >
+        {shipmentDetail && <Stack gap="md">
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <Card withBorder><Text size="xs" c="dimmed">Origen</Text><Text fw={600}>{stockLocationLabel(shipmentDetail.originLocation)}</Text></Card>
+            <Card withBorder><Text size="xs" c="dimmed">Municipio destino</Text><Text fw={600}>{shipmentDetail.destinationLocation.municipio?.name ?? shipmentDetail.destinationLocation.name}</Text></Card>
+            <Card withBorder><Text size="xs" c="dimmed">Responsable</Text><Text fw={600}>{shipmentDetail.receiver?.displayName ?? shipmentDetail.receiver?.email ?? 'Sin asignar'}</Text></Card>
+            <Card withBorder><Text size="xs" c="dimmed">Estado</Text><Badge color={shipmentDetail.status.includes('DISCREPANCY') ? 'red' : shipmentDetail.status === 'RECEIVED' ? 'green' : shipmentDetail.status === 'DRAFT' ? 'gray' : 'blue'}>{shipmentDetail.status.replace(/_/g, ' ')}</Badge></Card>
+          </SimpleGrid>
+          <Text size="sm">Creado: {new Date(shipmentDetail.createdAt).toLocaleString('es-CO')}</Text>
+          {shipmentDetail.dispatchedAt && <Text size="sm">Despachado: {new Date(shipmentDetail.dispatchedAt).toLocaleString('es-CO')}</Text>}
+          {shipmentDetail.completedAt && <Text size="sm">Completado: {new Date(shipmentDetail.completedAt).toLocaleString('es-CO')}</Text>}
+          {shipmentDetail.notes && <Text size="sm">Notas: {shipmentDetail.notes}</Text>}
+          <Divider label="Productos asignados" />
+          <ScrollArea type="always" h={260} scrollbarSize={10}>
+            <Table striped miw={620}>
+              <Table.Thead><Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidad</Table.Th><Table.Th ta="right">Enviado</Table.Th><Table.Th ta="right">Recibido</Table.Th></Table.Tr></Table.Thead>
+              <Table.Tbody>{shipmentDetail.items.map((item) => <Table.Tr key={item.id}><Table.Td>{item.product.sku}</Table.Td><Table.Td>{item.product.name}</Table.Td><Table.Td>{item.unitVersion.unitCode}</Table.Td><Table.Td ta="right">{quantity(item.quantityBase)}</Table.Td><Table.Td ta="right">{quantity(item.receivedBase)}</Table.Td></Table.Tr>)}</Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Stack>}
+      </Modal>
 
       <Modal opened={createOpened} onClose={createModal.close} title="Asignar productos a un municipio" size="lg">
         <form onSubmit={form.onSubmit((values) => createShipment.mutate(values, {

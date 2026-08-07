@@ -50,4 +50,10 @@ describe('canonical inventory event', () => {
     const second = canonicalInventoryPayload({ ...EVENT, quantity: '10.6' });
     expect(hashInventoryPayload(first)).not.toBe(hashInventoryPayload(second));
   });
+
+  it('includes a trimmed operational justification in the immutable payload', () => {
+    expect(canonicalInventoryPayload({ ...EVENT, reason: '  Material sin usar  ' })).toMatchObject({
+      reason: 'Material sin usar',
+    });
+  });
 });

@@ -1006,7 +1006,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       const shipment = await tx.shipment.findFirst({
         where: applyInventoryScope(actor, 'Shipment', { id }),
         include: {
-          items: true,
+          items: { include: { product: { select: { name: true } } } },
           originLocation: true,
           destinationLocation: true,
           receiver: {
@@ -1108,6 +1108,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           shipmentCode: shipment.code,
           receiverUserId: shipment.receiverUserId!,
           destinationName: shipment.destinationLocation.name,
+          productNames: shipment.items.map((item) => item.product.name),
         },
       };
     });

@@ -264,7 +264,7 @@ export class FcmNotificationAdapter implements NotificationPort {
           tokens: batchRecipients.map((recipient) => recipient.pushToken),
           notification: {
             title: 'Nuevo envío de inventario',
-            body: `${payload.shipmentCode} está en camino a ${payload.destinationName}. Confirma la recepción con biometría.`,
+            body: `${this.shipmentProductSummary(payload.productNames)} est\u00e1 en camino a ${payload.destinationName}. Confirma la recepci\u00f3n con biometr\u00eda.`,
           },
           data: {
             type: 'SHIPMENT_DISPATCHED',
@@ -276,6 +276,13 @@ export class FcmNotificationAdapter implements NotificationPort {
     } catch (err) {
       this.logger.error('[FcmNotificationAdapter] Failed to send shipment push notification', err);
     }
+  }
+
+  private shipmentProductSummary(productNames: string[]): string {
+    const names = [...new Set(productNames.map((name) => name.trim()).filter(Boolean))];
+    if (names.length === 0) return 'Un env\u00edo de inventario';
+    if (names.length === 1) return names[0]!;
+    return names[0] + ' y ' + (names.length - 1) + ' producto' + (names.length === 2 ? '' : 's') + ' m\u00e1s';
   }
 
   /**
