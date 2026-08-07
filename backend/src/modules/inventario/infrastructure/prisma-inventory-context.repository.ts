@@ -10,15 +10,18 @@ export class PrismaInventoryContextRepository implements InventoryContextReposit
 
   async getForActor(actor: ScopeContext): Promise<InventoryContextSnapshot> {
     const now = new Date();
-    const assignmentWhere = {
-      userId: actor.userId,
-      supervisorId: actor.supervisorId ?? '__DENY__',
-      validFrom: { lte: now },
-      OR: [{ validUntil: null }, { validUntil: { gt: now } }],
-      location: { active: true, inventoryEnabled: true },
-    };
+    const assignmentWhere =
+      actor.role === 'SUPERVISOR'
+        ? {
+            userId: actor.userId,
+            supervisorId: actor.supervisorId ?? '__DENY__',
+            validFrom: { lte: now },
+            OR: [{ validUntil: null }, { validUntil: { gt: now } }],
+            location: { active: true, inventoryEnabled: true },
+          }
+        : { id: { in: [] as string[] } };
 
-    const [products, assignments] = await this.prisma.$transaction([
+    const [products, assignments, pendingReceipts] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where: { active: true },
         orderBy: [{ sku: 'asc' }, { id: 'asc' }],
@@ -42,6 +45,20 @@ export class PrismaInventoryContextRepository implements InventoryContextReposit
             },
           },
         },
+      }),
+      this.prisma.shipment.findMany({
+        where: {
+          receiverUserId: actor.userId,
+          status: { in: ['DISPATCHED', 'PARTIALLY_RECEIVED'] },
+        },
+        include: {
+          destinationLocation: true,
+          items: {
+            include: { product: true },
+            orderBy: [{ product: { sku: 'asc' } }],
+          },
+        },
+        orderBy: [{ dispatchedAt: 'asc' }, { id: 'asc' }],
       }),
     ]);
 
@@ -84,6 +101,25 @@ export class PrismaInventoryContextRepository implements InventoryContextReposit
           updatedAt: balance.updatedAt.toISOString(),
         })),
       ),
+      pendingReceipts: pendingReceipts.map((shipment) => ({
+        id: shipment.id,
+        code: shipment.code,
+        status: shipment.status as 'DISPATCHED' | 'PARTIALLY_RECEIVED',
+        destinationLocationId: shipment.destinationLocationId,
+        destinationCode: shipment.destinationLocation.code,
+        destinationName: shipment.destinationLocation.name,
+        dispatchedAt: shipment.dispatchedAt?.toISOString() ?? null,
+        items: shipment.items.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productSku: item.product.sku,
+          productName: item.product.name,
+          quantityBase: item.quantityBase.toString(),
+          receivedBase: item.receivedBase.toString(),
+          damagedBase: item.damagedBase.toString(),
+          lostBase: item.lostBase.toString(),
+        })),
+      })),
     };
   }
 }

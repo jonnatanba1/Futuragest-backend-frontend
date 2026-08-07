@@ -7,6 +7,7 @@ describe('PrismaInventoryContextRepository', () => {
     const assignmentQuery = Promise.resolve([]);
     const prisma = {
       product: { findMany: jest.fn().mockReturnValue(productQuery) },
+      shipment: { findMany: jest.fn() },
       inventoryLocationAssignment: {
         findMany: jest.fn().mockReturnValue(assignmentQuery),
       },
@@ -52,6 +53,7 @@ describe('PrismaInventoryContextRepository', () => {
             },
           },
         ],
+        [],
       ]),
     } as unknown as PrismaService;
 
@@ -75,14 +77,16 @@ describe('PrismaInventoryContextRepository', () => {
       schemaVersion: 1,
       units: [{ factorToBase: '1' }],
       balances: [{ quantityBase: '12.5', version: 4 }],
+      pendingReceipts: [],
     });
   });
 
   it('fails closed when the scope has no supervisor id', async () => {
     const prisma = {
       product: { findMany: jest.fn() },
+      shipment: { findMany: jest.fn() },
       inventoryLocationAssignment: { findMany: jest.fn() },
-      $transaction: jest.fn().mockResolvedValue([[], []]),
+      $transaction: jest.fn().mockResolvedValue([[], [], []]),
     } as unknown as PrismaService;
 
     await new PrismaInventoryContextRepository(prisma).getForActor({

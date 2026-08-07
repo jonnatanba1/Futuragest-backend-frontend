@@ -86,6 +86,12 @@ describe('applyInventoryScope', () => {
     });
   });
 
+  it('shows a supervisor only shipments explicitly assigned for receipt', () => {
+    expect(
+      applyInventoryScope(context({ supervisorId: 'sup-1' }), 'Shipment', BASE, NOW),
+    ).toEqual({ AND: [BASE, { receiverUserId: 'user-1' }] });
+  });
+
   it('scopes supervisor counts through an active location assignment', () => {
     expect(
       applyInventoryScope(context({ supervisorId: 'sup-1' }), 'InventoryCount', BASE, NOW),

@@ -119,6 +119,7 @@ model User {
   inventoryCommandsResolved   InventoryCommand[]            @relation("InventoryCommandResolver")
   shipmentsCreated            Shipment[]                    @relation("ShipmentCreator")
   shipmentsDispatched         Shipment[]                    @relation("ShipmentDispatcher")
+  shipmentsAssignedToReceive  Shipment[]                    @relation("ShipmentReceiver")
   shipmentsReceived           ShipmentReceipt[]             @relation("ShipmentReceiptActor")
   inventoryCounts             InventoryCount[]              @relation("InventoryCountCounter")
   inventoryCountsApproved     InventoryCount[]              @relation("InventoryCountApprover")
@@ -688,6 +689,8 @@ model Shipment {
   createdBy             User               @relation("ShipmentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   dispatchedByUserId    String?
   dispatchedBy          User?              @relation("ShipmentDispatcher", fields: [dispatchedByUserId], references: [id], onDelete: Restrict)
+  receiverUserId        String?
+  receiver              User?              @relation("ShipmentReceiver", fields: [receiverUserId], references: [id], onDelete: Restrict)
   dispatchCommandId     String?            @unique
   dispatchCommand       InventoryCommand?  @relation("ShipmentDispatchCommand", fields: [dispatchCommandId], references: [id], onDelete: Restrict)
   notes                 String?
@@ -702,6 +705,7 @@ model Shipment {
   @@index([status, createdAt])
   @@index([originLocationId, status])
   @@index([destinationLocationId, status])
+  @@index([receiverUserId, status])
 }
 
 model ShipmentItem {
@@ -724,17 +728,22 @@ model ShipmentItem {
 }
 
 model ShipmentReceipt {
-  id              String                @id @default(uuid())
-  shipmentId      String
-  shipment        Shipment              @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
-  clientCommandId String                @unique
-  commandId       String                @unique
-  command         InventoryCommand      @relation("ShipmentReceiptCommand", fields: [commandId], references: [id], onDelete: Restrict)
-  actorUserId     String
-  actor           User                  @relation("ShipmentReceiptActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  result          Json
-  items           ShipmentReceiptItem[]
-  receivedAt      DateTime              @default(now())
+  id                 String                @id @default(uuid())
+  shipmentId         String
+  shipment           Shipment              @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  clientCommandId    String                @unique
+  commandId          String                @unique
+  command            InventoryCommand      @relation("ShipmentReceiptCommand", fields: [commandId], references: [id], onDelete: Restrict)
+  actorUserId        String
+  actor              User                  @relation("ShipmentReceiptActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  verificationMethod VerificationMethod?
+  verificationReason String?
+  deviceId           String?
+  capturedAtUtc      DateTime?
+  capturedOffsetMin  Int?
+  result             Json
+  items              ShipmentReceiptItem[]
+  receivedAt         DateTime              @default(now())
 
   @@index([shipmentId, receivedAt])
 }

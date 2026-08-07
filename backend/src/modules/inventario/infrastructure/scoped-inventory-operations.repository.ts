@@ -14,6 +14,11 @@ import {
   assertLocationCanBeCreatedManually,
 } from '../domain/inventory-location-policy';
 import {
+  assertEligibleShipmentReceiver,
+  assertMunicipalShipmentOrigin,
+  assertShipmentReceiptIdentity,
+} from '../domain/inventory-shipment-policy';
+import {
   InventoryOperationError,
   type AddProductUnitInput,
   type ApproveCountInput,
@@ -143,6 +148,16 @@ function shipmentInclude() {
     inTransitLocation: true,
     createdBy: { select: { id: true, email: true, displayName: true } },
     dispatchedBy: { select: { id: true, email: true, displayName: true } },
+    receiver: {
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        coordinatedZoneId: true,
+        supervisor: { select: { id: true, zoneId: true, municipioId: true } },
+      },
+    },
     items: {
       include: { product: true, unitVersion: true },
       orderBy: [{ product: { sku: 'asc' as const } }],
@@ -169,10 +184,12 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     payload: Record<string, unknown>,
     locationId?: string,
     zoneId?: string | null,
+    capture?: { capturedAtUtc: Date; capturedOffsetMin: number },
   ): Promise<ReservedCommand> {
     const normalizedId = nonEmpty(clientCommandId, 'clientCommandId');
     const requestHash = hashInventoryPayload({ type, ...payload });
     const now = new Date();
+    const capturedAtUtc = capture?.capturedAtUtc ?? now;
     const reservation = await tx.inventoryCommand.createMany({
       data: [
         {
@@ -187,9 +204,9 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           payload: asJson(payload),
           requestHash,
           status: 'RECEIVED',
-          capturedAtUtc: now,
-          capturedOffsetMin: -300,
-          businessDate: colombiaBusinessDate(now),
+          capturedAtUtc,
+          capturedOffsetMin: capture?.capturedOffsetMin ?? -300,
+          businessDate: colombiaBusinessDate(capturedAtUtc),
           receivedAt: now,
         },
       ],
@@ -351,6 +368,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         email: true,
         displayName: true,
         role: true,
+        coordinatedZoneId: true,
         supervisor: { select: { id: true, zoneId: true, municipioId: true } },
       },
       orderBy: [{ role: 'asc' }, { displayName: 'asc' }, { email: 'asc' }],
@@ -821,19 +839,31 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       throw new InventoryOperationError('INVALID_INPUT', 'Shipment origin and destination must differ.');
     }
     return this.transaction(async (tx) => {
-      const [origin, destination, items] = await Promise.all([
+      const [origin, destination, receiver, items] = await Promise.all([
         tx.inventoryLocation.findFirst({ where: { id: input.originLocationId, active: true } }),
         tx.inventoryLocation.findFirst({ where: { id: input.destinationLocationId, active: true } }),
+        tx.user.findUnique({
+          where: { id: input.receiverUserId },
+          select: {
+            id: true,
+            role: true,
+            coordinatedZoneId: true,
+            supervisor: { select: { zoneId: true, municipioId: true } },
+          },
+        }),
         this.prepareShipmentItems(tx, input.items),
       ]);
       if (!origin || !destination) {
         throw new InventoryOperationError('INVALID_LOCATION', 'Shipment location is not active.');
       }
+      assertMunicipalShipmentOrigin(origin);
+      assertEligibleShipmentReceiver(destination, receiver);
       return tx.shipment.create({
         data: {
           code: `SHP-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 8).toUpperCase()}`,
           originLocationId: origin.id,
           destinationLocationId: destination.id,
+          receiverUserId: receiver.id,
           createdByUserId: actor.userId,
           notes: input.notes?.trim() || null,
           items: { create: items },
@@ -857,15 +887,28 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         throw new InventoryOperationError('INVALID_STATE', 'Only draft shipments can be edited.');
       }
       const destinationId = input.destinationLocationId ?? shipment.destinationLocationId;
+      const receiverUserId = input.receiverUserId ?? shipment.receiverUserId;
       if (destinationId === shipment.originLocationId) {
         throw new InventoryOperationError('INVALID_INPUT', 'Shipment origin and destination must differ.');
       }
-      if (input.destinationLocationId) {
-        const destination = await tx.inventoryLocation.findFirst({
-          where: { id: input.destinationLocationId, active: true },
-        });
-        if (!destination) throw new InventoryOperationError('INVALID_LOCATION', 'Destination is not active.');
+      const [destination, receiver] = await Promise.all([
+        tx.inventoryLocation.findFirst({ where: { id: destinationId, active: true } }),
+        receiverUserId
+          ? tx.user.findUnique({
+              where: { id: receiverUserId },
+              select: {
+                id: true,
+                role: true,
+                coordinatedZoneId: true,
+                supervisor: { select: { zoneId: true, municipioId: true } },
+              },
+            })
+          : null,
+      ]);
+      if (!destination) {
+        throw new InventoryOperationError('INVALID_LOCATION', 'Destination is not active.');
       }
+      assertEligibleShipmentReceiver(destination, receiver);
       if (input.items) {
         const items = await this.prepareShipmentItems(tx, input.items);
         await tx.shipmentItem.deleteMany({ where: { shipmentId: id } });
@@ -877,6 +920,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         where: { id },
         data: {
           destinationLocationId: input.destinationLocationId,
+          receiverUserId: input.receiverUserId,
           notes: input.notes === undefined ? undefined : input.notes.trim() || null,
         },
         include: shipmentInclude(),
@@ -892,7 +936,19 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     return this.transaction(async (tx) => {
       const shipment = await tx.shipment.findFirst({
         where: applyInventoryScope(actor, 'Shipment', { id }),
-        include: { items: true, originLocation: true },
+        include: {
+          items: true,
+          originLocation: true,
+          destinationLocation: true,
+          receiver: {
+            select: {
+              id: true,
+              role: true,
+              coordinatedZoneId: true,
+              supervisor: { select: { zoneId: true, municipioId: true } },
+            },
+          },
+        },
       });
       if (!shipment) throw new InventoryOperationError('NOT_FOUND', 'Shipment not found.');
       if (shipment.status !== 'DRAFT') {
@@ -902,6 +958,8 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         }
         throw new InventoryOperationError('INVALID_STATE', 'Only draft shipments can be dispatched.');
       }
+      assertMunicipalShipmentOrigin(shipment.originLocation);
+      assertEligibleShipmentReceiver(shipment.destinationLocation, shipment.receiver);
 
       const transit = await tx.inventoryLocation.upsert({
         where: { code: 'SYSTEM-IN-TRANSIT' },
@@ -1025,6 +1083,11 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         include: { items: true, destinationLocation: true },
       });
       if (!shipment) throw new InventoryOperationError('NOT_FOUND', 'Shipment not found.');
+      assertShipmentReceiptIdentity(
+        shipment.receiverUserId,
+        actor.userId,
+        input.verificationMethod,
+      );
       if (!['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status)) {
         const previous = await tx.shipmentReceipt.findUnique({
           where: { clientCommandId: input.clientCommandId },
@@ -1065,6 +1128,10 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
 
       const payload = {
         shipmentId: id,
+        verificationMethod: input.verificationMethod,
+        verificationReason: input.verificationReason?.trim() || undefined,
+        capturedAtUtc: input.capturedAtUtc,
+        capturedOffsetMin: input.capturedOffsetMin,
         items: parsed.map((line) => ({
           shipmentItemId: line.item.id,
           receivedBase: line.received.toString(),
@@ -1080,10 +1147,15 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         payload,
         shipment.destinationLocationId,
         shipment.destinationLocation.zoneId,
+        {
+          capturedAtUtc: new Date(input.capturedAtUtc),
+          capturedOffsetMin: input.capturedOffsetMin,
+        },
       );
       if (reserved.existingResult) return reserved.existingResult;
 
       const now = new Date();
+      const capturedAtUtc = new Date(input.capturedAtUtc);
       const movementIds: string[] = [];
       for (const line of parsed) {
         if (line.received.isPositive()) {
@@ -1108,8 +1180,8 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
                 locationId: shipment.inTransitLocationId,
                 type: 'TRANSFER_OUT',
                 quantityBase: line.received,
-                capturedAtUtc: now,
-                businessDate: colombiaBusinessDate(now),
+                capturedAtUtc,
+                businessDate: colombiaBusinessDate(capturedAtUtc),
               },
             }),
             tx.inventoryMovement.create({
@@ -1120,8 +1192,8 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
                 locationId: shipment.destinationLocationId,
                 type: 'TRANSFER_IN',
                 quantityBase: line.received,
-                capturedAtUtc: now,
-                businessDate: colombiaBusinessDate(now),
+                capturedAtUtc,
+                businessDate: colombiaBusinessDate(capturedAtUtc),
               },
             }),
           ]);
@@ -1164,6 +1236,11 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           clientCommandId: input.clientCommandId,
           commandId: reserved.id,
           actorUserId: actor.userId,
+          verificationMethod: input.verificationMethod,
+          verificationReason: input.verificationReason?.trim() || null,
+          deviceId: actor.deviceId,
+          capturedAtUtc,
+          capturedOffsetMin: input.capturedOffsetMin,
           result: asJson(result),
           items: {
             create: parsed.map((line) => ({

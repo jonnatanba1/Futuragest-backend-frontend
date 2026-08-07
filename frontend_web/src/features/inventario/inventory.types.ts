@@ -29,6 +29,7 @@ export interface InventoryAssignee {
   email: string;
   displayName?: string | null;
   role: 'SYSTEM_ADMIN' | 'COMPRAS' | 'COORDINADOR' | 'SUPERVISOR';
+  coordinatedZoneId?: string | null;
   supervisor?: { id: string; zoneId: string; municipioId: string } | null;
 }
 
@@ -134,6 +135,7 @@ export interface InventoryShipment {
     | 'CLOSED_WITH_DISCREPANCY';
   originLocationId: string;
   destinationLocationId: string;
+  receiverUserId: string | null;
   inTransitLocationId: string | null;
   notes: string | null;
   dispatchedAt: string | null;
@@ -141,6 +143,12 @@ export interface InventoryShipment {
   createdAt: string;
   originLocation: InventoryLocation;
   destinationLocation: InventoryLocation;
+  receiver?: {
+    id: string;
+    email: string;
+    displayName?: string | null;
+    role: 'COORDINADOR' | 'SUPERVISOR';
+  } | null;
   items: ShipmentItem[];
 }
 

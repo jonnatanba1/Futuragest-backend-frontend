@@ -394,6 +394,7 @@ export const inventoryApi = {
   createShipment: (body: {
     originLocationId: string;
     destinationLocationId: string;
+    receiverUserId: string;
     notes?: string;
     items: Array<{ productId: string; unitVersionId: string; quantity: string }>;
   }): Promise<InventoryShipment> => request<InventoryShipment>('POST', '/inventario/shipments', { body }),
@@ -407,6 +408,10 @@ export const inventoryApi = {
     id: string,
     body: {
       clientCommandId: string;
+      verificationMethod: 'BIOMETRIC';
+      verificationReason?: string;
+      capturedAtUtc: string;
+      capturedOffsetMin: number;
       items: Array<{ shipmentItemId: string; receivedBase: string; damagedBase?: string; missingBase?: string }>;
     },
   ): Promise<InventoryCommandResult> =>

@@ -57,7 +57,6 @@ import {
   useInventoryReviews,
   useInventoryShipments,
   useOpenCount,
-  useReceiveShipment,
   useResolveCommand,
   useResolveShipmentDiscrepancy,
   useReturnShipment,
@@ -71,6 +70,7 @@ import {
 import { clearInventoryCommandId, stableInventoryCommandId } from './inventory-command-id';
 import {
   eligibleInventoryAssignees,
+  eligibleShipmentReceivers,
   isOperationalInventoryLocation,
   MANUAL_INVENTORY_LOCATION_TYPES,
 } from './inventory-location-policy';
@@ -147,7 +147,7 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
   return (
     <QueryBoundary queries={overviewQueries}>
     <Stack gap="lg">
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: canReview ? 4 : 3 }}>
         <Card withBorder>
           <Text c="dimmed" size="sm">Combinaciones con saldo</Text>
           <Text fw={700} size="xl">{balances.data?.length ?? 0}</Text>
@@ -160,10 +160,10 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
           <Text c="dimmed" size="sm">Envíos activos</Text>
           <Text fw={700} size="xl">{activeShipments}</Text>
         </Card>
-        <Card withBorder>
+        {canReview && <Card withBorder>
           <Text c="dimmed" size="sm">Eventos por revisar</Text>
           <Text fw={700} size="xl" c={reviews.data?.length ? 'orange' : undefined}>{reviews.data?.length ?? 0}</Text>
-        </Card>
+        </Card>}
       </SimpleGrid>
 
       {canAdmin && reconciliation.data && (
@@ -200,15 +200,38 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
           </Table>
         </ScrollArea>
       </Card>
+
+      <Card withBorder style={tableContainment}>
+        <Title order={3} size="h4" mb="md">Alertas de reposición</Title>
+        <ScrollArea>
+          <Table striped highlightOnHover miw={720}>
+            <Table.Thead>
+              <Table.Tr><Table.Th>Municipio / bodega</Table.Th><Table.Th>Producto</Table.Th><Table.Th ta="right">Disponible</Table.Th><Table.Th ta="right">Mínimo</Table.Th><Table.Th ta="right">Faltante</Table.Th></Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {alerts.data?.length === 0 && <EmptyTableRow columns={5} message="No hay productos por debajo del mínimo." />}
+              {alerts.data?.map((alert) => (
+                <Table.Tr key={`${alert.location.id}:${alert.product.id}`}>
+                  <Table.Td>{alert.location.municipio?.name ?? alert.location.name}</Table.Td>
+                  <Table.Td>{alert.product.sku} · {alert.product.name}</Table.Td>
+                  <Table.Td ta="right">{quantity(alert.quantityBase)}</Table.Td>
+                  <Table.Td ta="right">{quantity(alert.minimumBase)}</Table.Td>
+                  <Table.Td ta="right" c="red" fw={600}>{quantity(alert.shortageBase)}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      </Card>
     </Stack>
     </QueryBoundary>
   );
 }
 
-function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
+function MasterDataPanel({ canAdmin, productsOnly = false }: { canAdmin: boolean; productsOnly?: boolean }) {
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
-  const assignees = useInventoryAssignees(canAdmin);
+  const assignees = useInventoryAssignees(canAdmin && !productsOnly);
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const addUnit = useAddProductUnit();
@@ -238,22 +261,22 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const eligibleAssignees = eligibleInventoryAssignees(assignmentLocation, assignees.data ?? []);
 
   return (
-    <QueryBoundary queries={[products, locations, ...(canAdmin ? [assignees] : [])]}>
+    <QueryBoundary queries={productsOnly ? [products] : [products, locations, ...(canAdmin ? [assignees] : [])]}>
     <Stack gap="lg">
       {canAdmin && (
         <Stack gap="sm">
-          <Alert color="blue">
+          {!productsOnly && <Alert color="blue">
             Las bodegas municipales y sus supervisores se enlazan desde los municipios y usuarios ya existentes. Acá solo se crean bodegas centrales o custodias adicionales.
-          </Alert>
+          </Alert>}
           <Group>
             <Button leftSection={<IconPlus size={16} />} onClick={productModal.open}>Nuevo producto</Button>
-            <Button variant="default" leftSection={<IconPlus size={16} />} onClick={locationModal.open}>Nueva ubicación</Button>
+            {!productsOnly && <Button variant="default" leftSection={<IconPlus size={16} />} onClick={locationModal.open}>Nueva ubicación</Button>}
           </Group>
         </Stack>
       )}
 
       <Grid>
-        <Grid.Col span={{ base: 12, lg: 7 }}>
+        <Grid.Col span={{ base: 12, lg: productsOnly ? 12 : 7 }}>
           <Card withBorder style={tableContainment}>
             <Title order={3} size="h4" mb="md">Productos y unidades</Title>
             <ScrollArea>
@@ -286,7 +309,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             </ScrollArea>
           </Card>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, lg: 5 }}>
+        {!productsOnly && <Grid.Col span={{ base: 12, lg: 5 }}>
           <Stack>
             <Card withBorder>
               <Title order={3} size="h4" mb="md">Ubicaciones</Title>
@@ -335,7 +358,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               </form>
             </Card>}
           </Stack>
-        </Grid.Col>
+        </Grid.Col>}
       </Grid>
 
       <Modal opened={productOpened} onClose={productModal.close} title="Nuevo producto">
@@ -402,19 +425,17 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   );
 }
 
-function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceive: boolean }) {
+function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   const shipments = useInventoryShipments();
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
+  const assignees = useInventoryAssignees(canAdmin);
   const createShipment = useCreateShipment();
   const dispatchShipment = useDispatchShipment();
   const cancelShipment = useCancelShipment();
-  const receiveShipment = useReceiveShipment();
   const returnShipment = useReturnShipment();
   const resolveDiscrepancy = useResolveShipmentDiscrepancy();
   const [createOpened, createModal] = useDisclosure(false);
-  const [receiptShipment, setReceiptShipment] = useState<InventoryShipment | null>(null);
-  const [receiptValues, setReceiptValues] = useState<Record<string, { receivedBase: string; damagedBase: string; missingBase: string }>>({});
   const [confirmAction, setConfirmAction] = useState<{ kind: 'dispatch' | 'cancel'; shipment: InventoryShipment } | null>(null);
   const [reasonAction, setReasonAction] = useState<{ kind: 'return' | 'discrepancy'; shipment: InventoryShipment } | null>(null);
   const [actionReason, setActionReason] = useState('');
@@ -423,38 +444,13 @@ function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceiv
     initialValues: {
       originLocationId: '',
       destinationLocationId: '',
+      receiverUserId: '',
       notes: '',
       items: [{ productId: '', unitVersionId: '', quantity: '' }],
     },
   });
-
-  const openReceipt = (shipment: InventoryShipment) => {
-    setReceiptShipment(shipment);
-    setReceiptValues(Object.fromEntries(shipment.items.map((item) => [item.id, {
-      receivedBase: Math.max(
-        0,
-        Number(item.quantityBase) - Number(item.receivedBase) - Number(item.damagedBase) - Number(item.lostBase),
-      ).toString(),
-      damagedBase: '0',
-      missingBase: '0',
-    }])));
-  };
-
-  const submitReceipt = () => {
-    if (!receiptShipment) return;
-    const operationKey = `receive:${receiptShipment.id}`;
-    const items = receiptShipment.items.map((item) => ({ shipmentItemId: item.id, ...receiptValues[item.id] }));
-    receiveShipment.mutate([
-      receiptShipment.id,
-      {
-        clientCommandId: stableInventoryCommandId(operationKey, { shipmentId: receiptShipment.id, items }),
-        items,
-      },
-    ], {
-      onSuccess: () => { clearInventoryCommandId(operationKey); success('Recepción registrada sin duplicar efectos.'); setReceiptShipment(null); },
-      onError: failure,
-    });
-  };
+  const destination = locations.data?.find((location) => location.id === form.values.destinationLocationId);
+  const receivers = eligibleShipmentReceivers(destination, assignees.data ?? []);
 
   const runConfirmedAction = () => {
     if (!confirmAction) return;
@@ -501,20 +497,21 @@ function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceiv
   };
 
   return (
-    <QueryBoundary queries={[shipments, products, locations]}>
+    <QueryBoundary queries={[shipments, products, locations, ...(canAdmin ? [assignees] : [])]}>
     <Stack>
-      {canAdmin && <Button leftSection={<IconPlus size={16} />} onClick={createModal.open} w="fit-content">Nuevo envío</Button>}
+      {canAdmin && <Button leftSection={<IconPlus size={16} />} onClick={createModal.open} w="fit-content">Asignar productos a un municipio</Button>}
       <Card withBorder style={tableContainment}>
         <ScrollArea>
-          <Table striped highlightOnHover miw={980}>
-            <Table.Thead><Table.Tr><Table.Th>Código</Table.Th><Table.Th>Origen</Table.Th><Table.Th>Destino</Table.Th><Table.Th>Estado</Table.Th><Table.Th>Líneas</Table.Th><Table.Th>Fecha</Table.Th><Table.Th>Acciones</Table.Th></Table.Tr></Table.Thead>
+          <Table striped highlightOnHover miw={1080}>
+            <Table.Thead><Table.Tr><Table.Th>Código</Table.Th><Table.Th>Origen</Table.Th><Table.Th>Municipio destino</Table.Th><Table.Th>Responsable</Table.Th><Table.Th>Estado</Table.Th><Table.Th>Productos</Table.Th><Table.Th>Fecha</Table.Th><Table.Th>Acciones</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
-              {shipments.data?.length === 0 && <EmptyTableRow columns={7} message="No hay envíos registrados." />}
+              {shipments.data?.length === 0 && <EmptyTableRow columns={8} message="No hay asignaciones registradas." />}
               {shipments.data?.map((shipment) => (
                 <Table.Tr key={shipment.id}>
                   <Table.Td fw={600}>{shipment.code}</Table.Td>
                   <Table.Td>{shipment.originLocation.code}</Table.Td>
-                  <Table.Td>{shipment.destinationLocation.code}</Table.Td>
+                  <Table.Td>{shipment.destinationLocation.municipio?.name ?? shipment.destinationLocation.name}</Table.Td>
+                  <Table.Td>{shipment.receiver?.displayName ?? shipment.receiver?.email ?? 'Sin asignar'}</Table.Td>
                   <Table.Td><Badge color={shipment.status.includes('DISCREPANCY') ? 'red' : shipment.status === 'RECEIVED' ? 'green' : shipment.status === 'DRAFT' ? 'gray' : 'blue'}>{shipment.status.replace(/_/g, ' ')}</Badge></Table.Td>
                   <Table.Td>{shipment.items.length}</Table.Td>
                   <Table.Td>{new Date(shipment.createdAt).toLocaleString('es-CO')}</Table.Td>
@@ -524,7 +521,6 @@ function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceiv
                         <Button size="xs" onClick={() => setConfirmAction({ kind: 'dispatch', shipment })}>Despachar</Button>
                         <Button size="xs" variant="subtle" color="red" onClick={() => setConfirmAction({ kind: 'cancel', shipment })}>Cancelar</Button>
                       </>}
-                      {canReceive && ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status) && <Button size="xs" variant="light" onClick={() => openReceipt(shipment)}>Recibir</Button>}
                       {canAdmin && ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status) && <Button size="xs" variant="subtle" onClick={() => { setActionReason(''); setReasonAction({ kind: 'return', shipment }); }}>Retornar</Button>}
                       {canAdmin && shipment.status === 'DISCREPANCY_REVIEW' && <Button size="xs" color="orange" onClick={() => { setActionReason(''); setReasonAction({ kind: 'discrepancy', shipment }); }}>Resolver</Button>}
                     </Group>
@@ -536,13 +532,32 @@ function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceiv
         </ScrollArea>
       </Card>
 
-      <Modal opened={createOpened} onClose={createModal.close} title="Crear envío" size="lg">
+      <Modal opened={createOpened} onClose={createModal.close} title="Asignar productos a un municipio" size="lg">
         <form onSubmit={form.onSubmit((values) => createShipment.mutate(values, {
-          onSuccess: () => { success('Borrador de envío creado.'); form.reset(); createModal.close(); }, onError: failure,
+          onSuccess: () => { success('Asignación creada. Confirma el envío cuando salga de compras.'); form.reset(); createModal.close(); }, onError: failure,
         }))}>
           <Stack>
-            <Select searchable label="Origen" data={(locations.data ?? []).filter(isOperationalInventoryLocation).map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} />
-            <Select searchable label="Destino" data={(locations.data ?? []).filter(isOperationalInventoryLocation).map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('destinationLocationId')} />
+            <Select searchable required label="Bodega de compras" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} />
+            <Select
+              searchable
+              required
+              label="Municipio destino"
+              data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'MUNICIPAL_WAREHOUSE').map((item) => ({ value: item.id, label: item.municipio?.name ?? item.name }))}
+              {...form.getInputProps('destinationLocationId')}
+              onChange={(value) => {
+                form.setFieldValue('destinationLocationId', value ?? '');
+                form.setFieldValue('receiverUserId', '');
+              }}
+            />
+            <Select
+              searchable
+              required
+              disabled={!destination}
+              label="Responsable de recibir"
+              description="Supervisor del municipio o coordinador de su zona. La recepción se confirma desde el teléfono con biometría."
+              data={receivers.map((item) => ({ value: item.id, label: `${item.displayName ?? item.email} · ${item.role === 'SUPERVISOR' ? 'Supervisor' : 'Coordinador de zona'}` }))}
+              {...form.getInputProps('receiverUserId')}
+            />
             <TextInput label="Notas" {...form.getInputProps('notes')} />
             <Divider label="Productos" />
             {form.values.items.map((line, index) => {
@@ -555,23 +570,9 @@ function ShipmentsPanel({ canAdmin, canReceive }: { canAdmin: boolean; canReceiv
               </Grid>;
             })}
             <Button variant="default" onClick={() => form.insertListItem('items', { productId: '', unitVersionId: '', quantity: '' })}>Agregar línea</Button>
-            <Button type="submit" loading={createShipment.isPending}>Guardar borrador</Button>
+            <Button type="submit" loading={createShipment.isPending}>Guardar asignación</Button>
           </Stack>
         </form>
-      </Modal>
-
-      <Modal opened={receiptShipment !== null} onClose={() => setReceiptShipment(null)} title={`Recibir ${receiptShipment?.code ?? ''}`} size="lg">
-        <Stack>
-          {receiptShipment?.items.map((item) => <Card withBorder key={item.id}>
-            <Text fw={600}>{item.product.sku} · {item.product.name}</Text>
-            <Text size="sm" c="dimmed" mb="sm">Despachado: {quantity(item.quantityBase)} · recibido previo: {quantity(item.receivedBase)}</Text>
-            <SimpleGrid cols={{ base: 1, sm: 3 }}>
-              {(['receivedBase', 'damagedBase', 'missingBase'] as const).map((field) => <TextInput key={field} label={field === 'receivedBase' ? 'Recibido' : field === 'damagedBase' ? 'Dañado' : 'Faltante'} inputMode="decimal" value={receiptValues[item.id]?.[field] ?? '0'} onChange={(event) => setReceiptValues((current) => ({ ...current, [item.id]: { ...current[item.id], [field]: event.currentTarget.value } }))} />)}
-            </SimpleGrid>
-          </Card>)}
-          <Alert color="blue">Solo lo confirmado como recibido aumenta el saldo del destino. Daños y faltantes quedan pendientes de resolución.</Alert>
-          <Button loading={receiveShipment.isPending} onClick={submitReceipt}>Confirmar recepción</Button>
-        </Stack>
       </Modal>
 
       <Modal opened={confirmAction !== null} onClose={() => setConfirmAction(null)} title={confirmAction?.kind === 'dispatch' ? 'Confirmar despacho' : 'Confirmar cancelación'}>
@@ -834,36 +835,40 @@ export function InventoryPage() {
   const { user } = useAuth();
   const canAdmin = user?.role === 'COMPRAS' || user?.role === 'SYSTEM_ADMIN';
   const canReview = canAdmin || user?.role === 'COORDINADOR';
-  const canReceive = user?.role !== 'GERENCIA';
+  const isPurchasing = user?.role === 'COMPRAS';
 
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
         <div>
           <Title order={2}>Inventario</Title>
-          <Text c="dimmed">Ledger auditable, operaciones idempotentes y control por ubicación.</Text>
+          <Text c="dimmed">Asigna productos a municipios, consulta existencias y atiende alertas.</Text>
         </div>
         <Badge size="lg" variant="light">{user?.role}</Badge>
       </Group>
       <Tabs defaultValue="overview" keepMounted={false}>
         <ScrollArea type="auto">
           <Tabs.List style={{ flexWrap: 'nowrap', minWidth: 'max-content' }}>
-            <Tabs.Tab value="overview" leftSection={<IconPackage size={16} />}>Resumen</Tabs.Tab>
-            <Tabs.Tab value="catalog">Catálogo</Tabs.Tab>
-            <Tabs.Tab value="shipments" leftSection={<IconTruckDelivery size={16} />}>Envíos</Tabs.Tab>
-            <Tabs.Tab value="counts" leftSection={<IconClipboardCheck size={16} />}>Conteos</Tabs.Tab>
-            <Tabs.Tab value="reviews" leftSection={<IconAlertTriangle size={16} />}>Revisión</Tabs.Tab>
-            <Tabs.Tab value="movements" leftSection={<IconArrowsExchange size={16} />}>Movimientos</Tabs.Tab>
-            <Tabs.Tab value="import" leftSection={<IconRefresh size={16} />}>Apertura</Tabs.Tab>
+            <Tabs.Tab value="overview" leftSection={<IconPackage size={16} />}>{isPurchasing ? 'Stock y alertas' : 'Resumen'}</Tabs.Tab>
+            <Tabs.Tab value="catalog">{isPurchasing ? 'Productos' : 'Catálogo'}</Tabs.Tab>
+            <Tabs.Tab value="shipments" leftSection={<IconTruckDelivery size={16} />}>{isPurchasing ? 'Asignar a municipios' : 'Envíos'}</Tabs.Tab>
+            {!isPurchasing && <>
+              <Tabs.Tab value="counts" leftSection={<IconClipboardCheck size={16} />}>Conteos</Tabs.Tab>
+              <Tabs.Tab value="reviews" leftSection={<IconAlertTriangle size={16} />}>Revisión</Tabs.Tab>
+              <Tabs.Tab value="movements" leftSection={<IconArrowsExchange size={16} />}>Movimientos</Tabs.Tab>
+              <Tabs.Tab value="import" leftSection={<IconRefresh size={16} />}>Apertura</Tabs.Tab>
+            </>}
           </Tabs.List>
         </ScrollArea>
-        <Tabs.Panel value="overview" pt="lg"><InventoryOverview canAdmin={canAdmin} canReview={canReview} /></Tabs.Panel>
-        <Tabs.Panel value="catalog" pt="lg"><MasterDataPanel canAdmin={canAdmin} /></Tabs.Panel>
-        <Tabs.Panel value="shipments" pt="lg"><ShipmentsPanel canAdmin={canAdmin} canReceive={canReceive} /></Tabs.Panel>
-        <Tabs.Panel value="counts" pt="lg"><CountsPanel canApprove={canReview} /></Tabs.Panel>
-        <Tabs.Panel value="reviews" pt="lg"><ReviewsPanel canReview={canReview} /></Tabs.Panel>
-        <Tabs.Panel value="movements" pt="lg"><MovementsPanel canAdmin={canAdmin} /></Tabs.Panel>
-        <Tabs.Panel value="import" pt="lg"><OpeningImportPanel canAdmin={canAdmin} /></Tabs.Panel>
+        <Tabs.Panel value="overview" pt="lg"><InventoryOverview canAdmin={!isPurchasing && canAdmin} canReview={!isPurchasing && canReview} /></Tabs.Panel>
+        <Tabs.Panel value="catalog" pt="lg"><MasterDataPanel canAdmin={canAdmin} productsOnly={isPurchasing} /></Tabs.Panel>
+        <Tabs.Panel value="shipments" pt="lg"><ShipmentsPanel canAdmin={canAdmin} /></Tabs.Panel>
+        {!isPurchasing && <>
+          <Tabs.Panel value="counts" pt="lg"><CountsPanel canApprove={canReview} /></Tabs.Panel>
+          <Tabs.Panel value="reviews" pt="lg"><ReviewsPanel canReview={canReview} /></Tabs.Panel>
+          <Tabs.Panel value="movements" pt="lg"><MovementsPanel canAdmin={canAdmin} /></Tabs.Panel>
+          <Tabs.Panel value="import" pt="lg"><OpeningImportPanel canAdmin={canAdmin} /></Tabs.Panel>
+        </>}
       </Tabs>
     </Stack>
   );

@@ -19,9 +19,13 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Roles } from '../../iam/interface/roles.decorator';
@@ -147,6 +151,7 @@ class ShipmentLineBody {
 class CreateShipmentBody {
   @IsString() originLocationId!: string;
   @IsString() destinationLocationId!: string;
+  @IsString() receiverUserId!: string;
   @IsOptional() @IsString() notes?: string;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ShipmentLineBody)
   items!: ShipmentLineBody[];
@@ -154,6 +159,7 @@ class CreateShipmentBody {
 
 class UpdateShipmentBody {
   @IsOptional() @IsString() destinationLocationId?: string;
+  @IsOptional() @IsString() receiverUserId?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ShipmentLineBody)
   items?: ShipmentLineBody[];
@@ -166,7 +172,15 @@ class ShipmentReceiptLineBody {
   @IsOptional() @IsString() missingBase?: string;
 }
 
+enum ReceiptVerificationMethodDto {
+  BIOMETRIC = 'BIOMETRIC',
+}
+
 class ReceiveShipmentBody extends CommandBody {
+  @IsEnum(ReceiptVerificationMethodDto) verificationMethod!: ReceiptVerificationMethodDto;
+  @IsOptional() @IsString() verificationReason?: string;
+  @IsDateString() capturedAtUtc!: string;
+  @IsInt() @Min(-840) @Max(840) capturedOffsetMin!: number;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ShipmentReceiptLineBody)
   items!: ShipmentReceiptLineBody[];
 }

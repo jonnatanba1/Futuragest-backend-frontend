@@ -46,7 +46,7 @@ export class InventoryController {
   ) {}
 
   @Get('context')
-  @Roles('SUPERVISOR')
+  @Roles('SUPERVISOR', 'COORDINADOR')
   @ApiOkResponse({ description: 'Actor-scoped mobile inventory bootstrap snapshot.' })
   context() {
     return this.getInventoryContext.execute();

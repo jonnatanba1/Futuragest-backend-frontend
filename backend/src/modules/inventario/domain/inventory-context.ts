@@ -35,6 +35,25 @@ export interface InventoryContextSnapshot {
     version: number;
     updatedAt: string;
   }>;
+  pendingReceipts: Array<{
+    id: string;
+    code: string;
+    status: 'DISPATCHED' | 'PARTIALLY_RECEIVED';
+    destinationLocationId: string;
+    destinationCode: string;
+    destinationName: string;
+    dispatchedAt: string | null;
+    items: Array<{
+      id: string;
+      productId: string;
+      productSku: string;
+      productName: string;
+      quantityBase: string;
+      receivedBase: string;
+      damagedBase: string;
+      lostBase: string;
+    }>;
+  }>;
 }
 
 export interface InventoryContextRepositoryPort {

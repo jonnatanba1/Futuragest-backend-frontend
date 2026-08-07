@@ -92,12 +92,7 @@ export function applyInventoryScope(
       case 'InventoryCommand':
         return and(where, { actorUserId: ctx.userId });
       case 'Shipment':
-        return and(where, {
-          OR: [
-            { originLocation: activeAssignment },
-            { destinationLocation: activeAssignment },
-          ],
-        });
+        return and(where, { receiverUserId: ctx.userId });
       case 'InventoryCount':
         return and(where, { location: activeAssignment });
       default:

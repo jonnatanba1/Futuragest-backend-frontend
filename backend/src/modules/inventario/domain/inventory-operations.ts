@@ -76,6 +76,7 @@ export interface ShipmentLineInput {
 export interface CreateShipmentInput {
   originLocationId: string;
   destinationLocationId: string;
+  receiverUserId: string;
   notes?: string;
   items: ShipmentLineInput[];
 }
@@ -83,6 +84,7 @@ export interface CreateShipmentInput {
 export interface UpdateShipmentInput {
   notes?: string;
   destinationLocationId?: string;
+  receiverUserId?: string;
   items?: ShipmentLineInput[];
 }
 
@@ -99,6 +101,10 @@ export interface ShipmentReceiptLineInput {
 }
 
 export interface ReceiveShipmentInput extends ShipmentCommandInput {
+  verificationMethod: 'BIOMETRIC';
+  verificationReason?: string;
+  capturedAtUtc: string;
+  capturedOffsetMin: number;
   items: ShipmentReceiptLineInput[];
 }
 

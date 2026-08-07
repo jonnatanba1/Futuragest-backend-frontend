@@ -21,3 +21,23 @@ export function eligibleInventoryAssignees(
       && assignee.supervisor?.zoneId === location.zoneId,
   );
 }
+
+export function eligibleShipmentReceivers(
+  destination: InventoryLocation | undefined,
+  assignees: InventoryAssignee[],
+): InventoryAssignee[] {
+  if (
+    destination?.type !== 'MUNICIPAL_WAREHOUSE'
+    || !destination.zoneId
+    || !destination.municipioId
+  ) return [];
+
+  return assignees.filter((assignee) => {
+    if (assignee.role === 'SUPERVISOR') {
+      return assignee.supervisor?.municipioId === destination.municipioId
+        && assignee.supervisor.zoneId === destination.zoneId;
+    }
+    return assignee.role === 'COORDINADOR'
+      && assignee.coordinatedZoneId === destination.zoneId;
+  });
+}

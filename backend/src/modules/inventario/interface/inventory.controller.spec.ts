@@ -22,7 +22,14 @@ function contextUseCase(): jest.Mocked<GetInventoryContextUseCase> {
 }
 
 describe('InventoryController', () => {
-  it.each(['context', 'sync', 'statuses'] as const)('%s declares explicit SUPERVISOR access', (method) => {
+  it('allows supervisors and coordinators to load their mobile inventory context', () => {
+    expect(Reflect.getMetadata(ROLES_KEY, InventoryController.prototype.context)).toEqual([
+      'SUPERVISOR',
+      'COORDINADOR',
+    ]);
+  });
+
+  it.each(['sync', 'statuses'] as const)('%s declares explicit SUPERVISOR access', (method) => {
     expect(Reflect.getMetadata(ROLES_KEY, InventoryController.prototype[method])).toEqual([
       'SUPERVISOR',
     ]);
