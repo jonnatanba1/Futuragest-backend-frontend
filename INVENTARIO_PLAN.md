@@ -173,7 +173,7 @@ El backend vuelve a comprobar la identidad y la elegibilidad. Ocultar opciones e
 ## Modelo de datos mínimo
 
 - `Product`: catálogo maestro.
-- `InventoryLocation`: bodega central, municipal o ubicación técnica de tránsito.
+- `InventoryLocation`: detalle técnico interno para llevar el ledger. Cada municipio tiene una única ubicación municipal automática, presentada en la interfaz simplemente como **Municipio**.
 - `InventoryBalance`: saldo actual por ubicación y producto.
 - `InventoryCommand`: inbox idempotente y estado de aplicación.
 - `InventoryMovement`: ledger inmutable.
@@ -245,7 +245,7 @@ Conteos físicos, conciliación, reversos, importación de saldos iniciales y re
 
 ## Fuera de alcance de este flujo
 
-- crear municipios, zonas, supervisores o coordinadores desde Inventario;
+- crear municipios, zonas, supervisores, coordinadores o bodegas municipales desde Inventario;
 - permitir que Compras confirme recepciones en nombre del responsable;
 - aumentar stock por el solo hecho de crear un envío;
 - usar credenciales del dispositivo como sustituto de biometría;

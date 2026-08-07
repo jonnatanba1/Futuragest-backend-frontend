@@ -13,7 +13,6 @@ import {
   Select,
   SimpleGrid,
   Stack,
-  Switch,
   Table,
   Tabs,
   Text,
@@ -38,10 +37,8 @@ import { inventoryApi } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/auth-context';
 import {
   useAddProductUnit,
-  useAssignLocation,
   useApproveCount,
   useCancelShipment,
-  useCreateLocation,
   useCreateProduct,
   useCreateShipment,
   useDispatchShipment,
@@ -65,16 +62,13 @@ import {
   useSetMinimum,
   useSubmitCount,
   useUpdateProduct,
-  useUpdateLocation,
 } from './inventory-queries';
 import { clearInventoryCommandId, stableInventoryCommandId } from './inventory-command-id';
 import {
-  eligibleInventoryAssignees,
   eligibleShipmentReceivers,
   isOperationalInventoryLocation,
-  MANUAL_INVENTORY_LOCATION_TYPES,
 } from './inventory-location-policy';
-import type { InventoryCount, InventoryReviewCommand, InventoryShipment } from './inventory.types';
+import type { InventoryCount, InventoryLocation, InventoryReviewCommand, InventoryShipment } from './inventory.types';
 
 const tableContainment: React.CSSProperties = {
   contentVisibility: 'auto',
@@ -96,6 +90,16 @@ function failure(error: unknown) {
 function quantity(value: string | number | null | undefined) {
   const parsed = Number(value ?? 0);
   return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 6 }).format(parsed);
+}
+
+function stockLocationLabel(location: InventoryLocation) {
+  if (location.type === 'MUNICIPAL_WAREHOUSE') {
+    return location.municipio?.name ?? location.name;
+  }
+  if (location.type === 'CENTRAL_WAREHOUSE') {
+    return 'Bodega central: ' + location.name;
+  }
+  return location.name;
 }
 
 interface QueryState {
@@ -183,13 +187,13 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
         <ScrollArea>
           <Table striped highlightOnHover miw={720}>
             <Table.Thead>
-              <Table.Tr><Table.Th>Ubicación</Table.Th><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th ta="right">Saldo base</Table.Th><Table.Th>Actualizado</Table.Th></Table.Tr>
+              <Table.Tr><Table.Th>Municipio / origen</Table.Th><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th ta="right">Saldo base</Table.Th><Table.Th>Actualizado</Table.Th></Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {balances.data?.length === 0 && <EmptyTableRow columns={5} message="Todavía no hay saldos registrados." />}
               {balances.data?.map((balance) => (
                 <Table.Tr key={balance.id}>
-                  <Table.Td>{balance.location.code} · {balance.location.name}</Table.Td>
+                  <Table.Td>{stockLocationLabel(balance.location)}</Table.Td>
                   <Table.Td>{balance.product.sku}</Table.Td>
                   <Table.Td>{balance.product.name}</Table.Td>
                   <Table.Td ta="right">{quantity(balance.quantityBase)}</Table.Td>
@@ -228,70 +232,46 @@ function InventoryOverview({ canAdmin, canReview }: { canAdmin: boolean; canRevi
   );
 }
 
-function MasterDataPanel({ canAdmin, productsOnly = false }: { canAdmin: boolean; productsOnly?: boolean }) {
+function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const products = useInventoryProducts();
   const locations = useInventoryLocations();
-  const assignees = useInventoryAssignees(canAdmin && !productsOnly);
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const addUnit = useAddProductUnit();
-  const createLocation = useCreateLocation();
-  const updateLocation = useUpdateLocation();
-  const assignLocation = useAssignLocation();
   const setMinimum = useSetMinimum();
   const [productOpened, productModal] = useDisclosure(false);
-  const [locationOpened, locationModal] = useDisclosure(false);
   const [unitProductId, setUnitProductId] = useState<string | null>(null);
-  const [assignmentLocationId, setAssignmentLocationId] = useState<string | null>(null);
-
   const productForm = useForm({ initialValues: { sku: '', name: '', baseUnitCode: 'UND' } });
-  const locationForm = useForm({
-    initialValues: {
-      code: '',
-      name: '',
-      type: 'CENTRAL_WAREHOUSE' as 'CENTRAL_WAREHOUSE' | 'SUPERVISOR_CUSTODY',
-    },
-  });
   const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
   const minimumForm = useForm({ initialValues: { locationId: '', productId: '', quantityBase: '0' } });
-  const assignmentForm = useForm({
-    initialValues: { userId: '', role: 'CUSTODIAN' as 'CUSTODIAN' | 'RECEIVER' | 'COUNTER' },
-  });
-  const assignmentLocation = locations.data?.find((location) => location.id === assignmentLocationId);
-  const eligibleAssignees = eligibleInventoryAssignees(assignmentLocation, assignees.data ?? []);
 
   return (
-    <QueryBoundary queries={productsOnly ? [products] : [products, locations, ...(canAdmin ? [assignees] : [])]}>
-    <Stack gap="lg">
-      {canAdmin && (
-        <Stack gap="sm">
-          {!productsOnly && <Alert color="blue">
-            Las bodegas municipales y sus supervisores se enlazan desde los municipios y usuarios ya existentes. Acá solo se crean bodegas centrales o custodias adicionales.
-          </Alert>}
+    <QueryBoundary queries={canAdmin ? [products, locations] : [products]}>
+      <Stack gap="lg">
+        {canAdmin && (
           <Group>
             <Button leftSection={<IconPlus size={16} />} onClick={productModal.open}>Nuevo producto</Button>
-            {!productsOnly && <Button variant="default" leftSection={<IconPlus size={16} />} onClick={locationModal.open}>Nueva ubicación</Button>}
           </Group>
-        </Stack>
-      )}
+        )}
 
-      <Grid>
-        <Grid.Col span={{ base: 12, lg: productsOnly ? 12 : 7 }}>
-          <Card withBorder style={tableContainment}>
-            <Title order={3} size="h4" mb="md">Productos y unidades</Title>
-            <ScrollArea>
-              <Table striped miw={680}>
-                <Table.Thead><Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th>Estado</Table.Th><Table.Th /></Table.Tr></Table.Thead>
-                <Table.Tbody>
-                  {products.data?.length === 0 && <EmptyTableRow columns={5} message="No hay productos registrados." />}
-                  {products.data?.map((product) => (
-                    <Table.Tr key={product.id}>
-                      <Table.Td>{product.sku}</Table.Td>
-                      <Table.Td>{product.name}</Table.Td>
-                      <Table.Td>{product.unitVersions.filter((unit) => !unit.validUntil).map((unit) => `${unit.unitCode} × ${unit.factorToBase}`).join(', ')}</Table.Td>
-                      <Table.Td><Badge color={product.active ? 'green' : 'gray'}>{product.active ? 'Activo' : 'Inactivo'}</Badge></Table.Td>
-                      <Table.Td>
-                        {canAdmin && <Group gap="xs" wrap="nowrap">
+        <Card withBorder style={tableContainment}>
+          <Title order={3} size="h4" mb="md">Productos y unidades</Title>
+          <ScrollArea>
+            <Table striped miw={680}>
+              <Table.Thead>
+                <Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th>Estado</Table.Th><Table.Th /></Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {products.data?.length === 0 && <EmptyTableRow columns={5} message="No hay productos registrados." />}
+                {products.data?.map((product) => (
+                  <Table.Tr key={product.id}>
+                    <Table.Td>{product.sku}</Table.Td>
+                    <Table.Td>{product.name}</Table.Td>
+                    <Table.Td>{product.unitVersions.filter((unit) => !unit.validUntil).map((unit) => unit.unitCode + ' × ' + unit.factorToBase).join(', ')}</Table.Td>
+                    <Table.Td><Badge color={product.active ? 'green' : 'gray'}>{product.active ? 'Activo' : 'Inactivo'}</Badge></Table.Td>
+                    <Table.Td>
+                      {canAdmin && (
+                        <Group gap="xs" wrap="nowrap">
                           <Button size="xs" variant="subtle" onClick={() => setUnitProductId(product.id)}>Unidad</Button>
                           <Button
                             size="xs"
@@ -299,128 +279,77 @@ function MasterDataPanel({ canAdmin, productsOnly = false }: { canAdmin: boolean
                             color={product.active ? 'red' : 'green'}
                             loading={updateProduct.isPending}
                             onClick={() => updateProduct.mutate({ id: product.id, active: !product.active }, { onError: failure })}
-                          >{product.active ? 'Desactivar' : 'Activar'}</Button>
-                        </Group>}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </ScrollArea>
-          </Card>
-        </Grid.Col>
-        {!productsOnly && <Grid.Col span={{ base: 12, lg: 5 }}>
-          <Stack>
-            <Card withBorder>
-              <Title order={3} size="h4" mb="md">Ubicaciones</Title>
-              <Stack gap="xs">
-                {locations.data?.filter((location) => location.type !== 'IN_TRANSIT').map((location) => (
-                  <Group key={location.id} justify="space-between" wrap="nowrap" align="flex-start">
-                    <div>
-                      <Text fw={600}>{location.code}</Text>
-                      <Text size="sm" c="dimmed">{location.name}{location.municipio?.name ? ` · ${location.municipio.name}` : ''}</Text>
-                      {(location.assignments ?? []).map((assignment) => (
-                        <Text key={assignment.id} size="xs" c="dimmed">
-                          {assignment.user.displayName ?? assignment.user.email} · {assignment.role}
-                        </Text>
-                      ))}
-                    </div>
-                    <Stack gap={4} align="flex-end">
-                      <Group gap={4}>
-                        <Badge variant="light">{location.type.replace(/_/g, ' ')}</Badge>
-                        {!location.active && <Badge color="gray">Inactiva</Badge>}
-                      </Group>
-                      {canAdmin && <Group gap="xs" wrap="nowrap">
-                        <Switch
-                          size="xs"
-                          label="Piloto"
-                          checked={location.inventoryEnabled}
-                          onChange={(event) => updateLocation.mutate({ id: location.id, inventoryEnabled: event.currentTarget.checked }, { onError: failure })}
-                        />
-                        <Button size="compact-xs" variant="subtle" disabled={!location.active} onClick={() => { assignmentForm.reset(); setAssignmentLocationId(location.id); }}>Asignar</Button>
-                      </Group>}
-                    </Stack>
-                  </Group>
+                          >
+                            {product.active ? 'Desactivar' : 'Activar'}
+                          </Button>
+                        </Group>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </Stack>
-            </Card>
-            {canAdmin && <Card withBorder>
-              <Title order={3} size="h4" mb="md">Configurar mínimo</Title>
-              <form onSubmit={minimumForm.onSubmit((values) => setMinimum.mutate(values, {
-                onSuccess: () => { success('Mínimo guardado.'); minimumForm.reset(); }, onError: failure,
-              }))}>
-                <Stack>
-                  <Select label="Ubicación" searchable data={(locations.data ?? []).filter(isOperationalInventoryLocation).map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...minimumForm.getInputProps('locationId')} />
-                  <Select label="Producto" searchable data={(products.data ?? []).map((item) => ({ value: item.id, label: `${item.sku} · ${item.name}` }))} {...minimumForm.getInputProps('productId')} />
-                  <TextInput label="Cantidad base" inputMode="decimal" {...minimumForm.getInputProps('quantityBase')} />
-                  <Button type="submit" loading={setMinimum.isPending}>Guardar mínimo</Button>
-                </Stack>
-              </form>
-            </Card>}
-          </Stack>
-        </Grid.Col>}
-      </Grid>
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Card>
 
-      <Modal opened={productOpened} onClose={productModal.close} title="Nuevo producto">
-        <form onSubmit={productForm.onSubmit((values) => createProduct.mutate(values, {
-          onSuccess: () => { success('Producto creado.'); productForm.reset(); productModal.close(); }, onError: failure,
-        }))}>
-          <Stack><TextInput label="SKU" required {...productForm.getInputProps('sku')} /><TextInput label="Nombre" required {...productForm.getInputProps('name')} /><TextInput label="Unidad base" required {...productForm.getInputProps('baseUnitCode')} /><Button type="submit" loading={createProduct.isPending}>Crear</Button></Stack>
-        </form>
-      </Modal>
-      <Modal opened={locationOpened} onClose={locationModal.close} title="Nueva ubicación">
-        <form onSubmit={locationForm.onSubmit((values) => createLocation.mutate(values, {
-          onSuccess: () => { success('Ubicación creada.'); locationForm.reset(); locationModal.close(); }, onError: failure,
-        }))}>
-          <Stack><TextInput label="Código" required {...locationForm.getInputProps('code')} /><TextInput label="Nombre" required {...locationForm.getInputProps('name')} /><Select label="Tipo" data={[...MANUAL_INVENTORY_LOCATION_TYPES]} {...locationForm.getInputProps('type')} /><Button type="submit" loading={createLocation.isPending}>Crear</Button></Stack>
-        </form>
-      </Modal>
-      <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar versión de unidad">
-        <form onSubmit={unitForm.onSubmit((values) => {
-          if (!unitProductId) return;
-          addUnit.mutate({ id: unitProductId, ...values }, {
-            onSuccess: () => { success('Unidad versionada.'); unitForm.reset(); setUnitProductId(null); }, onError: failure,
-          });
-        })}>
-          <Stack><TextInput label="Código de unidad" required {...unitForm.getInputProps('unitCode')} /><TextInput label="Factor a unidad base" inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} /><Button type="submit" loading={addUnit.isPending}>Agregar versión</Button></Stack>
-        </form>
-      </Modal>
-      <Modal opened={assignmentLocationId !== null} onClose={() => setAssignmentLocationId(null)} title="Asignar responsable">
-        <form onSubmit={assignmentForm.onSubmit((values) => {
-          if (!assignmentLocationId) return;
-          const assignee = assignees.data?.find((item) => item.id === values.userId);
-          assignLocation.mutate({
-            id: assignmentLocationId,
-            ...values,
-            supervisorId: assignee?.supervisor?.id,
-          }, {
-            onSuccess: () => { success('Responsable asignado.'); assignmentForm.reset(); setAssignmentLocationId(null); },
-            onError: failure,
-          });
-        })}>
-          <Stack>
-            {assignmentLocation?.type === 'MUNICIPAL_WAREHOUSE' && (
-              <Alert color="blue">
-                Solo se muestran supervisores existentes del municipio {assignmentLocation.municipio?.name ?? 'asignado'}.
-              </Alert>
-            )}
-            <Select
-              label="Responsable"
-              searchable
-              required
-              data={eligibleAssignees.map((item) => ({ value: item.id, label: `${item.displayName ?? item.email} · ${item.role}` }))}
-              {...assignmentForm.getInputProps('userId')}
-            />
-            <Select
-              label="Función"
-              data={[{ value: 'CUSTODIAN', label: 'Custodia' }, { value: 'RECEIVER', label: 'Recepción' }, { value: 'COUNTER', label: 'Conteo' }]}
-              {...assignmentForm.getInputProps('role')}
-            />
-            <Button type="submit" loading={assignLocation.isPending}>Guardar asignación</Button>
-          </Stack>
-        </form>
-      </Modal>
-    </Stack>
+        {canAdmin && (
+          <Card withBorder>
+            <Title order={3} size="h4" mb="md">Mínimos por municipio</Title>
+            <form onSubmit={minimumForm.onSubmit((values) => setMinimum.mutate(values, {
+              onSuccess: () => { success('Mínimo guardado.'); minimumForm.reset(); }, onError: failure,
+            }))}>
+              <Stack>
+                <Select
+                  label="Municipio"
+                  searchable
+                  required
+                  data={(locations.data ?? [])
+                    .filter((item) => isOperationalInventoryLocation(item) && item.type === 'MUNICIPAL_WAREHOUSE')
+                    .map((item) => ({ value: item.id, label: item.municipio?.name ?? item.name }))}
+                  {...minimumForm.getInputProps('locationId')}
+                />
+                <Select
+                  label="Producto"
+                  searchable
+                  required
+                  data={(products.data ?? []).map((item) => ({ value: item.id, label: item.sku + ' - ' + item.name }))}
+                  {...minimumForm.getInputProps('productId')}
+                />
+                <TextInput label="Stock mínimo" inputMode="decimal" required {...minimumForm.getInputProps('quantityBase')} />
+                <Button type="submit" loading={setMinimum.isPending}>Guardar mínimo</Button>
+              </Stack>
+            </form>
+          </Card>
+        )}
+
+        <Modal opened={productOpened} onClose={productModal.close} title="Nuevo producto">
+          <form onSubmit={productForm.onSubmit((values) => createProduct.mutate(values, {
+            onSuccess: () => { success('Producto creado.'); productForm.reset(); productModal.close(); }, onError: failure,
+          }))}>
+            <Stack>
+              <TextInput label="SKU" required {...productForm.getInputProps('sku')} />
+              <TextInput label="Nombre" required {...productForm.getInputProps('name')} />
+              <TextInput label="Unidad base" required {...productForm.getInputProps('baseUnitCode')} />
+              <Button type="submit" loading={createProduct.isPending}>Crear</Button>
+            </Stack>
+          </form>
+        </Modal>
+
+        <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar versión de unidad">
+          <form onSubmit={unitForm.onSubmit((values) => {
+            if (!unitProductId) return;
+            addUnit.mutate({ id: unitProductId, ...values }, {
+              onSuccess: () => { success('Unidad versionada.'); unitForm.reset(); setUnitProductId(null); }, onError: failure,
+            });
+          })}>
+            <Stack>
+              <TextInput label="Código de unidad" required {...unitForm.getInputProps('unitCode')} />
+              <TextInput label="Factor a unidad base" inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
+              <Button type="submit" loading={addUnit.isPending}>Agregar versión</Button>
+            </Stack>
+          </form>
+        </Modal>
+      </Stack>
     </QueryBoundary>
   );
 }
@@ -509,7 +438,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
               {shipments.data?.map((shipment) => (
                 <Table.Tr key={shipment.id}>
                   <Table.Td fw={600}>{shipment.code}</Table.Td>
-                  <Table.Td>{shipment.originLocation.code}</Table.Td>
+                  <Table.Td>{stockLocationLabel(shipment.originLocation)}</Table.Td>
                   <Table.Td>{shipment.destinationLocation.municipio?.name ?? shipment.destinationLocation.name}</Table.Td>
                   <Table.Td>{shipment.receiver?.displayName ?? shipment.receiver?.email ?? 'Sin asignar'}</Table.Td>
                   <Table.Td><Badge color={shipment.status.includes('DISCREPANCY') ? 'red' : shipment.status === 'RECEIVED' ? 'green' : shipment.status === 'DRAFT' ? 'gray' : 'blue'}>{shipment.status.replace(/_/g, ' ')}</Badge></Table.Td>
@@ -537,7 +466,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
           onSuccess: () => { success('Asignación creada. Confirma el envío cuando salga de compras.'); form.reset(); createModal.close(); }, onError: failure,
         }))}>
           <Stack>
-            <Select searchable required label="Bodega de compras" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} />
+            <Select searchable required label="Bodega central" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} />
             <Select
               searchable
               required
@@ -861,7 +790,7 @@ export function InventoryPage() {
           </Tabs.List>
         </ScrollArea>
         <Tabs.Panel value="overview" pt="lg"><InventoryOverview canAdmin={!isPurchasing && canAdmin} canReview={!isPurchasing && canReview} /></Tabs.Panel>
-        <Tabs.Panel value="catalog" pt="lg"><MasterDataPanel canAdmin={canAdmin} productsOnly={isPurchasing} /></Tabs.Panel>
+        <Tabs.Panel value="catalog" pt="lg"><MasterDataPanel canAdmin={canAdmin} /></Tabs.Panel>
         <Tabs.Panel value="shipments" pt="lg"><ShipmentsPanel canAdmin={canAdmin} /></Tabs.Panel>
         {!isPurchasing && <>
           <Tabs.Panel value="counts" pt="lg"><CountsPanel canApprove={canReview} /></Tabs.Panel>
