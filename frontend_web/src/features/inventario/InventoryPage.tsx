@@ -252,7 +252,7 @@ function StockEntryModal({
   const form = useForm({ initialValues: { locationId: '', productId: initialProductId ?? '', unitVersionId: '', quantity: '', note: '' } });
   const product = products.find((item) => item.id === form.values.productId);
 
-  return <Modal opened={opened} onClose={onClose} title="Registrar entrada de compras">
+  return <Modal opened={opened} onClose={onClose} title="Registrar entrada de compras" zIndex={300}>
     <form onSubmit={form.onSubmit((values) => {
       const operationKey = 'stock-entry:' + values.locationId + ':' + values.productId + ':' + values.unitVersionId + ':' + values.quantity + ':' + values.note.trim();
       entry.mutate({ ...values, note: values.note.trim() || undefined, clientCommandId: stableInventoryCommandId(operationKey, values) }, {
@@ -286,6 +286,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const [entryProductId, setEntryProductId] = useState<string | null>(null);
   const [entryOpened, setEntryOpened] = useState(false);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [minimumOpened, setMinimumOpened] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const productForm = useForm({ initialValues: { sku: '', name: '', baseUnitCode: 'UND' } });
   const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
@@ -307,6 +308,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           <Group justify="flex-end">
             <Group>
               <Button variant="default" onClick={() => { setEntryProductId(null); setEntryOpened(true); }}>Nuevo ingreso</Button>
+              <Button variant="default" onClick={() => setMinimumOpened(true)}>Mínimos por municipio</Button>
               <Button leftSection={<IconPlus size={16} />} onClick={productModal.open}>Nuevo producto</Button>
             </Group>
           </Group>
@@ -339,10 +341,9 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
         </Card>
 
         {canAdmin && (
-          <Card withBorder>
-            <Title order={3} size="h4" mb="md">Mínimos por municipio</Title>
+          <Modal opened={minimumOpened} onClose={() => setMinimumOpened(false)} title="Mínimos por municipio" zIndex={300}>
             <form onSubmit={minimumForm.onSubmit((values) => setMinimum.mutate(values, {
-              onSuccess: () => { success('Mínimo guardado.'); minimumForm.reset(); }, onError: failure,
+              onSuccess: () => { success('Mínimo guardado.'); minimumForm.reset(); setMinimumOpened(false); }, onError: failure,
             }))}>
               <Stack>
                 <Select
@@ -365,10 +366,10 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 <Button type="submit" loading={setMinimum.isPending}>Guardar mínimo</Button>
               </Stack>
             </form>
-          </Card>
+          </Modal>
         )}
 
-        <Modal opened={detailProduct !== null} onClose={() => setDetailProductId(null)} title={detailProduct ? `${detailProduct.sku} - ${detailProduct.name}` : 'Detalle del producto'}>
+        <Modal opened={detailProduct !== null} onClose={() => setDetailProductId(null)} title={detailProduct ? `${detailProduct.sku} - ${detailProduct.name}` : 'Detalle del producto'} zIndex={200}>
           <Stack>
             <Text size="sm">Unidad base: {detailProduct?.baseUnitCode}</Text>
             <Text size="sm">Unidades vigentes: {detailProduct?.unitVersions.filter((unit) => !unit.validUntil).map((unit) => unit.unitCode).join(', ')}</Text>
@@ -377,8 +378,8 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               <Card withBorder><Text size="xs" c="dimmed">Stock municipios</Text><Text fw={700}>{quantity(detailProduct ? municipalStock[detailProduct.id] ?? 0 : 0)}</Text></Card>
             </SimpleGrid>
             {canAdmin && detailProduct && <Group grow>
-              <Button onClick={() => { setEntryProductId(detailProduct.id); setDetailProductId(null); setEntryOpened(true); }}>Registrar ingreso</Button>
-              <Button variant="default" onClick={() => { setUnitProductId(detailProduct.id); setDetailProductId(null); }}>Agregar unidad</Button>
+              <Button onClick={() => { setEntryProductId(detailProduct.id); setEntryOpened(true); }}>Registrar ingreso</Button>
+              <Button variant="default" onClick={() => setUnitProductId(detailProduct.id)}>Agregar unidad</Button>
               <Button
                 color={detailProduct.active ? 'red' : 'green'}
                 variant="light"
@@ -391,7 +392,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           </Stack>
         </Modal>
         {canAdmin && entryOpened && <StockEntryModal key={entryProductId ?? 'new-entry'} opened={entryOpened} onClose={() => { setEntryOpened(false); setEntryProductId(null); }} locations={locations.data ?? []} products={products.data ?? []} initialProductId={entryProductId ?? undefined} />}
-        <Modal opened={productOpened} onClose={productModal.close} title="Nuevo producto">
+        <Modal opened={productOpened} onClose={productModal.close} title="Nuevo producto" zIndex={300}>
           <form onSubmit={productForm.onSubmit((values) => createProduct.mutate(values, {
             onSuccess: () => { success('Producto creado.'); productForm.reset(); productModal.close(); }, onError: failure,
           }))}>
@@ -404,7 +405,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           </form>
         </Modal>
 
-        <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar unidad">
+        <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar unidad" zIndex={300}>
           <form onSubmit={unitForm.onSubmit((values) => {
             if (!unitProductId) return;
             addUnit.mutate({ id: unitProductId, ...values }, {
@@ -413,8 +414,10 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           })}>
             <Stack>
               <Select label="Codigo de unidad" required data={INVENTORY_UNIT_OPTIONS} {...unitForm.getInputProps('unitCode')} />
-              <Text size="sm" c="dimmed">Unidad base: {unitProduct?.baseUnitCode ?? 'sin definir'}.</Text>
-              <TextInput label="Equivale a cuantas unidades base" description="Ejemplo: si la unidad base es UND y una CAJA trae 12 UND, escribi 12. Si equivale a una unidad, escribi 1." inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
+              {unitForm.values.unitCode && <>
+                <Text size="sm" c="dimmed">Unidad base: {unitProduct?.baseUnitCode ?? 'sin definir'}.</Text>
+                <TextInput label="Equivale a cuantas unidades base" description="Ejemplo: si la unidad base es UND y una CAJA trae 12 UND, escribi 12. Si equivale a una unidad, escribi 1." inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
+              </>}
               <Button type="submit" loading={addUnit.isPending}>Agregar unidad</Button>
             </Stack>
           </form>

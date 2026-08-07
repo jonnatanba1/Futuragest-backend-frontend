@@ -93,6 +93,7 @@ No debe mostrar un cero falso mientras una consulta esté cargando o haya fallad
 Permite:
 
 - buscar productos por SKU o nombre y abrir su detalle;
+- abrir la configuración de mínimos por municipio desde un botón, sin ocupar la tabla del inventario;
 - registrar un nuevo ingreso desde la tabla o el detalle del producto;
 - crear productos con SKU, nombre y unidad base seleccionada de un catalogo controlado;
 - ver stock central y total municipal por cada producto;
