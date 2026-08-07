@@ -4,7 +4,7 @@ Este documento define el flujo simple del módulo de inventario. La complejidad 
 
 ## Decisión principal
 
-Compras administra el catálogo y envía cantidades desde una bodega central a una bodega municipal existente. En cada envío debe seleccionar una persona responsable entre:
+Compras administra el catálogo y envía cantidades desde la única bodega central, Oficina central Montería, a una bodega municipal existente. Esta bodega se selecciona automáticamente. En cada envío debe seleccionar una persona responsable entre:
 
 - un supervisor del municipio destino; o
 - el coordinador de la zona a la que pertenece ese municipio.

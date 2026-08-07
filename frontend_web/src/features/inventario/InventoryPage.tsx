@@ -249,7 +249,8 @@ function StockEntryModal({
   initialProductId?: string;
 }) {
   const entry = useRecordStockEntry();
-  const form = useForm({ initialValues: { locationId: '', productId: initialProductId ?? '', unitVersionId: '', quantity: '', note: '' } });
+  const centralLocation = locations.find((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE');
+  const form = useForm({ initialValues: { locationId: centralLocation?.id ?? '', productId: initialProductId ?? '', unitVersionId: '', quantity: '', note: '' } });
   const product = products.find((item) => item.id === form.values.productId);
 
   return <Modal opened={opened} onClose={onClose} title="Registrar entrada de compras" zIndex={300}>
@@ -262,7 +263,7 @@ function StockEntryModal({
     })}>
       <Stack>
         <Text size="sm" c="dimmed">Registra una compra o reposicion sin costo para una bodega central.</Text>
-        <Select searchable required label="Bodega central" data={locations.filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} - ${item.name}` }))} {...form.getInputProps('locationId')} />
+        <TextInput readOnly label="Bodega central" value={centralLocation ? `${centralLocation.code} - ${centralLocation.name}` : ''} description="Destino fijo de las compras y reposiciones." />
         <Select searchable required label="Producto" data={products.filter((item) => item.active).map((item) => ({ value: item.id, label: `${item.sku} - ${item.name}` }))} {...form.getInputProps('productId')} onChange={(value) => { form.setFieldValue('productId', value ?? ''); form.setFieldValue('unitVersionId', ''); }} />
         <Select required disabled={!product} label="Unidad" data={(product?.unitVersions ?? []).filter((unit) => !unit.validUntil).map((unit) => ({ value: unit.id, label: unit.unitCode }))} {...form.getInputProps('unitVersionId')} />
         <TextInput required label="Cantidad" inputMode="decimal" {...form.getInputProps('quantity')} />
@@ -464,6 +465,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
       items: [{ productId: '', unitVersionId: '', quantity: '' }],
     },
   });
+  const centralLocation = locations.data?.find((location) => isOperationalInventoryLocation(location) && location.type === 'CENTRAL_WAREHOUSE');
   const destination = locations.data?.find((location) => location.id === form.values.destinationLocationId);
   const receivers = eligibleShipmentReceivers(destination, assignees.data ?? []);
   const availableProducts = availableProductIdsAtLocation(balances.data ?? [], form.values.originLocationId);
@@ -515,7 +517,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   return (
     <QueryBoundary queries={[shipments, products, locations, balances, ...(canAdmin ? [assignees] : [])]}>
     <Stack>
-      {canAdmin && <Button leftSection={<IconPlus size={16} />} onClick={createModal.open} w="fit-content">Asignar productos a un municipio</Button>}
+      {canAdmin && <Button leftSection={<IconPlus size={16} />} onClick={() => { form.setFieldValue('originLocationId', centralLocation?.id ?? ''); createModal.open(); }} w="fit-content">Asignar productos a un municipio</Button>}
       <Card withBorder style={tableContainment}>
         <ScrollArea>
           <Table striped highlightOnHover miw={1080}>
@@ -553,7 +555,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
           onSuccess: () => { success('Asignación creada. Confirma el envío cuando salga de compras.'); form.reset(); createModal.close(); }, onError: failure,
         }))}>
           <Stack>
-            <Select searchable required label="Bodega central" data={(locations.data ?? []).filter((item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE').map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))} {...form.getInputProps('originLocationId')} onChange={(value) => { form.setFieldValue('originLocationId', value ?? ''); form.setFieldValue('items', [{ productId: '', unitVersionId: '', quantity: '' }]); }} />
+            <TextInput readOnly label="Bodega central de origen" value={centralLocation ? `${centralLocation.code} · ${centralLocation.name}` : ''} description="Origen fijo de todas las asignaciones municipales." />
             <Select
               searchable
               required
