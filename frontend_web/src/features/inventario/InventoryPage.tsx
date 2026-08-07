@@ -22,26 +22,29 @@ import {
   TextInput,
   Textarea,
   ThemeIcon,
+  Timeline,
   Title,
-} from '@mantine/core';
-import { useForm } from '@mantine/form';
-import { useDisclosure, useDocumentTitle } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
+} from "@mantine/core";
+import { useForm } from "@mantine/form";
+import { useDisclosure, useDocumentTitle } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconAlertTriangle,
   IconArrowsExchange,
   IconCheck,
+  IconCircleCheck,
   IconClipboardCheck,
+  IconClock,
   IconFilter,
   IconPackage,
   IconPlus,
   IconRefresh,
   IconScale,
   IconTruckDelivery,
-} from '@tabler/icons-react';
-import React, { useState } from 'react';
-import { inventoryApi } from '../../lib/api/client';
-import { useAuth } from '../../lib/auth/auth-context';
+} from "@tabler/icons-react";
+import React, { useState } from "react";
+import { inventoryApi } from "../../lib/api/client";
+import { useAuth } from "../../lib/auth/auth-context";
 import {
   useAddProductUnit,
   useApproveCount,
@@ -70,65 +73,122 @@ import {
   useSetMinimum,
   useSubmitCount,
   useUpdateProduct,
-} from './inventory-queries';
-import { clearInventoryCommandId, stableInventoryCommandId } from './inventory-command-id';
-import { automaticFactorToBase, INVENTORY_UNIT_OPTIONS } from './inventory-unit-options';
-import { availableProductIdsAtLocation, stockByProduct } from './inventory-stock';
+} from "./inventory-queries";
+import {
+  clearInventoryCommandId,
+  stableInventoryCommandId,
+} from "./inventory-command-id";
+import {
+  automaticFactorToBase,
+  INVENTORY_UNIT_OPTIONS,
+} from "./inventory-unit-options";
+import {
+  availableProductIdsAtLocation,
+  stockByProduct,
+} from "./inventory-stock";
 import {
   eligibleShipmentReceivers,
   isOperationalInventoryLocation,
-} from './inventory-location-policy';
+} from "./inventory-location-policy";
 import type {
   InventoryCount,
   InventoryLocation,
   InventoryReviewCommand,
   InventoryShipment,
-} from './inventory.types';
+} from "./inventory.types";
 
 const tableContainment: React.CSSProperties = {
-  contentVisibility: 'auto',
-  containIntrinsicSize: 'auto 800px',
+  contentVisibility: "auto",
+  containIntrinsicSize: "auto 800px",
 };
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'No fue posible completar la operación.';
+  return error instanceof Error
+    ? error.message
+    : "No fue posible completar la operación.";
 }
 
 function success(message: string) {
-  notifications.show({ color: 'green', title: 'Inventario actualizado', message });
+  notifications.show({
+    color: "green",
+    title: "Inventario actualizado",
+    message,
+  });
 }
 
 function failure(error: unknown) {
-  notifications.show({ color: 'red', title: 'Operación rechazada', message: errorMessage(error) });
+  notifications.show({
+    color: "red",
+    title: "Operación rechazada",
+    message: errorMessage(error),
+  });
 }
 
 function quantity(value: string | number | null | undefined) {
   const parsed = Number(value ?? 0);
-  return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 6 }).format(parsed);
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 6 }).format(
+    parsed,
+  );
 }
 
 function stockLocationLabel(location: InventoryLocation) {
-  if (location.type === 'MUNICIPAL_WAREHOUSE') {
+  if (location.type === "MUNICIPAL_WAREHOUSE") {
     return location.municipio?.name ?? location.name;
   }
-  if (location.type === 'CENTRAL_WAREHOUSE') {
-    return 'Bodega central: ' + location.name;
+  if (location.type === "CENTRAL_WAREHOUSE") {
+    return "Bodega central: " + location.name;
   }
   return location.name;
 }
 
+function formatDateTime(value: string | null | undefined) {
+  return value ? new Date(value).toLocaleString("es-CO") : "Pendiente";
+}
+
+function shipmentStatusColor(status: InventoryShipment["status"]) {
+  if (status.includes("DISCREPANCY")) return "red";
+  if (status === "RECEIVED") return "teal";
+  if (status === "DRAFT" || status === "CANCELLED") return "gray";
+  if (status === "RETURNED") return "orange";
+  return "blue";
+}
+
+function shipmentStatusLabel(status: InventoryShipment["status"]) {
+  const labels: Record<InventoryShipment["status"], string> = {
+    DRAFT: "Borrador",
+    DISPATCHED: "En tránsito",
+    PARTIALLY_RECEIVED: "Recepción parcial",
+    DISCREPANCY_REVIEW: "Revisión de diferencia",
+    RECEIVED: "Recibido",
+    CANCELLED: "Cancelado",
+    RETURNED: "Retornado",
+    CLOSED_WITH_DISCREPANCY: "Cerrado con diferencia",
+  };
+  return labels[status];
+}
+
+function shipmentHasReceipt(shipment: InventoryShipment) {
+  return [
+    "PARTIALLY_RECEIVED",
+    "DISCREPANCY_REVIEW",
+    "RECEIVED",
+    "RETURNED",
+    "CLOSED_WITH_DISCREPANCY",
+  ].includes(shipment.status);
+}
+
 function movementTraceLabel(type: string) {
   const labels: Record<string, string> = {
-    STOCK_ENTRY: 'Ingreso de compra',
-    OPENING_BALANCE: 'Saldo inicial',
-    TRANSFER_IN: 'Ingreso por traslado',
-    TRANSFER_OUT: 'Salida por envío',
-    FIELD_ISSUE: 'Salida de campo',
-    FIELD_RETURN: 'Retorno de campo',
-    DAMAGE_OR_LOSS: 'Daño o pérdida',
-    COUNT_ADJUSTMENT_IN: 'Ajuste positivo',
-    COUNT_ADJUSTMENT_OUT: 'Ajuste negativo',
-    REVERSAL: 'Reverso',
+    STOCK_ENTRY: "Ingreso de compra",
+    OPENING_BALANCE: "Saldo inicial",
+    TRANSFER_IN: "Ingreso por traslado",
+    TRANSFER_OUT: "Salida por envío",
+    FIELD_ISSUE: "Salida de campo",
+    FIELD_RETURN: "Retorno de campo",
+    DAMAGE_OR_LOSS: "Daño o pérdida",
+    COUNT_ADJUSTMENT_IN: "Ajuste positivo",
+    COUNT_ADJUSTMENT_OUT: "Ajuste negativo",
+    REVERSAL: "Reverso",
   };
   return labels[type] ?? type;
 }
@@ -166,14 +226,16 @@ function QueryBoundary({
       >
         <Stack gap="sm">
           <Text size="sm">
-            {errorMessage(failed.error)} Los valores no se reemplazaron por ceros para evitar
-            decisiones con información incompleta.
+            {errorMessage(failed.error)} Los valores no se reemplazaron por
+            ceros para evitar decisiones con información incompleta.
           </Text>
           <Button
             variant="light"
             color="red"
             w="fit-content"
-            onClick={() => void Promise.all(queries.map((query) => query.refetch()))}
+            onClick={() =>
+              void Promise.all(queries.map((query) => query.refetch()))
+            }
           >
             Reintentar
           </Button>
@@ -185,7 +247,13 @@ function QueryBoundary({
   return children;
 }
 
-function EmptyTableRow({ columns, message }: { columns: number; message: string }) {
+function EmptyTableRow({
+  columns,
+  message,
+}: {
+  columns: number;
+  message: string;
+}) {
   return (
     <Table.Tr>
       <Table.Td colSpan={columns}>
@@ -212,7 +280,9 @@ function InventoryOverview({
 
   const activeShipments =
     shipments.data?.filter((shipment) =>
-      ['DISPATCHED', 'PARTIALLY_RECEIVED', 'DISCREPANCY_REVIEW'].includes(shipment.status),
+      ["DISPATCHED", "PARTIALLY_RECEIVED", "DISCREPANCY_REVIEW"].includes(
+        shipment.status,
+      ),
     ).length ?? 0;
 
   const overviewQueries = [
@@ -239,7 +309,7 @@ function InventoryOverview({
             <Text c="dimmed" size="sm">
               Alertas de mínimo
             </Text>
-            <Text fw={700} size="xl" c={alerts.data?.length ? 'red' : 'green'}>
+            <Text fw={700} size="xl" c={alerts.data?.length ? "red" : "green"}>
               {alerts.data?.length ?? 0}
             </Text>
           </Card>
@@ -256,7 +326,11 @@ function InventoryOverview({
               <Text c="dimmed" size="sm">
                 Eventos por revisar
               </Text>
-              <Text fw={700} size="xl" c={reviews.data?.length ? 'orange' : undefined}>
+              <Text
+                fw={700}
+                size="xl"
+                c={reviews.data?.length ? "orange" : undefined}
+              >
                 {reviews.data?.length ?? 0}
               </Text>
             </Card>
@@ -265,7 +339,7 @@ function InventoryOverview({
 
         {canReconcile && reconciliation.data && (
           <Alert
-            color={reconciliation.data.mismatches.length ? 'red' : 'green'}
+            color={reconciliation.data.mismatches.length ? "red" : "green"}
             icon={<IconScale size={18} />}
             title="Reconciliación ledger/balance"
           >
@@ -292,15 +366,22 @@ function InventoryOverview({
               </Table.Thead>
               <Table.Tbody>
                 {balances.data?.length === 0 && (
-                  <EmptyTableRow columns={5} message="Todavía no hay saldos registrados." />
+                  <EmptyTableRow
+                    columns={5}
+                    message="Todavía no hay saldos registrados."
+                  />
                 )}
                 {balances.data?.map((balance) => (
                   <Table.Tr key={balance.id}>
                     <Table.Td>{stockLocationLabel(balance.location)}</Table.Td>
                     <Table.Td>{balance.product.sku}</Table.Td>
                     <Table.Td>{balance.product.name}</Table.Td>
-                    <Table.Td ta="right">{quantity(balance.quantityBase)}</Table.Td>
-                    <Table.Td>{new Date(balance.updatedAt).toLocaleString('es-CO')}</Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(balance.quantityBase)}
+                    </Table.Td>
+                    <Table.Td>
+                      {new Date(balance.updatedAt).toLocaleString("es-CO")}
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -325,16 +406,25 @@ function InventoryOverview({
               </Table.Thead>
               <Table.Tbody>
                 {alerts.data?.length === 0 && (
-                  <EmptyTableRow columns={5} message="No hay productos por debajo del mínimo." />
+                  <EmptyTableRow
+                    columns={5}
+                    message="No hay productos por debajo del mínimo."
+                  />
                 )}
                 {alerts.data?.map((alert) => (
                   <Table.Tr key={`${alert.location.id}:${alert.product.id}`}>
-                    <Table.Td>{alert.location.municipio?.name ?? alert.location.name}</Table.Td>
+                    <Table.Td>
+                      {alert.location.municipio?.name ?? alert.location.name}
+                    </Table.Td>
                     <Table.Td>
                       {alert.product.sku} · {alert.product.name}
                     </Table.Td>
-                    <Table.Td ta="right">{quantity(alert.quantityBase)}</Table.Td>
-                    <Table.Td ta="right">{quantity(alert.minimumBase)}</Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(alert.quantityBase)}
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(alert.minimumBase)}
+                    </Table.Td>
                     <Table.Td ta="right" c="red" fw={600}>
                       {quantity(alert.shortageBase)}
                     </Table.Td>
@@ -364,39 +454,49 @@ function StockEntryModal({
     sku: string;
     name: string;
     active: boolean;
-    unitVersions: Array<{ id: string; unitCode: string; validUntil: string | null }>;
+    unitVersions: Array<{
+      id: string;
+      unitCode: string;
+      validUntil: string | null;
+    }>;
   }>;
   initialProductId?: string;
 }) {
   const entry = useRecordStockEntry();
   const centralLocation = locations.find(
-    (item) => isOperationalInventoryLocation(item) && item.type === 'CENTRAL_WAREHOUSE',
+    (item) =>
+      isOperationalInventoryLocation(item) && item.type === "CENTRAL_WAREHOUSE",
   );
   const form = useForm({
     initialValues: {
-      locationId: centralLocation?.id ?? '',
-      productId: initialProductId ?? '',
-      unitVersionId: '',
-      quantity: '',
-      note: '',
+      locationId: centralLocation?.id ?? "",
+      productId: initialProductId ?? "",
+      unitVersionId: "",
+      quantity: "",
+      note: "",
     },
   });
   const product = products.find((item) => item.id === form.values.productId);
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Registrar entrada de compras" zIndex={300}>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Registrar entrada de compras"
+      zIndex={300}
+    >
       <form
         onSubmit={form.onSubmit((values) => {
           const operationKey =
-            'stock-entry:' +
+            "stock-entry:" +
             values.locationId +
-            ':' +
+            ":" +
             values.productId +
-            ':' +
+            ":" +
             values.unitVersionId +
-            ':' +
+            ":" +
             values.quantity +
-            ':' +
+            ":" +
             values.note.trim();
           entry.mutate(
             {
@@ -407,7 +507,7 @@ function StockEntryModal({
             {
               onSuccess: () => {
                 clearInventoryCommandId(operationKey);
-                success('Entrada de stock registrada.');
+                success("Entrada de stock registrada.");
                 onClose();
               },
               onError: failure,
@@ -422,7 +522,11 @@ function StockEntryModal({
           <TextInput
             readOnly
             label="Bodega central"
-            value={centralLocation ? `${centralLocation.code} - ${centralLocation.name}` : ''}
+            value={
+              centralLocation
+                ? `${centralLocation.code} - ${centralLocation.name}`
+                : ""
+            }
             description="Destino fijo de las compras y reposiciones."
           />
           <Select
@@ -431,11 +535,14 @@ function StockEntryModal({
             label="Producto"
             data={products
               .filter((item) => item.active)
-              .map((item) => ({ value: item.id, label: `${item.sku} - ${item.name}` }))}
-            {...form.getInputProps('productId')}
+              .map((item) => ({
+                value: item.id,
+                label: `${item.sku} - ${item.name}`,
+              }))}
+            {...form.getInputProps("productId")}
             onChange={(value) => {
-              form.setFieldValue('productId', value ?? '');
-              form.setFieldValue('unitVersionId', '');
+              form.setFieldValue("productId", value ?? "");
+              form.setFieldValue("unitVersionId", "");
             }}
           />
           <Select
@@ -445,7 +552,7 @@ function StockEntryModal({
             data={(product?.unitVersions ?? [])
               .filter((unit) => !unit.validUntil)
               .map((unit) => ({ value: unit.id, label: unit.unitCode }))}
-            {...form.getInputProps('unitVersionId')}
+            {...form.getInputProps("unitVersionId")}
           />
           <NumberInput
             required
@@ -456,7 +563,9 @@ function StockEntryModal({
             decimalScale={6}
             decimalSeparator=","
             value={form.values.quantity}
-            onChange={(value) => form.setFieldValue('quantity', String(value).replace(',', '.'))}
+            onChange={(value) =>
+              form.setFieldValue("quantity", String(value).replace(",", "."))
+            }
           />
           <Textarea
             label="Nota"
@@ -464,7 +573,7 @@ function StockEntryModal({
             autosize
             minRows={3}
             maxRows={8}
-            {...form.getInputProps('note')}
+            {...form.getInputProps("note")}
           />
           <Button type="submit" loading={entry.isPending}>
             Registrar ingreso
@@ -490,61 +599,77 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   const [entryOpened, setEntryOpened] = useState(false);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [minimumOpened, setMinimumOpened] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
-  const [inventoryFilter, setInventoryFilter] = useState('ALL');
-  const [movementFilter, setMovementFilter] = useState('ALL');
-  const [productShipmentFilter, setProductShipmentFilter] = useState('ALL');
-  const productForm = useForm({ initialValues: { sku: '', name: '', baseUnitCode: 'UND' } });
-  const unitForm = useForm({ initialValues: { unitCode: '', factorToBase: '' } });
+  const [productSearch, setProductSearch] = useState("");
+  const [inventoryFilter, setInventoryFilter] = useState("ALL");
+  const [movementFilter, setMovementFilter] = useState("ALL");
+  const [productShipmentFilter, setProductShipmentFilter] = useState("ALL");
+  const productForm = useForm({
+    initialValues: { sku: "", name: "", baseUnitCode: "UND" },
+  });
+  const unitForm = useForm({
+    initialValues: { unitCode: "", factorToBase: "" },
+  });
   const minimumForm = useForm({
-    initialValues: { locationId: '', productId: '', quantityBase: '0' },
+    initialValues: { locationId: "", productId: "", quantityBase: "0" },
   });
   const productMovements = useInventoryMovements(detailProductId ?? undefined);
 
-  const centralStock = stockByProduct(balances.data ?? [], 'CENTRAL_WAREHOUSE');
-  const municipalStock = stockByProduct(balances.data ?? [], 'MUNICIPAL_WAREHOUSE');
+  const centralStock = stockByProduct(balances.data ?? [], "CENTRAL_WAREHOUSE");
+  const municipalStock = stockByProduct(
+    balances.data ?? [],
+    "MUNICIPAL_WAREHOUSE",
+  );
   const visibleProducts = (products.data ?? []).filter((product) => {
-    const query = productSearch.trim().toLocaleLowerCase('es-CO');
+    const query = productSearch.trim().toLocaleLowerCase("es-CO");
     const matchesSearch =
       !query ||
-      product.sku.toLocaleLowerCase('es-CO').includes(query) ||
-      product.name.toLocaleLowerCase('es-CO').includes(query);
+      product.sku.toLocaleLowerCase("es-CO").includes(query) ||
+      product.name.toLocaleLowerCase("es-CO").includes(query);
     if (!matchesSearch) return false;
     const central = centralStock[product.id] ?? 0;
     const municipal = municipalStock[product.id] ?? 0;
-    if (inventoryFilter === 'CENTRAL_STOCK') return central > 0;
-    if (inventoryFilter === 'MUNICIPAL_STOCK') return municipal > 0;
-    if (inventoryFilter === 'OUT_OF_STOCK') return central <= 0 && municipal <= 0;
-    if (inventoryFilter === 'ACTIVE') return product.active;
-    if (inventoryFilter === 'INACTIVE') return !product.active;
+    if (inventoryFilter === "CENTRAL_STOCK") return central > 0;
+    if (inventoryFilter === "MUNICIPAL_STOCK") return municipal > 0;
+    if (inventoryFilter === "OUT_OF_STOCK")
+      return central <= 0 && municipal <= 0;
+    if (inventoryFilter === "ACTIVE") return product.active;
+    if (inventoryFilter === "INACTIVE") return !product.active;
     return true;
   });
-  const detailProduct = products.data?.find((product) => product.id === detailProductId) ?? null;
-  const unitProduct = products.data?.find((product) => product.id === unitProductId) ?? null;
-  const traceRows = productMovements.data?.pages.flatMap((page) => page.items) ?? [];
+  const detailProduct =
+    products.data?.find((product) => product.id === detailProductId) ?? null;
+  const unitProduct =
+    products.data?.find((product) => product.id === unitProductId) ?? null;
+  const traceRows =
+    productMovements.data?.pages.flatMap((page) => page.items) ?? [];
   const productShipments = (shipments.data ?? []).filter((shipment) =>
     shipment.items.some((item) => item.productId === detailProductId),
   );
   const visibleTraceRows = traceRows.filter((movement) => {
-    if (movementFilter === 'INBOUND')
+    if (movementFilter === "INBOUND")
       return [
-        'STOCK_ENTRY',
-        'OPENING_BALANCE',
-        'TRANSFER_IN',
-        'FIELD_RETURN',
-        'COUNT_ADJUSTMENT_IN',
+        "STOCK_ENTRY",
+        "OPENING_BALANCE",
+        "TRANSFER_IN",
+        "FIELD_RETURN",
+        "COUNT_ADJUSTMENT_IN",
       ].includes(movement.type);
-    if (movementFilter === 'OUTBOUND')
-      return ['TRANSFER_OUT', 'FIELD_ISSUE', 'DAMAGE_OR_LOSS', 'COUNT_ADJUSTMENT_OUT'].includes(
-        movement.type,
-      );
+    if (movementFilter === "OUTBOUND")
+      return [
+        "TRANSFER_OUT",
+        "FIELD_ISSUE",
+        "DAMAGE_OR_LOSS",
+        "COUNT_ADJUSTMENT_OUT",
+      ].includes(movement.type);
     return true;
   });
   const visibleProductShipments = productShipments.filter((shipment) => {
-    if (productShipmentFilter === 'IN_TRANSIT')
-      return ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status);
-    if (productShipmentFilter === 'RECEIVED') return shipment.status === 'RECEIVED';
-    if (productShipmentFilter === 'REVIEW') return shipment.status.includes('DISCREPANCY');
+    if (productShipmentFilter === "IN_TRANSIT")
+      return ["DISPATCHED", "PARTIALLY_RECEIVED"].includes(shipment.status);
+    if (productShipmentFilter === "RECEIVED")
+      return shipment.status === "RECEIVED";
+    if (productShipmentFilter === "REVIEW")
+      return shipment.status.includes("DISCREPANCY");
     return true;
   });
   const automaticUnitFactor = unitProduct
@@ -552,7 +677,11 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
     : null;
 
   return (
-    <QueryBoundary queries={canAdmin ? [products, locations, balances] : [products, balances]}>
+    <QueryBoundary
+      queries={
+        canAdmin ? [products, locations, balances] : [products, balances]
+      }
+    >
       <Stack gap="lg">
         {canAdmin && (
           <Group justify="flex-end">
@@ -569,7 +698,10 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               <Button variant="default" onClick={() => setMinimumOpened(true)}>
                 Mínimos por municipio
               </Button>
-              <Button leftSection={<IconPlus size={16} />} onClick={productModal.open}>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={productModal.open}
+              >
                 Nuevo producto
               </Button>
             </Group>
@@ -595,14 +727,14 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             <Select
               label="Filtrar inventario"
               value={inventoryFilter}
-              onChange={(value) => setInventoryFilter(value ?? 'ALL')}
+              onChange={(value) => setInventoryFilter(value ?? "ALL")}
               data={[
-                { value: 'ALL', label: 'Todos los productos' },
-                { value: 'CENTRAL_STOCK', label: 'Con stock central' },
-                { value: 'MUNICIPAL_STOCK', label: 'Con stock en municipios' },
-                { value: 'OUT_OF_STOCK', label: 'Sin existencias' },
-                { value: 'ACTIVE', label: 'Activos' },
-                { value: 'INACTIVE', label: 'Inactivos' },
+                { value: "ALL", label: "Todos los productos" },
+                { value: "CENTRAL_STOCK", label: "Con stock central" },
+                { value: "MUNICIPAL_STOCK", label: "Con stock en municipios" },
+                { value: "OUT_OF_STOCK", label: "Sin existencias" },
+                { value: "ACTIVE", label: "Activos" },
+                { value: "INACTIVE", label: "Inactivos" },
               ]}
             />
           </Group>
@@ -620,23 +752,28 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               </Table.Thead>
               <Table.Tbody>
                 {products.data?.length === 0 && (
-                  <EmptyTableRow columns={6} message="No hay productos registrados." />
-                )}
-                {products.data && products.data.length > 0 && visibleProducts.length === 0 && (
                   <EmptyTableRow
                     columns={6}
-                    message="No hay productos que coincidan con la busqueda."
+                    message="No hay productos registrados."
                   />
                 )}
+                {products.data &&
+                  products.data.length > 0 &&
+                  visibleProducts.length === 0 && (
+                    <EmptyTableRow
+                      columns={6}
+                      message="No hay productos que coincidan con la busqueda."
+                    />
+                  )}
                 {visibleProducts.map((product) => (
                   <Table.Tr
                     key={product.id}
                     role="button"
                     tabIndex={0}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: "pointer" }}
                     onClick={() => setDetailProductId(product.id)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
+                      if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         setDetailProductId(product.id);
                       }
@@ -647,14 +784,20 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     <Table.Td>
                       {product.unitVersions
                         .filter((unit) => !unit.validUntil)
-                        .map((unit) => unit.unitCode + ' × ' + unit.factorToBase)
-                        .join(', ')}
+                        .map(
+                          (unit) => unit.unitCode + " × " + unit.factorToBase,
+                        )
+                        .join(", ")}
                     </Table.Td>
-                    <Table.Td ta="right">{quantity(centralStock[product.id] ?? 0)}</Table.Td>
-                    <Table.Td ta="right">{quantity(municipalStock[product.id] ?? 0)}</Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(centralStock[product.id] ?? 0)}
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(municipalStock[product.id] ?? 0)}
+                    </Table.Td>
                     <Table.Td>
-                      <Badge color={product.active ? 'green' : 'gray'}>
-                        {product.active ? 'Activo' : 'Inactivo'}
+                      <Badge color={product.active ? "green" : "gray"}>
+                        {product.active ? "Activo" : "Inactivo"}
                       </Badge>
                     </Table.Td>
                   </Table.Tr>
@@ -675,7 +818,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               onSubmit={minimumForm.onSubmit((values) =>
                 setMinimum.mutate(values, {
                   onSuccess: () => {
-                    success('Mínimo guardado.');
+                    success("Mínimo guardado.");
                     minimumForm.reset();
                     setMinimumOpened(false);
                   },
@@ -691,10 +834,14 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                   data={(locations.data ?? [])
                     .filter(
                       (item) =>
-                        isOperationalInventoryLocation(item) && item.type === 'MUNICIPAL_WAREHOUSE',
+                        isOperationalInventoryLocation(item) &&
+                        item.type === "MUNICIPAL_WAREHOUSE",
                     )
-                    .map((item) => ({ value: item.id, label: item.municipio?.name ?? item.name }))}
-                  {...minimumForm.getInputProps('locationId')}
+                    .map((item) => ({
+                      value: item.id,
+                      label: item.municipio?.name ?? item.name,
+                    }))}
+                  {...minimumForm.getInputProps("locationId")}
                 />
                 <Select
                   label="Producto"
@@ -702,15 +849,15 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                   required
                   data={(products.data ?? []).map((item) => ({
                     value: item.id,
-                    label: item.sku + ' - ' + item.name,
+                    label: item.sku + " - " + item.name,
                   }))}
-                  {...minimumForm.getInputProps('productId')}
+                  {...minimumForm.getInputProps("productId")}
                 />
                 <TextInput
                   label="Stock mínimo"
                   inputMode="decimal"
                   required
-                  {...minimumForm.getInputProps('quantityBase')}
+                  {...minimumForm.getInputProps("quantityBase")}
                 />
                 <Button type="submit" loading={setMinimum.isPending}>
                   Guardar mínimo
@@ -724,7 +871,9 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           opened={detailProduct !== null}
           onClose={() => setDetailProductId(null)}
           title={
-            detailProduct ? `${detailProduct.sku} - ${detailProduct.name}` : 'Detalle del producto'
+            detailProduct
+              ? `${detailProduct.sku} - ${detailProduct.name}`
+              : "Detalle del producto"
           }
           size="xl"
           zIndex={200}
@@ -736,13 +885,19 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 p="xl"
                 style={{
                   background:
-                    'linear-gradient(135deg, var(--mantine-color-blue-7), var(--mantine-color-cyan-6))',
-                  color: 'white',
+                    "linear-gradient(135deg, #1f2937 0%, #334155 58%, #0f766e 150%)",
+                  color: "white",
+                  boxShadow: "0 14px 32px rgba(15, 23, 42, 0.18)",
                 }}
               >
                 <Group justify="space-between" align="flex-start" wrap="wrap">
                   <Group>
-                    <ThemeIcon size={52} radius="xl" variant="white" color="blue">
+                    <ThemeIcon
+                      size={52}
+                      radius="xl"
+                      variant="white"
+                      color="dark"
+                    >
                       <IconPackage size={28} />
                     </ThemeIcon>
                     <div>
@@ -750,30 +905,34 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                         <Title order={3} c="white">
                           {detailProduct.name}
                         </Title>
-                        <Badge variant="white" color="blue">
-                          {detailProduct.active ? 'Activo' : 'Inactivo'}
+                        <Badge variant="white" color="dark">
+                          {detailProduct.active ? "Activo" : "Inactivo"}
                         </Badge>
                       </Group>
-                      <Text size="sm" c="blue.0">
-                        SKU {detailProduct.sku} · Unidad base: {detailProduct.baseUnitCode}
+                      <Text size="sm" c="gray.2">
+                        SKU {detailProduct.sku} · Unidad base:{" "}
+                        {detailProduct.baseUnitCode}
                       </Text>
                     </div>
                   </Group>
-                  <Text size="sm" maw={320} c="blue.0">
-                    Unidades disponibles:{' '}
+                  <Text size="sm" maw={320} c="gray.2">
+                    Unidades disponibles:{" "}
                     {detailProduct.unitVersions
                       .filter((unit) => !unit.validUntil)
                       .map((unit) => unit.unitCode)
-                      .join(', ')}
+                      .join(", ")}
                   </Text>
                 </Group>
                 <SimpleGrid cols={{ base: 1, sm: 2 }} mt="lg">
                   <Card
                     radius="md"
                     p="md"
-                    style={{ background: 'rgba(255,255,255,0.16)', color: 'white' }}
+                    style={{
+                      background: "rgba(255,255,255,0.16)",
+                      color: "white",
+                    }}
                   >
-                    <Text size="xs" c="blue.0">
+                    <Text size="xs" c="gray.2">
                       Stock central
                     </Text>
                     <Text size="xl" fw={800}>
@@ -783,7 +942,10 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                   <Card
                     radius="md"
                     p="md"
-                    style={{ background: 'rgba(255,255,255,0.16)', color: 'white' }}
+                    style={{
+                      background: "rgba(255,255,255,0.16)",
+                      color: "white",
+                    }}
                   >
                     <Text size="xs" c="blue.0">
                       Stock en municipios
@@ -804,31 +966,42 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 </Group>
                 <Menu shadow="md" width={220} position="bottom-end">
                   <Menu.Target>
-                    <ActionIcon variant="subtle" aria-label="Filtrar entradas y salidas">
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label="Filtrar entradas y salidas"
+                    >
                       <IconFilter size={18} />
                     </ActionIcon>
                   </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Label>Filtrar movimientos</Menu.Label>
                     <Menu.Item
-                      leftSection={movementFilter === 'ALL' ? <IconCheck size={15} /> : undefined}
-                      onClick={() => setMovementFilter('ALL')}
+                      leftSection={
+                        movementFilter === "ALL" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
+                      }
+                      onClick={() => setMovementFilter("ALL")}
                     >
                       Todos
                     </Menu.Item>
                     <Menu.Item
                       leftSection={
-                        movementFilter === 'INBOUND' ? <IconCheck size={15} /> : undefined
+                        movementFilter === "INBOUND" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setMovementFilter('INBOUND')}
+                      onClick={() => setMovementFilter("INBOUND")}
                     >
                       Solo entradas
                     </Menu.Item>
                     <Menu.Item
                       leftSection={
-                        movementFilter === 'OUTBOUND' ? <IconCheck size={15} /> : undefined
+                        movementFilter === "OUTBOUND" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setMovementFilter('OUTBOUND')}
+                      onClick={() => setMovementFilter("OUTBOUND")}
                     >
                       Solo salidas
                     </Menu.Item>
@@ -846,35 +1019,42 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {!productMovements.isLoading && visibleTraceRows.length === 0 && (
-                      <EmptyTableRow
-                        columns={4}
-                        message={
-                          traceRows.length === 0
-                            ? 'Aún no hay movimientos para este producto.'
-                            : 'No hay movimientos con este filtro.'
-                        }
-                      />
-                    )}
+                    {!productMovements.isLoading &&
+                      visibleTraceRows.length === 0 && (
+                        <EmptyTableRow
+                          columns={4}
+                          message={
+                            traceRows.length === 0
+                              ? "Aún no hay movimientos para este producto."
+                              : "No hay movimientos con este filtro."
+                          }
+                        />
+                      )}
                     {visibleTraceRows.map((movement) => (
                       <Table.Tr key={movement.id}>
-                        <Table.Td>{new Date(movement.createdAt).toLocaleString('es-CO')}</Table.Td>
+                        <Table.Td>
+                          {new Date(movement.createdAt).toLocaleString("es-CO")}
+                        </Table.Td>
                         <Table.Td>
                           <Badge
                             variant="light"
                             color={
-                              movement.type.includes('OUT') ||
-                              movement.type === 'FIELD_ISSUE' ||
-                              movement.type === 'DAMAGE_OR_LOSS'
-                                ? 'red'
-                                : 'green'
+                              movement.type.includes("OUT") ||
+                              movement.type === "FIELD_ISSUE" ||
+                              movement.type === "DAMAGE_OR_LOSS"
+                                ? "red"
+                                : "green"
                             }
                           >
                             {movementTraceLabel(movement.type)}
                           </Badge>
                         </Table.Td>
-                        <Table.Td>{stockLocationLabel(movement.location)}</Table.Td>
-                        <Table.Td ta="right">{quantity(movement.quantityBase)}</Table.Td>
+                        <Table.Td>
+                          {stockLocationLabel(movement.location)}
+                        </Table.Td>
+                        <Table.Td ta="right">
+                          {quantity(movement.quantityBase)}
+                        </Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
@@ -900,7 +1080,10 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 </Group>
                 <Menu shadow="md" width={220} position="bottom-end">
                   <Menu.Target>
-                    <ActionIcon variant="subtle" aria-label="Filtrar envíos del producto">
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label="Filtrar envíos del producto"
+                    >
                       <IconFilter size={18} />
                     </ActionIcon>
                   </Menu.Target>
@@ -908,33 +1091,41 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     <Menu.Label>Filtrar envíos</Menu.Label>
                     <Menu.Item
                       leftSection={
-                        productShipmentFilter === 'ALL' ? <IconCheck size={15} /> : undefined
+                        productShipmentFilter === "ALL" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setProductShipmentFilter('ALL')}
+                      onClick={() => setProductShipmentFilter("ALL")}
                     >
                       Todos
                     </Menu.Item>
                     <Menu.Item
                       leftSection={
-                        productShipmentFilter === 'IN_TRANSIT' ? <IconCheck size={15} /> : undefined
+                        productShipmentFilter === "IN_TRANSIT" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setProductShipmentFilter('IN_TRANSIT')}
+                      onClick={() => setProductShipmentFilter("IN_TRANSIT")}
                     >
                       En tránsito
                     </Menu.Item>
                     <Menu.Item
                       leftSection={
-                        productShipmentFilter === 'RECEIVED' ? <IconCheck size={15} /> : undefined
+                        productShipmentFilter === "RECEIVED" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setProductShipmentFilter('RECEIVED')}
+                      onClick={() => setProductShipmentFilter("RECEIVED")}
                     >
                       Recibidos
                     </Menu.Item>
                     <Menu.Item
                       leftSection={
-                        productShipmentFilter === 'REVIEW' ? <IconCheck size={15} /> : undefined
+                        productShipmentFilter === "REVIEW" ? (
+                          <IconCheck size={15} />
+                        ) : undefined
                       }
-                      onClick={() => setProductShipmentFilter('REVIEW')}
+                      onClick={() => setProductShipmentFilter("REVIEW")}
                     >
                       Con discrepancia
                     </Menu.Item>
@@ -953,32 +1144,41 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {!shipments.isLoading && visibleProductShipments.length === 0 && (
-                      <EmptyTableRow
-                        columns={5}
-                        message={
-                          productShipments.length === 0
-                            ? 'Este producto aún no tiene envíos municipales.'
-                            : 'No hay envíos con este filtro.'
-                        }
-                      />
-                    )}
+                    {!shipments.isLoading &&
+                      visibleProductShipments.length === 0 && (
+                        <EmptyTableRow
+                          columns={5}
+                          message={
+                            productShipments.length === 0
+                              ? "Este producto aún no tiene envíos municipales."
+                              : "No hay envíos con este filtro."
+                          }
+                        />
+                      )}
                     {visibleProductShipments.flatMap((shipment) =>
                       shipment.items
                         .filter((item) => item.productId === detailProduct?.id)
                         .map((item) => (
                           <Table.Tr key={item.id}>
                             <Table.Td>
-                              {new Date(shipment.createdAt).toLocaleString('es-CO')}
+                              {new Date(shipment.createdAt).toLocaleString(
+                                "es-CO",
+                              )}
                             </Table.Td>
                             <Table.Td>
                               {shipment.destinationLocation.municipio?.name ??
                                 shipment.destinationLocation.name}
                             </Table.Td>
-                            <Table.Td ta="right">{quantity(item.quantityBase)}</Table.Td>
-                            <Table.Td ta="right">{quantity(item.receivedBase)}</Table.Td>
+                            <Table.Td ta="right">
+                              {quantity(item.quantityBase)}
+                            </Table.Td>
+                            <Table.Td ta="right">
+                              {quantity(item.receivedBase)}
+                            </Table.Td>
                             <Table.Td>
-                              <Badge variant="light">{shipment.status.replace(/_/g, ' ')}</Badge>
+                              <Badge variant="light">
+                                {shipment.status.replace(/_/g, " ")}
+                              </Badge>
                             </Table.Td>
                           </Table.Tr>
                         )),
@@ -997,11 +1197,14 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 >
                   Registrar ingreso
                 </Button>
-                <Button variant="default" onClick={() => setUnitProductId(detailProduct.id)}>
+                <Button
+                  variant="default"
+                  onClick={() => setUnitProductId(detailProduct.id)}
+                >
                   Agregar unidad
                 </Button>
                 <Button
-                  color={detailProduct.active ? 'red' : 'green'}
+                  color={detailProduct.active ? "red" : "green"}
                   variant="light"
                   loading={updateProduct.isPending}
                   onClick={() =>
@@ -1011,7 +1214,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     )
                   }
                 >
-                  {detailProduct.active ? 'Desactivar' : 'Activar'}
+                  {detailProduct.active ? "Desactivar" : "Activar"}
                 </Button>
               </Group>
             )}
@@ -1019,7 +1222,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
         </Modal>
         {canAdmin && entryOpened && (
           <StockEntryModal
-            key={entryProductId ?? 'new-entry'}
+            key={entryProductId ?? "new-entry"}
             opened={entryOpened}
             onClose={() => {
               setEntryOpened(false);
@@ -1040,7 +1243,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             onSubmit={productForm.onSubmit((values) =>
               createProduct.mutate(values, {
                 onSuccess: () => {
-                  success('Producto creado.');
+                  success("Producto creado.");
                   productForm.reset();
                   productModal.close();
                 },
@@ -1049,13 +1252,21 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             )}
           >
             <Stack>
-              <TextInput label="SKU" required {...productForm.getInputProps('sku')} />
-              <TextInput label="Nombre" required {...productForm.getInputProps('name')} />
+              <TextInput
+                label="SKU"
+                required
+                {...productForm.getInputProps("sku")}
+              />
+              <TextInput
+                label="Nombre"
+                required
+                {...productForm.getInputProps("name")}
+              />
               <Select
                 label="Unidad base"
                 required
                 data={INVENTORY_UNIT_OPTIONS}
-                {...productForm.getInputProps('baseUnitCode')}
+                {...productForm.getInputProps("baseUnitCode")}
               />
               <Button type="submit" loading={createProduct.isPending}>
                 Crear
@@ -1077,7 +1288,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 { id: unitProductId, ...values },
                 {
                   onSuccess: () => {
-                    success('Unidad agregada.');
+                    success("Unidad agregada.");
                     unitForm.reset();
                     setUnitProductId(null);
                   },
@@ -1093,35 +1304,38 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                 data={INVENTORY_UNIT_OPTIONS.filter(
                   (unit) => unit.value !== unitProduct?.baseUnitCode,
                 )}
-                {...unitForm.getInputProps('unitCode')}
+                {...unitForm.getInputProps("unitCode")}
                 onChange={(value) => {
-                  const unitCode = value ?? '';
-                  unitForm.setFieldValue('unitCode', unitCode);
+                  const unitCode = value ?? "";
+                  unitForm.setFieldValue("unitCode", unitCode);
                   unitForm.setFieldValue(
-                    'factorToBase',
+                    "factorToBase",
                     unitProduct
-                      ? (automaticFactorToBase(unitProduct.baseUnitCode, unitCode) ?? '')
-                      : '',
+                      ? (automaticFactorToBase(
+                          unitProduct.baseUnitCode,
+                          unitCode,
+                        ) ?? "")
+                      : "",
                   );
                 }}
               />
               {automaticUnitFactor !== null && (
                 <Text size="sm" c="dimmed">
-                  Conversión automática: 1 {unitForm.values.unitCode} equivale a{' '}
+                  Conversión automática: 1 {unitForm.values.unitCode} equivale a{" "}
                   {automaticUnitFactor} {unitProduct?.baseUnitCode}.
                 </Text>
               )}
               {unitForm.values.unitCode && automaticUnitFactor === null && (
                 <>
                   <Text size="sm" c="dimmed">
-                    Unidad base: {unitProduct?.baseUnitCode ?? 'sin definir'}.
+                    Unidad base: {unitProduct?.baseUnitCode ?? "sin definir"}.
                   </Text>
                   <TextInput
                     label="Equivale a cuantas unidades base"
                     description="Ejemplo: si la unidad base es UND y una CAJA trae 12 UND, escribi 12. Si equivale a una unidad, escribi 1."
                     inputMode="decimal"
                     required
-                    {...unitForm.getInputProps('factorToBase')}
+                    {...unitForm.getInputProps("factorToBase")}
                   />
                 </>
               )}
@@ -1149,54 +1363,63 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
   const resolveDiscrepancy = useResolveShipmentDiscrepancy();
   const [createOpened, createModal] = useDisclosure(false);
   const [confirmAction, setConfirmAction] = useState<{
-    kind: 'dispatch' | 'cancel';
+    kind: "dispatch" | "cancel";
     shipment: InventoryShipment;
   } | null>(null);
   const [reasonAction, setReasonAction] = useState<{
-    kind: 'return' | 'discrepancy';
+    kind: "return" | "discrepancy";
     shipment: InventoryShipment;
   } | null>(null);
-  const [shipmentDetail, setShipmentDetail] = useState<InventoryShipment | null>(null);
-  const [shipmentFilter, setShipmentFilter] = useState('ALL');
-  const [actionReason, setActionReason] = useState('');
+  const [shipmentDetail, setShipmentDetail] =
+    useState<InventoryShipment | null>(null);
+  const [shipmentFilter, setShipmentFilter] = useState("ALL");
+  const [actionReason, setActionReason] = useState("");
 
   const form = useForm({
     initialValues: {
-      originLocationId: '',
-      destinationLocationId: '',
-      receiverUserId: '',
-      notes: '',
-      items: [{ productId: '', unitVersionId: '', quantity: '' }],
+      originLocationId: "",
+      destinationLocationId: "",
+      receiverUserId: "",
+      notes: "",
+      items: [{ productId: "", unitVersionId: "", quantity: "" }],
     },
   });
   const centralLocation = locations.data?.find(
-    (location) => isOperationalInventoryLocation(location) && location.type === 'CENTRAL_WAREHOUSE',
+    (location) =>
+      isOperationalInventoryLocation(location) &&
+      location.type === "CENTRAL_WAREHOUSE",
   );
   const destination = locations.data?.find(
     (location) => location.id === form.values.destinationLocationId,
   );
-  const receivers = eligibleShipmentReceivers(destination, assignees.data ?? []);
+  const receivers = eligibleShipmentReceivers(
+    destination,
+    assignees.data ?? [],
+  );
   const availableProducts = availableProductIdsAtLocation(
     balances.data ?? [],
     form.values.originLocationId,
   );
   const visibleShipments = (shipments.data ?? []).filter((shipment) => {
-    if (shipmentFilter === 'DRAFT') return shipment.status === 'DRAFT';
-    if (shipmentFilter === 'IN_TRANSIT')
-      return ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status);
-    if (shipmentFilter === 'RECEIVED') return shipment.status === 'RECEIVED';
-    if (shipmentFilter === 'REVIEW') return shipment.status.includes('DISCREPANCY');
-    if (shipmentFilter === 'CLOSED')
-      return ['CANCELLED', 'RETURNED', 'CLOSED_WITH_DISCREPANCY'].includes(shipment.status);
+    if (shipmentFilter === "DRAFT") return shipment.status === "DRAFT";
+    if (shipmentFilter === "IN_TRANSIT")
+      return ["DISPATCHED", "PARTIALLY_RECEIVED"].includes(shipment.status);
+    if (shipmentFilter === "RECEIVED") return shipment.status === "RECEIVED";
+    if (shipmentFilter === "REVIEW")
+      return shipment.status.includes("DISCREPANCY");
+    if (shipmentFilter === "CLOSED")
+      return ["CANCELLED", "RETURNED", "CLOSED_WITH_DISCREPANCY"].includes(
+        shipment.status,
+      );
     return true;
   });
 
   const runConfirmedAction = () => {
     if (!confirmAction) return;
-    if (confirmAction.kind === 'cancel') {
+    if (confirmAction.kind === "cancel") {
       cancelShipment.mutate(confirmAction.shipment.id, {
         onSuccess: () => {
-          success('Envío cancelado.');
+          success("Envío cancelado.");
           setConfirmAction(null);
         },
         onError: failure,
@@ -1215,7 +1438,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
       {
         onSuccess: () => {
           clearInventoryCommandId(operationKey);
-          success('Envío despachado.');
+          success("Envío despachado.");
           setConfirmAction(null);
         },
         onError: failure,
@@ -1237,26 +1460,36 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
     const options = {
       onSuccess: () => {
         clearInventoryCommandId(operationKey);
-        success(reasonAction.kind === 'return' ? 'Remanente retornado.' : 'Discrepancia cerrada.');
+        success(
+          reasonAction.kind === "return"
+            ? "Remanente retornado."
+            : "Discrepancia cerrada.",
+        );
         setReasonAction(null);
-        setActionReason('');
+        setActionReason("");
       },
       onError: failure,
     };
-    if (reasonAction.kind === 'return') returnShipment.mutate(input, options);
+    if (reasonAction.kind === "return") returnShipment.mutate(input, options);
     else resolveDiscrepancy.mutate(input, options);
   };
 
   return (
     <QueryBoundary
-      queries={[shipments, products, locations, balances, ...(canAdmin ? [assignees] : [])]}
+      queries={[
+        shipments,
+        products,
+        locations,
+        balances,
+        ...(canAdmin ? [assignees] : []),
+      ]}
     >
       <Stack>
         {canAdmin && (
           <Button
             leftSection={<IconPlus size={16} />}
             onClick={() => {
-              form.setFieldValue('originLocationId', centralLocation?.id ?? '');
+              form.setFieldValue("originLocationId", centralLocation?.id ?? "");
               createModal.open();
             }}
             w="fit-content"
@@ -1276,47 +1509,73 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
             </div>
             <Menu shadow="md" width={230} position="bottom-end">
               <Menu.Target>
-                <ActionIcon variant="light" size="lg" aria-label="Filtrar envíos">
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  aria-label="Filtrar envíos"
+                >
                   <IconFilter size={19} />
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>Filtrar envíos</Menu.Label>
                 <Menu.Item
-                  leftSection={shipmentFilter === 'ALL' ? <IconCheck size={15} /> : undefined}
-                  onClick={() => setShipmentFilter('ALL')}
+                  leftSection={
+                    shipmentFilter === "ALL" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
+                  }
+                  onClick={() => setShipmentFilter("ALL")}
                 >
                   Todos
                 </Menu.Item>
                 <Menu.Item
-                  leftSection={shipmentFilter === 'DRAFT' ? <IconCheck size={15} /> : undefined}
-                  onClick={() => setShipmentFilter('DRAFT')}
+                  leftSection={
+                    shipmentFilter === "DRAFT" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
+                  }
+                  onClick={() => setShipmentFilter("DRAFT")}
                 >
                   Borradores
                 </Menu.Item>
                 <Menu.Item
                   leftSection={
-                    shipmentFilter === 'IN_TRANSIT' ? <IconCheck size={15} /> : undefined
+                    shipmentFilter === "IN_TRANSIT" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
                   }
-                  onClick={() => setShipmentFilter('IN_TRANSIT')}
+                  onClick={() => setShipmentFilter("IN_TRANSIT")}
                 >
                   En tránsito
                 </Menu.Item>
                 <Menu.Item
-                  leftSection={shipmentFilter === 'RECEIVED' ? <IconCheck size={15} /> : undefined}
-                  onClick={() => setShipmentFilter('RECEIVED')}
+                  leftSection={
+                    shipmentFilter === "RECEIVED" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
+                  }
+                  onClick={() => setShipmentFilter("RECEIVED")}
                 >
                   Recibidos
                 </Menu.Item>
                 <Menu.Item
-                  leftSection={shipmentFilter === 'REVIEW' ? <IconCheck size={15} /> : undefined}
-                  onClick={() => setShipmentFilter('REVIEW')}
+                  leftSection={
+                    shipmentFilter === "REVIEW" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
+                  }
+                  onClick={() => setShipmentFilter("REVIEW")}
                 >
                   Con discrepancia
                 </Menu.Item>
                 <Menu.Item
-                  leftSection={shipmentFilter === 'CLOSED' ? <IconCheck size={15} /> : undefined}
-                  onClick={() => setShipmentFilter('CLOSED')}
+                  leftSection={
+                    shipmentFilter === "CLOSED" ? (
+                      <IconCheck size={15} />
+                    ) : undefined
+                  }
+                  onClick={() => setShipmentFilter("CLOSED")}
                 >
                   Cerrados o cancelados
                 </Menu.Item>
@@ -1339,60 +1598,77 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
               </Table.Thead>
               <Table.Tbody>
                 {shipments.data?.length === 0 && (
-                  <EmptyTableRow columns={8} message="No hay asignaciones registradas." />
+                  <EmptyTableRow
+                    columns={8}
+                    message="No hay asignaciones registradas."
+                  />
                 )}
-                {shipments.data && shipments.data.length > 0 && visibleShipments.length === 0 && (
-                  <EmptyTableRow columns={8} message="No hay envíos con este filtro." />
-                )}
+                {shipments.data &&
+                  shipments.data.length > 0 &&
+                  visibleShipments.length === 0 && (
+                    <EmptyTableRow
+                      columns={8}
+                      message="No hay envíos con este filtro."
+                    />
+                  )}
                 {visibleShipments.map((shipment) => (
                   <Table.Tr
                     key={shipment.id}
                     role="button"
                     tabIndex={0}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: "pointer" }}
                     onClick={() => setShipmentDetail(shipment)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
+                      if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         setShipmentDetail(shipment);
                       }
                     }}
                   >
                     <Table.Td fw={600}>{shipment.code}</Table.Td>
-                    <Table.Td>{stockLocationLabel(shipment.originLocation)}</Table.Td>
+                    <Table.Td>
+                      {stockLocationLabel(shipment.originLocation)}
+                    </Table.Td>
                     <Table.Td>
                       {shipment.destinationLocation.municipio?.name ??
                         shipment.destinationLocation.name}
                     </Table.Td>
                     <Table.Td>
-                      {shipment.receiver?.displayName ?? shipment.receiver?.email ?? 'Sin asignar'}
+                      {shipment.receiver?.displayName ??
+                        shipment.receiver?.email ??
+                        "Sin asignar"}
                     </Table.Td>
                     <Table.Td>
                       <Badge
                         color={
-                          shipment.status.includes('DISCREPANCY')
-                            ? 'red'
-                            : shipment.status === 'RECEIVED'
-                              ? 'green'
-                              : shipment.status === 'DRAFT'
-                                ? 'gray'
-                                : 'blue'
+                          shipment.status.includes("DISCREPANCY")
+                            ? "red"
+                            : shipment.status === "RECEIVED"
+                              ? "green"
+                              : shipment.status === "DRAFT"
+                                ? "gray"
+                                : "blue"
                         }
                       >
-                        {shipment.status.replace(/_/g, ' ')}
+                        {shipment.status.replace(/_/g, " ")}
                       </Badge>
                     </Table.Td>
                     <Table.Td>{shipment.items.length}</Table.Td>
-                    <Table.Td>{new Date(shipment.createdAt).toLocaleString('es-CO')}</Table.Td>
+                    <Table.Td>
+                      {new Date(shipment.createdAt).toLocaleString("es-CO")}
+                    </Table.Td>
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap">
-                        {canAdmin && shipment.status === 'DRAFT' && (
+                        {canAdmin && shipment.status === "DRAFT" && (
                           <>
                             <Button
                               size="xs"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setConfirmAction({ kind: 'dispatch', shipment });
+                                setConfirmAction({
+                                  kind: "dispatch",
+                                  shipment,
+                                });
                               }}
                             >
                               Despachar
@@ -1403,7 +1679,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                               color="red"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setConfirmAction({ kind: 'cancel', shipment });
+                                setConfirmAction({ kind: "cancel", shipment });
                               }}
                             >
                               Cancelar
@@ -1411,32 +1687,38 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                           </>
                         )}
                         {canAdmin &&
-                          ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(shipment.status) && (
+                          ["DISPATCHED", "PARTIALLY_RECEIVED"].includes(
+                            shipment.status,
+                          ) && (
                             <Button
                               size="xs"
                               variant="subtle"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setActionReason('');
-                                setReasonAction({ kind: 'return', shipment });
+                                setActionReason("");
+                                setReasonAction({ kind: "return", shipment });
                               }}
                             >
                               Retornar
                             </Button>
                           )}
-                        {canAdmin && shipment.status === 'DISCREPANCY_REVIEW' && (
-                          <Button
-                            size="xs"
-                            color="orange"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setActionReason('');
-                              setReasonAction({ kind: 'discrepancy', shipment });
-                            }}
-                          >
-                            Resolver
-                          </Button>
-                        )}
+                        {canAdmin &&
+                          shipment.status === "DISCREPANCY_REVIEW" && (
+                            <Button
+                              size="xs"
+                              color="orange"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setActionReason("");
+                                setReasonAction({
+                                  kind: "discrepancy",
+                                  shipment,
+                                });
+                              }}
+                            >
+                              Resolver
+                            </Button>
+                          )}
                       </Group>
                     </Table.Td>
                   </Table.Tr>
@@ -1449,70 +1731,200 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
         <Modal
           opened={shipmentDetail !== null}
           onClose={() => setShipmentDetail(null)}
-          title={shipmentDetail ? `Detalle del envío ${shipmentDetail.code}` : 'Detalle del envío'}
+          title={
+            shipmentDetail
+              ? `Detalle del envío ${shipmentDetail.code}`
+              : "Detalle del envío"
+          }
           size="xl"
         >
           {shipmentDetail && (
-            <Stack gap="md">
+            <Stack gap="lg">
+              <Card
+                radius="lg"
+                p="xl"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1f2937 0%, #334155 58%, #0f766e 150%)",
+                  color: "white",
+                  boxShadow: "0 14px 32px rgba(15, 23, 42, 0.18)",
+                }}
+              >
+                <Group justify="space-between" align="flex-start" wrap="wrap">
+                  <Group gap="md">
+                    <ThemeIcon
+                      size={52}
+                      radius="xl"
+                      variant="white"
+                      color="dark"
+                    >
+                      <IconTruckDelivery size={28} />
+                    </ThemeIcon>
+                    <div>
+                      <Text size="xs" tt="uppercase" fw={700} c="gray.3">
+                        Seguimiento de asignación
+                      </Text>
+                      <Title order={3} c="white">
+                        {shipmentDetail.code}
+                      </Title>
+                      <Text size="sm" c="gray.2">
+                        {stockLocationLabel(shipmentDetail.originLocation)} →{" "}
+                        {shipmentDetail.destinationLocation.municipio?.name ??
+                          shipmentDetail.destinationLocation.name}
+                      </Text>
+                    </div>
+                  </Group>
+                  <Badge
+                    variant="white"
+                    color={shipmentStatusColor(shipmentDetail.status)}
+                    size="lg"
+                  >
+                    {shipmentStatusLabel(shipmentDetail.status)}
+                  </Badge>
+                </Group>
+                <SimpleGrid cols={{ base: 1, sm: 3 }} mt="lg">
+                  <Card
+                    radius="md"
+                    p="md"
+                    style={{
+                      background: "rgba(255,255,255,0.13)",
+                      color: "white",
+                    }}
+                  >
+                    <Text size="xs" c="gray.3">
+                      Productos
+                    </Text>
+                    <Text size="xl" fw={800}>
+                      {shipmentDetail.items.length}
+                    </Text>
+                  </Card>
+                  <Card
+                    radius="md"
+                    p="md"
+                    style={{
+                      background: "rgba(255,255,255,0.13)",
+                      color: "white",
+                    }}
+                  >
+                    <Text size="xs" c="gray.3">
+                      Responsable de recibir
+                    </Text>
+                    <Text fw={700} lineClamp={1}>
+                      {shipmentDetail.receiver?.displayName ??
+                        shipmentDetail.receiver?.email ??
+                        "Sin asignar"}
+                    </Text>
+                  </Card>
+                  <Card
+                    radius="md"
+                    p="md"
+                    style={{
+                      background: "rgba(255,255,255,0.13)",
+                      color: "white",
+                    }}
+                  >
+                    <Text size="xs" c="gray.3">
+                      Destino
+                    </Text>
+                    <Text fw={700} lineClamp={1}>
+                      {shipmentDetail.destinationLocation.municipio?.name ??
+                        shipmentDetail.destinationLocation.name}
+                    </Text>
+                  </Card>
+                </SimpleGrid>
+              </Card>
+
               <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                <Card withBorder>
-                  <Text size="xs" c="dimmed">
+                <Card withBorder radius="md" p="md">
+                  <Text size="xs" tt="uppercase" fw={700} c="dimmed">
                     Origen
                   </Text>
-                  <Text fw={600}>{stockLocationLabel(shipmentDetail.originLocation)}</Text>
+                  <Text fw={700} mt={4}>
+                    {stockLocationLabel(shipmentDetail.originLocation)}
+                  </Text>
                 </Card>
-                <Card withBorder>
-                  <Text size="xs" c="dimmed">
+                <Card withBorder radius="md" p="md">
+                  <Text size="xs" tt="uppercase" fw={700} c="dimmed">
                     Municipio destino
                   </Text>
-                  <Text fw={600}>
+                  <Text fw={700} mt={4}>
                     {shipmentDetail.destinationLocation.municipio?.name ??
                       shipmentDetail.destinationLocation.name}
                   </Text>
                 </Card>
-                <Card withBorder>
-                  <Text size="xs" c="dimmed">
-                    Responsable
-                  </Text>
-                  <Text fw={600}>
-                    {shipmentDetail.receiver?.displayName ??
-                      shipmentDetail.receiver?.email ??
-                      'Sin asignar'}
-                  </Text>
-                </Card>
-                <Card withBorder>
-                  <Text size="xs" c="dimmed">
-                    Estado
-                  </Text>
-                  <Badge
-                    color={
-                      shipmentDetail.status.includes('DISCREPANCY')
-                        ? 'red'
-                        : shipmentDetail.status === 'RECEIVED'
-                          ? 'green'
-                          : shipmentDetail.status === 'DRAFT'
-                            ? 'gray'
-                            : 'blue'
-                    }
-                  >
-                    {shipmentDetail.status.replace(/_/g, ' ')}
-                  </Badge>
-                </Card>
               </SimpleGrid>
-              <Text size="sm">
-                Creado: {new Date(shipmentDetail.createdAt).toLocaleString('es-CO')}
-              </Text>
-              {shipmentDetail.dispatchedAt && (
-                <Text size="sm">
-                  Despachado: {new Date(shipmentDetail.dispatchedAt).toLocaleString('es-CO')}
-                </Text>
+
+              <Card withBorder radius="md" p="lg">
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Text fw={700}>Historial del envío</Text>
+                    <Text size="sm" c="dimmed">
+                      Estado y tiempos registrados para esta asignación.
+                    </Text>
+                  </div>
+                  <ThemeIcon variant="light" color="teal" radius="xl">
+                    <IconClock size={18} />
+                  </ThemeIcon>
+                </Group>
+                <Timeline
+                  active={
+                    shipmentHasReceipt(shipmentDetail)
+                      ? 2
+                      : shipmentDetail.dispatchedAt
+                        ? 1
+                        : 0
+                  }
+                  bulletSize={28}
+                  lineWidth={2}
+                >
+                  <Timeline.Item
+                    bullet={<IconPackage size={15} />}
+                    title="Asignación creada"
+                  >
+                    <Text size="sm" c="dimmed">
+                      {formatDateTime(shipmentDetail.createdAt)}
+                    </Text>
+                  </Timeline.Item>
+                  <Timeline.Item
+                    bullet={<IconTruckDelivery size={15} />}
+                    title="Envío despachado"
+                  >
+                    <Text size="sm" c="dimmed">
+                      {shipmentDetail.dispatchedAt
+                        ? formatDateTime(shipmentDetail.dispatchedAt)
+                        : "Pendiente de despacho desde Compras"}
+                    </Text>
+                  </Timeline.Item>
+                  <Timeline.Item
+                    bullet={<IconCircleCheck size={15} />}
+                    title={
+                      shipmentHasReceipt(shipmentDetail)
+                        ? "Recepción registrada"
+                        : "Pendiente de recepción"
+                    }
+                    color={shipmentHasReceipt(shipmentDetail) ? "teal" : "gray"}
+                  >
+                    <Text size="sm" c="dimmed">
+                      {shipmentHasReceipt(shipmentDetail)
+                        ? formatDateTime(shipmentDetail.completedAt) +
+                          " · Confirmación del responsable asignado"
+                        : "El responsable asignado debe confirmar desde la aplicación con biometría."}
+                    </Text>
+                  </Timeline.Item>
+                </Timeline>
+              </Card>
+
+              {shipmentDetail.notes && (
+                <Card withBorder radius="md" p="md">
+                  <Text size="xs" tt="uppercase" fw={700} c="dimmed">
+                    Observaciones
+                  </Text>
+                  <Text size="sm" mt={4}>
+                    {shipmentDetail.notes}
+                  </Text>
+                </Card>
               )}
-              {shipmentDetail.completedAt && (
-                <Text size="sm">
-                  Completado: {new Date(shipmentDetail.completedAt).toLocaleString('es-CO')}
-                </Text>
-              )}
-              {shipmentDetail.notes && <Text size="sm">Notas: {shipmentDetail.notes}</Text>}
+
               <Divider label="Productos asignados" />
               <ScrollArea type="always" h={260} scrollbarSize={10}>
                 <Table striped miw={620}>
@@ -1531,8 +1943,12 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                         <Table.Td>{item.product.sku}</Table.Td>
                         <Table.Td>{item.product.name}</Table.Td>
                         <Table.Td>{item.unitVersion.unitCode}</Table.Td>
-                        <Table.Td ta="right">{quantity(item.quantityBase)}</Table.Td>
-                        <Table.Td ta="right">{quantity(item.receivedBase)}</Table.Td>
+                        <Table.Td ta="right">
+                          {quantity(item.quantityBase)}
+                        </Table.Td>
+                        <Table.Td ta="right">
+                          {quantity(item.receivedBase)}
+                        </Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>
@@ -1552,7 +1968,9 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
             onSubmit={form.onSubmit((values) =>
               createShipment.mutate(values, {
                 onSuccess: () => {
-                  success('Asignación creada. Confirma el envío cuando salga de compras.');
+                  success(
+                    "Asignación creada. Confirma el envío cuando salga de compras.",
+                  );
                   form.reset();
                   createModal.close();
                 },
@@ -1564,7 +1982,11 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
               <TextInput
                 readOnly
                 label="Bodega central de origen"
-                value={centralLocation ? `${centralLocation.code} · ${centralLocation.name}` : ''}
+                value={
+                  centralLocation
+                    ? `${centralLocation.code} · ${centralLocation.name}`
+                    : ""
+                }
                 description="Origen fijo de todas las asignaciones municipales."
               />
               <Select
@@ -1574,13 +1996,17 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                 data={(locations.data ?? [])
                   .filter(
                     (item) =>
-                      isOperationalInventoryLocation(item) && item.type === 'MUNICIPAL_WAREHOUSE',
+                      isOperationalInventoryLocation(item) &&
+                      item.type === "MUNICIPAL_WAREHOUSE",
                   )
-                  .map((item) => ({ value: item.id, label: item.municipio?.name ?? item.name }))}
-                {...form.getInputProps('destinationLocationId')}
+                  .map((item) => ({
+                    value: item.id,
+                    label: item.municipio?.name ?? item.name,
+                  }))}
+                {...form.getInputProps("destinationLocationId")}
                 onChange={(value) => {
-                  form.setFieldValue('destinationLocationId', value ?? '');
-                  form.setFieldValue('receiverUserId', '');
+                  form.setFieldValue("destinationLocationId", value ?? "");
+                  form.setFieldValue("receiverUserId", "");
                 }}
               />
               <Select
@@ -1591,14 +2017,16 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                 description="Supervisor del municipio o coordinador de su zona. La recepción se confirma desde el teléfono con biometría."
                 data={receivers.map((item) => ({
                   value: item.id,
-                  label: `${item.displayName ?? item.email} · ${item.role === 'SUPERVISOR' ? 'Supervisor' : 'Coordinador de zona'}`,
+                  label: `${item.displayName ?? item.email} · ${item.role === "SUPERVISOR" ? "Supervisor" : "Coordinador de zona"}`,
                 }))}
-                {...form.getInputProps('receiverUserId')}
+                {...form.getInputProps("receiverUserId")}
               />
-              <TextInput label="Notas" {...form.getInputProps('notes')} />
+              <TextInput label="Notas" {...form.getInputProps("notes")} />
               <Divider label="Productos" />
               {form.values.items.map((line, index) => {
-                const product = products.data?.find((item) => item.id === line.productId);
+                const product = products.data?.find(
+                  (item) => item.id === line.productId,
+                );
                 return (
                   <Grid key={index} align="end">
                     <Grid.Col span={{ base: 12, sm: 5 }}>
@@ -1608,16 +2036,28 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                         disabled={!form.values.originLocationId}
                         nothingFoundMessage={
                           form.values.originLocationId
-                            ? 'No hay productos con saldo disponible en esta bodega.'
-                            : 'Selecciona primero la bodega central.'
+                            ? "No hay productos con saldo disponible en esta bodega."
+                            : "Selecciona primero la bodega central."
                         }
                         data={(products.data ?? [])
-                          .filter((item) => item.active && availableProducts.has(item.id))
-                          .map((item) => ({ value: item.id, label: `${item.sku} ? ${item.name}` }))}
+                          .filter(
+                            (item) =>
+                              item.active && availableProducts.has(item.id),
+                          )
+                          .map((item) => ({
+                            value: item.id,
+                            label: `${item.sku} ? ${item.name}`,
+                          }))}
                         {...form.getInputProps(`items.${index}.productId`)}
                         onChange={(value) => {
-                          form.setFieldValue(`items.${index}.productId`, value ?? '');
-                          form.setFieldValue(`items.${index}.unitVersionId`, '');
+                          form.setFieldValue(
+                            `items.${index}.productId`,
+                            value ?? "",
+                          );
+                          form.setFieldValue(
+                            `items.${index}.unitVersionId`,
+                            "",
+                          );
                         }}
                       />
                     </Grid.Col>
@@ -1626,7 +2066,10 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                         label="Unidad"
                         data={(product?.unitVersions ?? [])
                           .filter((unit) => !unit.validUntil)
-                          .map((unit) => ({ value: unit.id, label: unit.unitCode }))}
+                          .map((unit) => ({
+                            value: unit.id,
+                            label: unit.unitCode,
+                          }))}
                         {...form.getInputProps(`items.${index}.unitVersionId`)}
                       />
                     </Grid.Col>
@@ -1642,7 +2085,7 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
                         color="red"
                         variant="subtle"
                         disabled={form.values.items.length === 1}
-                        onClick={() => form.removeListItem('items', index)}
+                        onClick={() => form.removeListItem("items", index)}
                       >
                         ×
                       </Button>
@@ -1653,7 +2096,11 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
               <Button
                 variant="default"
                 onClick={() =>
-                  form.insertListItem('items', { productId: '', unitVersionId: '', quantity: '' })
+                  form.insertListItem("items", {
+                    productId: "",
+                    unitVersionId: "",
+                    quantity: "",
+                  })
                 }
               >
                 Agregar línea
@@ -1669,21 +2116,23 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
           opened={confirmAction !== null}
           onClose={() => setConfirmAction(null)}
           title={
-            confirmAction?.kind === 'dispatch' ? 'Confirmar despacho' : 'Confirmar cancelación'
+            confirmAction?.kind === "dispatch"
+              ? "Confirmar despacho"
+              : "Confirmar cancelación"
           }
         >
           <Stack>
             <Text>
-              {confirmAction?.kind === 'dispatch'
+              {confirmAction?.kind === "dispatch"
                 ? `El envío ${confirmAction.shipment.code} descontará existencias del origen y quedará en tránsito.`
-                : `El borrador ${confirmAction?.shipment.code ?? ''} quedará cancelado.`}
+                : `El borrador ${confirmAction?.shipment.code ?? ""} quedará cancelado.`}
             </Text>
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setConfirmAction(null)}>
                 Volver
               </Button>
               <Button
-                color={confirmAction?.kind === 'cancel' ? 'red' : 'blue'}
+                color={confirmAction?.kind === "cancel" ? "red" : "blue"}
                 loading={dispatchShipment.isPending || cancelShipment.isPending}
                 onClick={runConfirmedAction}
               >
@@ -1696,7 +2145,11 @@ function ShipmentsPanel({ canAdmin }: { canAdmin: boolean }) {
         <Modal
           opened={reasonAction !== null}
           onClose={() => setReasonAction(null)}
-          title={reasonAction?.kind === 'return' ? 'Retornar remanente' : 'Resolver discrepancia'}
+          title={
+            reasonAction?.kind === "return"
+              ? "Retornar remanente"
+              : "Resolver discrepancia"
+          }
         >
           <Stack>
             <TextInput
@@ -1730,8 +2183,10 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
   const [selected, setSelected] = useState<InventoryCount | null>(null);
   const [counted, setCounted] = useState<Record<string, string>>({});
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [approveTarget, setApproveTarget] = useState<InventoryCount | null>(null);
-  const [approvalReason, setApprovalReason] = useState('');
+  const [approveTarget, setApproveTarget] = useState<InventoryCount | null>(
+    null,
+  );
+  const [approvalReason, setApprovalReason] = useState("");
 
   const openDetail = async (id: string) => {
     setLoadingDetail(true);
@@ -1740,7 +2195,10 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
       setSelected(detail);
       setCounted(
         Object.fromEntries(
-          (detail.lines ?? []).map((line) => [line.productId, line.countedBase ?? '']),
+          (detail.lines ?? []).map((line) => [
+            line.productId,
+            line.countedBase ?? "",
+          ]),
         ),
       );
     } catch (error) {
@@ -1765,9 +2223,9 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
       {
         onSuccess: () => {
           clearInventoryCommandId(operationKey);
-          success('Conteo ajustado y cerrado.');
+          success("Conteo ajustado y cerrado.");
           setApproveTarget(null);
-          setApprovalReason('');
+          setApprovalReason("");
         },
         onError: failure,
       },
@@ -1786,7 +2244,10 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
               onChange={setLocationId}
               data={(locations.data ?? [])
                 .filter(isOperationalInventoryLocation)
-                .map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))}
+                .map((item) => ({
+                  value: item.id,
+                  label: `${item.code} · ${item.name}`,
+                }))}
               style={{ flex: 1 }}
             />
             <Button
@@ -1796,7 +2257,7 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                 locationId &&
                 openCount.mutate(locationId, {
                   onSuccess: () => {
-                    success('Conteo abierto con snapshot de saldos.');
+                    success("Conteo abierto con snapshot de saldos.");
                     setLocationId(null);
                   },
                   onError: failure,
@@ -1823,28 +2284,41 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
               </Table.Thead>
               <Table.Tbody>
                 {counts.data?.length === 0 && (
-                  <EmptyTableRow columns={6} message="No hay conteos registrados." />
+                  <EmptyTableRow
+                    columns={6}
+                    message="No hay conteos registrados."
+                  />
                 )}
                 {counts.data?.map((count) => (
                   <Table.Tr key={count.id}>
                     <Table.Td>{count.location.code}</Table.Td>
-                    <Table.Td>{count.counter.displayName ?? count.counter.email}</Table.Td>
-                    <Table.Td>{new Date(count.cutoffAt).toLocaleString('es-CO')}</Table.Td>
+                    <Table.Td>
+                      {count.counter.displayName ?? count.counter.email}
+                    </Table.Td>
+                    <Table.Td>
+                      {new Date(count.cutoffAt).toLocaleString("es-CO")}
+                    </Table.Td>
                     <Table.Td>
                       <Badge>{count.status}</Badge>
                     </Table.Td>
-                    <Table.Td>{count._count?.lines ?? count.lines?.length ?? 0}</Table.Td>
+                    <Table.Td>
+                      {count._count?.lines ?? count.lines?.length ?? 0}
+                    </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
-                        <Button size="xs" variant="light" onClick={() => openDetail(count.id)}>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          onClick={() => openDetail(count.id)}
+                        >
                           Detalle
                         </Button>
-                        {canApprove && count.status === 'SUBMITTED' && (
+                        {canApprove && count.status === "SUBMITTED" && (
                           <Button
                             size="xs"
                             color="green"
                             onClick={() => {
-                              setApprovalReason('');
+                              setApprovalReason("");
                               setApproveTarget(count);
                             }}
                           >
@@ -1863,11 +2337,11 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
         <Modal
           opened={selected !== null}
           onClose={() => setSelected(null)}
-          title={`Conteo ${selected?.location.code ?? ''}`}
+          title={`Conteo ${selected?.location.code ?? ""}`}
           size="xl"
         >
           <Stack>
-            {selected?.status === 'OPEN' && (
+            {selected?.status === "OPEN" && (
               <Alert color="blue">
                 Conteo ciego: el saldo esperado permanece oculto hasta enviar.
               </Alert>
@@ -1877,9 +2351,13 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Producto</Table.Th>
-                    {selected?.status !== 'OPEN' && <Table.Th ta="right">Esperado</Table.Th>}
+                    {selected?.status !== "OPEN" && (
+                      <Table.Th ta="right">Esperado</Table.Th>
+                    )}
                     <Table.Th ta="right">Contado</Table.Th>
-                    {selected?.status !== 'OPEN' && <Table.Th ta="right">Diferencia</Table.Th>}
+                    {selected?.status !== "OPEN" && (
+                      <Table.Th ta="right">Diferencia</Table.Th>
+                    )}
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -1888,15 +2366,17 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                       <Table.Td>
                         {line.product.sku} · {line.product.name}
                       </Table.Td>
-                      {selected.status !== 'OPEN' && (
-                        <Table.Td ta="right">{quantity(line.expectedBase)}</Table.Td>
+                      {selected.status !== "OPEN" && (
+                        <Table.Td ta="right">
+                          {quantity(line.expectedBase)}
+                        </Table.Td>
                       )}
                       <Table.Td ta="right">
-                        {selected.status === 'OPEN' ? (
+                        {selected.status === "OPEN" ? (
                           <TextInput
                             aria-label={`Cantidad contada de ${line.product.name}`}
                             inputMode="decimal"
-                            value={counted[line.productId] ?? ''}
+                            value={counted[line.productId] ?? ""}
                             onChange={(event) =>
                               setCounted((current) => ({
                                 ...current,
@@ -1908,15 +2388,17 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                           quantity(line.countedBase)
                         )}
                       </Table.Td>
-                      {selected.status !== 'OPEN' && (
-                        <Table.Td ta="right">{quantity(line.differenceBase)}</Table.Td>
+                      {selected.status !== "OPEN" && (
+                        <Table.Td ta="right">
+                          {quantity(line.differenceBase)}
+                        </Table.Td>
                       )}
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
               </Table>
             </ScrollArea>
-            {selected?.status === 'OPEN' && (
+            {selected?.status === "OPEN" && (
               <Group justify="flex-end">
                 <Button
                   variant="default"
@@ -1927,12 +2409,12 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                         id: selected.id,
                         lines: (selected.lines ?? []).map((line) => ({
                           productId: line.productId,
-                          countedBase: counted[line.productId] ?? '',
+                          countedBase: counted[line.productId] ?? "",
                         })),
                       },
                       {
                         onSuccess: async () => {
-                          success('Conteo guardado.');
+                          success("Conteo guardado.");
                           await openDetail(selected.id);
                         },
                         onError: failure,
@@ -1947,7 +2429,7 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
                   onClick={() =>
                     submitCount.mutate(selected.id, {
                       onSuccess: () => {
-                        success('Conteo enviado para aprobación.');
+                        success("Conteo enviado para aprobación.");
                         setSelected(null);
                       },
                       onError: failure,
@@ -1964,12 +2446,12 @@ function CountsPanel({ canApprove }: { canApprove: boolean }) {
         <Modal
           opened={approveTarget !== null}
           onClose={() => setApproveTarget(null)}
-          title={`Aprobar conteo ${approveTarget?.location.code ?? ''}`}
+          title={`Aprobar conteo ${approveTarget?.location.code ?? ""}`}
         >
           <Stack>
             <Alert color="orange">
-              La aprobación genera movimientos de ajuste inmutables. Verificá las diferencias antes
-              de continuar.
+              La aprobación genera movimientos de ajuste inmutables. Verificá
+              las diferencias antes de continuar.
             </Alert>
             <TextInput
               label="Motivo de aprobación"
@@ -1998,7 +2480,11 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
   const resolve = useResolveCommand();
   const [selected, setSelected] = useState<InventoryReviewCommand | null>(null);
   const form = useForm({
-    initialValues: { action: 'APPROVE' as 'APPROVE' | 'DISMISS', reason: '', locationId: '' },
+    initialValues: {
+      action: "APPROVE" as "APPROVE" | "DISMISS",
+      reason: "",
+      locationId: "",
+    },
   });
 
   if (!canReview)
@@ -2026,17 +2512,26 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
               </Table.Thead>
               <Table.Tbody>
                 {reviews.data?.length === 0 && (
-                  <EmptyTableRow columns={6} message="No hay eventos pendientes de revisión." />
+                  <EmptyTableRow
+                    columns={6}
+                    message="No hay eventos pendientes de revisión."
+                  />
                 )}
                 {reviews.data?.map((review) => (
                   <Table.Tr key={review.id}>
-                    <Table.Td>{new Date(review.receivedAt).toLocaleString('es-CO')}</Table.Td>
-                    <Table.Td>{review.actor.displayName ?? review.actor.email}</Table.Td>
+                    <Table.Td>
+                      {new Date(review.receivedAt).toLocaleString("es-CO")}
+                    </Table.Td>
+                    <Table.Td>
+                      {review.actor.displayName ?? review.actor.email}
+                    </Table.Td>
                     <Table.Td>{review.type}</Table.Td>
                     <Table.Td>
                       <Badge color="orange">{review.reviewCode}</Badge>
                     </Table.Td>
-                    <Table.Td>{review.location?.code ?? 'Sin resolver'}</Table.Td>
+                    <Table.Td>
+                      {review.location?.code ?? "Sin resolver"}
+                    </Table.Td>
                     <Table.Td>
                       {canReview && (
                         <Button
@@ -2044,9 +2539,9 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
                           onClick={() => {
                             setSelected(review);
                             form.setValues({
-                              action: 'APPROVE',
-                              reason: '',
-                              locationId: review.location?.id ?? '',
+                              action: "APPROVE",
+                              reason: "",
+                              locationId: review.location?.id ?? "",
                             });
                           }}
                         >
@@ -2078,14 +2573,17 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
             resolve.mutate(
               {
                 id: selected.id,
-                clientCommandId: stableInventoryCommandId(operationKey, payload),
+                clientCommandId: stableInventoryCommandId(
+                  operationKey,
+                  payload,
+                ),
                 ...values,
                 locationId: values.locationId || undefined,
               },
               {
                 onSuccess: () => {
                   clearInventoryCommandId(operationKey);
-                  success('Evento resuelto con trazabilidad.');
+                  success("Evento resuelto con trazabilidad.");
                   setSelected(null);
                   form.reset();
                 },
@@ -2098,21 +2596,28 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
             <Select
               label="Decisión"
               data={[
-                { value: 'APPROVE', label: 'Aprobar y aplicar' },
-                { value: 'DISMISS', label: 'Descartar sin efecto' },
+                { value: "APPROVE", label: "Aprobar y aplicar" },
+                { value: "DISMISS", label: "Descartar sin efecto" },
               ]}
-              {...form.getInputProps('action')}
+              {...form.getInputProps("action")}
             />
-            <TextInput label="Motivo obligatorio" required {...form.getInputProps('reason')} />
-            {form.values.action === 'APPROVE' && (
+            <TextInput
+              label="Motivo obligatorio"
+              required
+              {...form.getInputProps("reason")}
+            />
+            {form.values.action === "APPROVE" && (
               <Select
                 searchable
                 clearable
                 label="Ubicación autorizada"
                 data={(locations.data ?? [])
                   .filter(isOperationalInventoryLocation)
-                  .map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))}
-                {...form.getInputProps('locationId')}
+                  .map((item) => ({
+                    value: item.id,
+                    label: `${item.code} · ${item.name}`,
+                  }))}
+                {...form.getInputProps("locationId")}
               />
             )}
             <Button type="submit" loading={resolve.isPending}>
@@ -2128,8 +2633,11 @@ function ReviewsPanel({ canReview }: { canReview: boolean }) {
 function MovementsPanel({ canAdmin }: { canAdmin: boolean }) {
   const movements = useInventoryMovements();
   const reverse = useReverseMovement();
-  const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string } | null>(null);
-  const [reason, setReason] = useState('');
+  const [reverseTarget, setReverseTarget] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [reason, setReason] = useState("");
   const rows = movements.data?.pages.flatMap((page) => page.items) ?? [];
 
   const submitReverse = () => {
@@ -2147,9 +2655,9 @@ function MovementsPanel({ canAdmin }: { canAdmin: boolean }) {
       {
         onSuccess: () => {
           clearInventoryCommandId(operationKey);
-          success('Reverso registrado sin editar el movimiento original.');
+          success("Reverso registrado sin editar el movimiento original.");
           setReverseTarget(null);
-          setReason('');
+          setReason("");
         },
         onError: failure,
       },
@@ -2175,11 +2683,16 @@ function MovementsPanel({ canAdmin }: { canAdmin: boolean }) {
               </Table.Thead>
               <Table.Tbody>
                 {rows.length === 0 && (
-                  <EmptyTableRow columns={7} message="No hay movimientos registrados." />
+                  <EmptyTableRow
+                    columns={7}
+                    message="No hay movimientos registrados."
+                  />
                 )}
                 {rows.map((movement) => (
                   <Table.Tr key={movement.id}>
-                    <Table.Td>{new Date(movement.createdAt).toLocaleString('es-CO')}</Table.Td>
+                    <Table.Td>
+                      {new Date(movement.createdAt).toLocaleString("es-CO")}
+                    </Table.Td>
                     <Table.Td>{movement.location.code}</Table.Td>
                     <Table.Td>
                       {movement.product.sku} · {movement.product.name}
@@ -2187,25 +2700,31 @@ function MovementsPanel({ canAdmin }: { canAdmin: boolean }) {
                     <Table.Td>
                       <Badge variant="light">{movement.type}</Badge>
                     </Table.Td>
-                    <Table.Td ta="right">{quantity(movement.quantityBase)}</Table.Td>
-                    <Table.Td>{movement.command.clientCommandId.slice(0, 8)}…</Table.Td>
+                    <Table.Td ta="right">
+                      {quantity(movement.quantityBase)}
+                    </Table.Td>
                     <Table.Td>
-                      {canAdmin && movement.type !== 'REVERSAL' && !movement.sourceMovementId && (
-                        <Button
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => {
-                            setReason('');
-                            setReverseTarget({
-                              id: movement.id,
-                              label: `${movement.product.sku} en ${movement.location.code}`,
-                            });
-                          }}
-                        >
-                          Reversar
-                        </Button>
-                      )}
+                      {movement.command.clientCommandId.slice(0, 8)}…
+                    </Table.Td>
+                    <Table.Td>
+                      {canAdmin &&
+                        movement.type !== "REVERSAL" &&
+                        !movement.sourceMovementId && (
+                          <Button
+                            size="xs"
+                            variant="subtle"
+                            color="red"
+                            onClick={() => {
+                              setReason("");
+                              setReverseTarget({
+                                id: movement.id,
+                                label: `${movement.product.sku} en ${movement.location.code}`,
+                              });
+                            }}
+                          >
+                            Reversar
+                          </Button>
+                        )}
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -2230,8 +2749,8 @@ function MovementsPanel({ canAdmin }: { canAdmin: boolean }) {
         >
           <Stack>
             <Alert color="red">
-              Se creará un movimiento compensatorio para {reverseTarget?.label}. El original
-              permanecerá intacto.
+              Se creará un movimiento compensatorio para {reverseTarget?.label}.
+              El original permanecerá intacto.
             </Alert>
             <TextInput
               label="Motivo de auditoría"
@@ -2260,34 +2779,40 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
   const [rows, setRows] = useState<
     Array<{ locationCode: string; productSku: string; quantityBase: string }>
   >([]);
-  const [sourceHash, setSourceHash] = useState('');
+  const [sourceHash, setSourceHash] = useState("");
 
   const readFile = async (next: File | null) => {
     setFile(next);
     setRows([]);
-    setSourceHash('');
+    setSourceHash("");
     if (!next) return;
     try {
       const bytes = await next.arrayBuffer();
-      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
       setSourceHash(
-        Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''),
+        Array.from(new Uint8Array(digest), (byte) =>
+          byte.toString(16).padStart(2, "0"),
+        ).join(""),
       );
-      const text = new TextDecoder().decode(bytes).replace(/^\uFEFF/, '');
+      const text = new TextDecoder().decode(bytes).replace(/^\uFEFF/, "");
       const lines = text.split(/\r?\n/).filter((line) => line.trim());
-      const delimiter = lines[0]?.includes(';') ? ';' : ',';
-      const header = lines[0]?.split(delimiter).map((value) => value.trim().toLowerCase()) ?? [];
+      const delimiter = lines[0]?.includes(";") ? ";" : ",";
+      const header =
+        lines[0]?.split(delimiter).map((value) => value.trim().toLowerCase()) ??
+        [];
       const locationIndex = header.findIndex((value) =>
-        ['locationcode', 'ubicacion', 'codigo_ubicacion'].includes(value),
+        ["locationcode", "ubicacion", "codigo_ubicacion"].includes(value),
       );
       const skuIndex = header.findIndex((value) =>
-        ['productsku', 'sku', 'producto'].includes(value),
+        ["productsku", "sku", "producto"].includes(value),
       );
       const quantityIndex = header.findIndex((value) =>
-        ['quantitybase', 'cantidad', 'saldo'].includes(value),
+        ["quantitybase", "cantidad", "saldo"].includes(value),
       );
       if ([locationIndex, skuIndex, quantityIndex].some((index) => index < 0)) {
-        throw new Error('El CSV requiere columnas locationCode, productSku y quantityBase.');
+        throw new Error(
+          "El CSV requiere columnas locationCode, productSku y quantityBase.",
+        );
       }
       setRows(
         lines.slice(1).map((line) => {
@@ -2295,7 +2820,7 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
           return {
             locationCode: cells[locationIndex],
             productSku: cells[skuIndex],
-            quantityBase: cells[quantityIndex].replace(',', '.'),
+            quantityBase: cells[quantityIndex].replace(",", "."),
           };
         }),
       );
@@ -2307,13 +2832,15 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
 
   if (!canAdmin)
     return (
-      <Alert color="blue">La importación inicial está restringida a COMPRAS y SYSTEM_ADMIN.</Alert>
+      <Alert color="blue">
+        La importación inicial está restringida a COMPRAS y SYSTEM_ADMIN.
+      </Alert>
     );
   return (
     <Stack>
       <Alert color="orange" icon={<IconAlertTriangle size={18} />}>
-        Solo se permiten saldos de apertura sobre combinaciones sin movimientos previos. Repetir el
-        mismo archivo y comando no duplica registros.
+        Solo se permiten saldos de apertura sobre combinaciones sin movimientos
+        previos. Repetir el mismo archivo y comando no duplica registros.
       </Alert>
       <Card withBorder>
         <Stack>
@@ -2337,7 +2864,10 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
               const operationKey = `opening-import:${sourceHash}`;
               importer.mutate(
                 {
-                  clientCommandId: stableInventoryCommandId(operationKey, { sourceHash, rows }),
+                  clientCommandId: stableInventoryCommandId(operationKey, {
+                    sourceHash,
+                    rows,
+                  }),
                   sourceHash,
                   rows,
                 },
@@ -2347,7 +2877,7 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
                     success(`${rows.length} saldos iniciales procesados.`);
                     setFile(null);
                     setRows([]);
-                    setSourceHash('');
+                    setSourceHash("");
                   },
                   onError: failure,
                 },
@@ -2363,11 +2893,11 @@ function OpeningImportPanel({ canAdmin }: { canAdmin: boolean }) {
 }
 
 export function InventoryPage() {
-  useDocumentTitle('FuturaGest · Inventario');
+  useDocumentTitle("FuturaGest · Inventario");
   const { user } = useAuth();
-  const canAdmin = user?.role === 'COMPRAS' || user?.role === 'SYSTEM_ADMIN';
-  const canReview = canAdmin || user?.role === 'COORDINADOR';
-  const isPurchasing = user?.role === 'COMPRAS';
+  const canAdmin = user?.role === "COMPRAS" || user?.role === "SYSTEM_ADMIN";
+  const canReview = canAdmin || user?.role === "COORDINADOR";
+  const isPurchasing = user?.role === "COMPRAS";
 
   return (
     <Stack gap="lg">
@@ -2375,7 +2905,8 @@ export function InventoryPage() {
         <div>
           <Title order={2}>Inventario</Title>
           <Text c="dimmed">
-            Asigna productos a municipios, consulta existencias y atiende alertas.
+            Asigna productos a municipios, consulta existencias y atiende
+            alertas.
           </Text>
         </div>
         <Badge size="lg" variant="light">
@@ -2384,26 +2915,41 @@ export function InventoryPage() {
       </Group>
       <Tabs defaultValue="overview" keepMounted={false}>
         <ScrollArea type="auto">
-          <Tabs.List style={{ flexWrap: 'nowrap', minWidth: 'max-content' }}>
+          <Tabs.List style={{ flexWrap: "nowrap", minWidth: "max-content" }}>
             <Tabs.Tab value="overview" leftSection={<IconPackage size={16} />}>
-              {isPurchasing ? 'Stock y alertas' : 'Resumen'}
+              {isPurchasing ? "Stock y alertas" : "Resumen"}
             </Tabs.Tab>
             <Tabs.Tab value="catalog">Inventario</Tabs.Tab>
-            <Tabs.Tab value="shipments" leftSection={<IconTruckDelivery size={16} />}>
-              {isPurchasing ? 'Asignar a municipios' : 'Envíos'}
+            <Tabs.Tab
+              value="shipments"
+              leftSection={<IconTruckDelivery size={16} />}
+            >
+              {isPurchasing ? "Asignar a municipios" : "Envíos"}
             </Tabs.Tab>
             {!isPurchasing && (
               <>
-                <Tabs.Tab value="counts" leftSection={<IconClipboardCheck size={16} />}>
+                <Tabs.Tab
+                  value="counts"
+                  leftSection={<IconClipboardCheck size={16} />}
+                >
                   Conteos
                 </Tabs.Tab>
-                <Tabs.Tab value="reviews" leftSection={<IconAlertTriangle size={16} />}>
+                <Tabs.Tab
+                  value="reviews"
+                  leftSection={<IconAlertTriangle size={16} />}
+                >
                   Revisión
                 </Tabs.Tab>
-                <Tabs.Tab value="movements" leftSection={<IconArrowsExchange size={16} />}>
+                <Tabs.Tab
+                  value="movements"
+                  leftSection={<IconArrowsExchange size={16} />}
+                >
                   Movimientos
                 </Tabs.Tab>
-                <Tabs.Tab value="import" leftSection={<IconRefresh size={16} />}>
+                <Tabs.Tab
+                  value="import"
+                  leftSection={<IconRefresh size={16} />}
+                >
                   Apertura
                 </Tabs.Tab>
               </>
