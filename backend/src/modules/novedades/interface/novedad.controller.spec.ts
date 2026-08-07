@@ -30,6 +30,10 @@ import { AuthModule } from '../../auth/auth.module';
 import { IamModule } from '../../iam/iam.module';
 import { PrismaModule } from '../../../database/prisma.module';
 import { ConfigModule } from '@nestjs/config';
+import { ATTENDANCE_REPOSITORY_PORT } from '../../asistencia/domain/ports/attendance-repository.port';
+import { ScopedOperarioRepository } from '../../iam/infrastructure/scoped-operario.repository';
+import { ScopedSupervisorRepository } from '../../iam/infrastructure/scoped-supervisor.repository';
+import { ScopedZoneRepository } from '../../iam/infrastructure/scoped-zone.repository';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,8 +48,8 @@ function makeNovedad(overrides: Record<string, unknown> = {}) {
     status: 'PENDING',
     approvedByUserId: null,
     decidedAt: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }
@@ -89,6 +93,30 @@ describe('NovedadController (unit — mocked use-cases)', () => {
         { provide: CANCEL_NOVEDAD_USE_CASE, useValue: mockCancelUseCase },
         { provide: GET_NOVEDAD_USE_CASE, useValue: mockGetUseCase },
         { provide: LIST_NOVEDADES_USE_CASE, useValue: mockListUseCase },
+        {
+          provide: ATTENDANCE_REPOSITORY_PORT,
+          useValue: {
+            findManyScoped: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ScopedOperarioRepository,
+          useValue: {
+            findManyScoped: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ScopedSupervisorRepository,
+          useValue: {
+            findManyScoped: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ScopedZoneRepository,
+          useValue: {
+            findManyScoped: jest.fn().mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
 
@@ -215,7 +243,7 @@ describe('NovedadController (unit — mocked use-cases)', () => {
         .set('Authorization', 'Bearer skip')
         .send({ verification: 'NONE' })
         .expect(200);
-      expect(mockRejectUseCase.execute).toHaveBeenCalledWith('nov-1', 'NONE');
+      expect(mockRejectUseCase.execute).toHaveBeenCalledWith('nov-1', 'NONE', undefined);
     });
   });
 

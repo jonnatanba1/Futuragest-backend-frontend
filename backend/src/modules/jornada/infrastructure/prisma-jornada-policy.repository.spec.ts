@@ -31,6 +31,8 @@ describe('PrismaJornadaPolicyRepository (3-level resolution)', () => {
       horasSemanales: new Decimal(37.5),
       almuerzoInicio: null,
       almuerzoFin: null,
+      desayunoInicio: null,
+      desayunoFin: null,
       toleranciaMin: 5,
       vigenteDesde: new Date('2025-07-16'),
       createdAt: new Date(),

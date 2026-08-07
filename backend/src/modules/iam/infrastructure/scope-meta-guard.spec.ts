@@ -44,7 +44,9 @@ function isSanctioned(filePath: string): boolean {
     normalized.includes('compensation-drift-marker.adapter') ||
     // Fix 7: supervisor zone reader uses a direct unique-key lookup on Supervisor by id
     // (not a scoped MANY query) to resolve zoneId for close-period snapshot.
-    normalized.includes('supervisor-zone-reader')
+    normalized.includes('supervisor-zone-reader') ||
+    // FCM notification adapter accesses Novedad directly to enrich push notification payload
+    normalized.includes('fcm-notification.adapter')
   );
 }
 

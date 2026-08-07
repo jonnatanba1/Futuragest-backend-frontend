@@ -89,10 +89,12 @@ function makeBalanceAttendance(
 function makePolicy(vigenteDesdeStr: string, horasDiarias: number): JornadaPolicyRecord {
   return {
     id: `pol-${vigenteDesdeStr}`,
+    operarioId: null,
+    zoneId: null,
     horasDiarias: new Decimal(horasDiarias),
     vigenteDesde: new Date(`${vigenteDesdeStr}T00:00:00Z`),
     createdAt: new Date(),
-  };
+  } as unknown as JornadaPolicyRecord;
 }
 
 // ─── Check-out duration guard tests ───────────────────────────────────────────

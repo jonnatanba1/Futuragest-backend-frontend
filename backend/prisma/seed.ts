@@ -114,6 +114,26 @@ async function main() {
       });
       console.log(`    Municipio: ${municipioData.name} (${municipio.id})`);
 
+      // Upsert InventoryLocation for this municipio
+      const locationCode = `MW-${municipioData.name.toUpperCase().replace(/\s+/g, '_')}`;
+      const location = await prisma.inventoryLocation.upsert({
+        where: { code: locationCode },
+        update: {
+          name: `Bodega ${municipioData.name}`,
+          zoneId,
+          municipioId: municipio.id,
+        },
+        create: {
+          code: locationCode,
+          name: `Bodega ${municipioData.name}`,
+          type: 'MUNICIPAL_WAREHOUSE',
+          zoneId,
+          municipioId: municipio.id,
+          active: true,
+        },
+      });
+      console.log(`      Location: ${location.name} (${location.code})`);
+
       // Upsert supervisors for this municipio
       for (let i = 0; i < municipioData.supervisorCount; i++) {
         const idx = supervisorIndex + i;
@@ -133,7 +153,7 @@ async function main() {
         });
 
         // Upsert supervisor (unique on userId)
-        await prisma.supervisor.upsert({
+        const supervisor = await prisma.supervisor.upsert({
           where: { userId: user.id },
           update: {},
           create: {
@@ -143,6 +163,27 @@ async function main() {
             area,
           },
         });
+
+        // Upsert InventoryLocationAssignment for supervisor
+        const validFrom = new Date('2026-01-01T00:00:00Z');
+        const existingAssignment = await prisma.inventoryLocationAssignment.findFirst({
+          where: {
+            locationId: location.id,
+            userId: user.id,
+          },
+        });
+
+        if (!existingAssignment) {
+          await prisma.inventoryLocationAssignment.create({
+            data: {
+              locationId: location.id,
+              userId: user.id,
+              supervisorId: supervisor.id,
+              role: 'SUPERVISOR',
+              validFrom,
+            },
+          });
+        }
       }
 
       supervisorIndex += municipioData.supervisorCount;
