@@ -414,7 +414,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             <Divider label="Trazabilidad" />
             <Card withBorder>
               <Group justify="space-between" mb="xs"><Text fw={600}>Entradas y salidas</Text>{productMovements.isLoading && <Loader size="xs" />}</Group>
-              <ScrollArea mah={220}>
+              <ScrollArea type="always" h={240} scrollbarSize={10}>
                 <Table striped miw={620}>
                   <Table.Thead><Table.Tr><Table.Th>Fecha</Table.Th><Table.Th>Movimiento</Table.Th><Table.Th>Ubicación</Table.Th><Table.Th ta="right">Cantidad</Table.Th></Table.Tr></Table.Thead>
                   <Table.Tbody>
@@ -427,7 +427,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             </Card>
             <Card withBorder>
               <Group justify="space-between" mb="xs"><Text fw={600}>Envíos a municipios</Text>{shipments.isLoading && <Loader size="xs" />}</Group>
-              <ScrollArea mah={200}>
+              <ScrollArea type="always" h={220} scrollbarSize={10}>
                 <Table striped miw={560}>
                   <Table.Thead><Table.Tr><Table.Th>Fecha</Table.Th><Table.Th>Municipio destino</Table.Th><Table.Th ta="right">Enviado</Table.Th><Table.Th ta="right">Recibido</Table.Th><Table.Th>Estado</Table.Th></Table.Tr></Table.Thead>
                   <Table.Tbody>
