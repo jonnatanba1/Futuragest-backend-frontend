@@ -1,93 +1,107 @@
 /**
- * Sync script to ensure all existing Municipios have a corresponding InventoryLocation (MUNICIPAL_WAREHOUSE)
- * and all existing Supervisors are assigned to the location of their assigned Municipio.
+ * Idempotently links existing municipios and supervisors to inventory.
  *
- * Usage: pnpm exec ts-node prisma/sync-municipal-locations.ts
+ * This script never creates municipios, supervisors, or users. It only creates
+ * the missing municipal warehouse and a current CUSTODIAN assignment for each
+ * existing supervisor in that municipio.
+ *
+ * Usage: pnpm exec tsx prisma/sync-municipal-locations.ts
  */
 
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
-
+import 'dotenv/config';
 import { createPrismaClient } from '../src/database/prisma-client';
 
 const prisma = createPrismaClient();
 
-async function main() {
-  console.log('Synchronizing municipal inventory locations and supervisor assignments...');
+function municipalWarehouseCode(municipioId: string): string {
+  return `MW-${municipioId.replaceAll('-', '').toUpperCase()}`;
+}
 
+async function main() {
   const municipios = await prisma.municipio.findMany({
     include: {
       supervisors: {
-        include: {
-          user: true,
-        },
+        include: { user: { select: { email: true } } },
       },
     },
+    orderBy: [{ zoneId: 'asc' }, { name: 'asc' }],
   });
 
   let createdLocations = 0;
   let createdAssignments = 0;
 
   for (const municipio of municipios) {
-    const locationCode = `MW-${municipio.name.toUpperCase().replace(/\s+/g, '_')}`;
-
-    const location = await prisma.inventoryLocation.upsert({
-      where: { code: locationCode },
-      update: {
-        name: `Bodega ${municipio.name}`,
-        zoneId: municipio.zoneId,
-        municipioId: municipio.id,
-      },
-      create: {
-        code: locationCode,
-        name: `Bodega ${municipio.name}`,
-        type: 'MUNICIPAL_WAREHOUSE',
-        zoneId: municipio.zoneId,
-        municipioId: municipio.id,
-        active: true,
-      },
-    });
-
-    createdLocations++;
-    console.log(`Location: ${location.name} (${location.code})`);
-
-    const validFrom = new Date('2026-01-01T00:00:00Z');
-
-    for (const supervisor of municipio.supervisors) {
-      const existingAssignment = await prisma.inventoryLocationAssignment.findFirst({
+    const result = await prisma.$transaction(async (tx) => {
+      let location = await tx.inventoryLocation.findFirst({
         where: {
-          locationId: location.id,
-          userId: supervisor.userId,
+          municipioId: municipio.id,
+          type: 'MUNICIPAL_WAREHOUSE',
+          active: true,
         },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
 
-      if (!existingAssignment) {
-        await prisma.inventoryLocationAssignment.create({
+      let locationCreated = false;
+      if (!location) {
+        location = await tx.inventoryLocation.create({
+          data: {
+            code: municipalWarehouseCode(municipio.id),
+            name: `Bodega ${municipio.name}`,
+            type: 'MUNICIPAL_WAREHOUSE',
+            zoneId: municipio.zoneId,
+            municipioId: municipio.id,
+            active: true,
+            inventoryEnabled: false,
+          },
+        });
+        locationCreated = true;
+      }
+
+      let assignmentsCreated = 0;
+      const now = new Date();
+      for (const supervisor of municipio.supervisors) {
+        const activeAssignment = await tx.inventoryLocationAssignment.findFirst({
+          where: {
+            locationId: location.id,
+            userId: supervisor.userId,
+            supervisorId: supervisor.id,
+            validFrom: { lte: now },
+            OR: [{ validUntil: null }, { validUntil: { gt: now } }],
+          },
+        });
+        if (activeAssignment) continue;
+
+        await tx.inventoryLocationAssignment.create({
           data: {
             locationId: location.id,
             userId: supervisor.userId,
             supervisorId: supervisor.id,
-            role: 'SUPERVISOR',
-            validFrom,
+            role: 'CUSTODIAN',
+            validFrom: now,
           },
         });
-        createdAssignments++;
-        console.log(`  Assigned supervisor: ${supervisor.user.email} -> ${location.name}`);
+        assignmentsCreated += 1;
       }
-    }
+
+      return { location, locationCreated, assignmentsCreated };
+    });
+
+    createdLocations += Number(result.locationCreated);
+    createdAssignments += result.assignmentsCreated;
+    console.log(
+      `${result.location.code}: ${municipio.name} — ${municipio.supervisors.length} supervisor(es) vinculados`,
+    );
   }
 
-  console.log(`\nSync finished:`);
-  console.log(`  Locations processed: ${createdLocations}`);
-  console.log(`  Assignments created: ${createdAssignments}`);
+  console.log(
+    `Sync finished: ${municipios.length} municipios processed, ${createdLocations} locations created, ${createdAssignments} assignments created.`,
+  );
 }
 
 main()
-  .catch((e) => {
-    console.error('Error during sync:', e);
-    process.exit(1);
+  .catch((error) => {
+    console.error('Municipal inventory synchronization failed.', error);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();

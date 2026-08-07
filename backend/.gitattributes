@@ -1,0 +1,3 @@
+# Prisma records migration checksums over exact bytes. Never let client-side
+# line-ending conversion rewrite a migration after it has been deployed.
+prisma/migrations/**/*.sql -text

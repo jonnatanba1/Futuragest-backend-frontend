@@ -67,7 +67,7 @@ describe('PrismaInventoryContextRepository', () => {
         where: expect.objectContaining({
           userId: 'user-1',
           supervisorId: 'supervisor-1',
-          location: { active: true },
+          location: { active: true, inventoryEnabled: true },
         }),
       }),
     );

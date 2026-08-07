@@ -15,7 +15,7 @@ export class PrismaInventoryContextRepository implements InventoryContextReposit
       supervisorId: actor.supervisorId ?? '__DENY__',
       validFrom: { lte: now },
       OR: [{ validUntil: null }, { validUntil: { gt: now } }],
-      location: { active: true },
+      location: { active: true, inventoryEnabled: true },
     };
 
     const [products, assignments] = await this.prisma.$transaction([

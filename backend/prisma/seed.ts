@@ -179,7 +179,7 @@ async function main() {
               locationId: location.id,
               userId: user.id,
               supervisorId: supervisor.id,
-              role: 'SUPERVISOR',
+              role: 'CUSTODIAN',
               validFrom,
             },
           });

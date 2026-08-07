@@ -8,13 +8,13 @@ import {
   IconCoin,
   IconFileSpreadsheet,
   IconLayoutDashboard,
-  IconPackage,
   IconSettings,
   IconSun,
   IconUsers,
+  IconPackages,
 } from '@tabler/icons-react';
 import React from 'react';
-import { ADMIN_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../../lib/auth/roles';
+import { ADMIN_ROLES, INVENTORY_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../../lib/auth/roles';
 
 export interface NavItem {
   label: string;
@@ -25,11 +25,11 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  { label: 'Inventario', path: '/inventario', icon: IconPackages, roles: INVENTORY_ROLES },
   { label: 'Operarios', path: '/operarios', icon: IconUsers, roles: OPERARIO_READ_ROLES },
-  { label: 'Tablero', path: '/', icon: IconLayoutDashboard },
+  { label: 'Tablero', path: '/', icon: IconLayoutDashboard, roles: OFFICE_ROLES },
   { label: 'Asistencia', path: '/asistencia', icon: IconCalendarTime, roles: OFFICE_ROLES },
   { label: 'Novedades', path: '/novedades', icon: IconBellExclamation, roles: OFFICE_ROLES },
-  { label: 'Inventario', path: '/inventario', icon: IconPackage, roles: ['COMPRAS', 'SUPERVISOR', 'COORDINADOR', 'GERENCIA', 'SYSTEM_ADMIN'] },
   { label: 'Compensación', path: '/compensacion', icon: IconClockDollar, roles: OFFICE_ROLES },
   { label: 'Reportes', path: '/reportes', icon: IconFileSpreadsheet, roles: ['SYSTEM_ADMIN', 'TALENTO_HUMANO'] },
   { label: 'Configuración', path: '/config/jornada', icon: IconSettings, roles: ADMIN_ROLES },

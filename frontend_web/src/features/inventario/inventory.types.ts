@@ -4,41 +4,13 @@ export type InventoryLocationType =
   | 'SUPERVISOR_CUSTODY'
   | 'IN_TRANSIT';
 
-export type InventoryMovementType =
-  | 'OPENING_BALANCE'
-  | 'FIELD_ISSUE'
-  | 'FIELD_RETURN'
-  | 'TRANSFER_OUT'
-  | 'TRANSFER_IN'
-  | 'COUNT_ADJUSTMENT_IN'
-  | 'COUNT_ADJUSTMENT_OUT'
-  | 'DAMAGE_OR_LOSS'
-  | 'IN_TRANSIT_LOSS'
-  | 'IN_TRANSIT_DAMAGE'
-  | 'REVERSAL';
-
-export type ShipmentStatus =
-  | 'DRAFT'
-  | 'DISPATCHED'
-  | 'PARTIALLY_RECEIVED'
-  | 'RECEIVED'
-  | 'DISCREPANCY_REVIEW'
-  | 'CLOSED_WITH_DISCREPANCY'
-  | 'RETURNED'
-  | 'CANCELLED';
-
-export type InventoryCountStatus =
-  | 'OPEN'
-  | 'SUBMITTED'
-  | 'APPROVED'
-  | 'CLOSED';
-
-export interface ProductUnitVersion {
+export interface InventoryUnit {
   id: string;
   unitCode: string;
   factorToBase: string;
+  isBase: boolean;
   validFrom: string;
-  validUntil?: string | null;
+  validUntil: string | null;
 }
 
 export interface InventoryProduct {
@@ -47,9 +19,17 @@ export interface InventoryProduct {
   name: string;
   baseUnitCode: string;
   active: boolean;
-  unitVersions?: ProductUnitVersion[];
-  createdAt?: string;
-  updatedAt?: string;
+  deactivatedAt: string | null;
+  updatedAt: string;
+  unitVersions: InventoryUnit[];
+}
+
+export interface InventoryAssignee {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  role: 'SYSTEM_ADMIN' | 'COMPRAS' | 'COORDINADOR' | 'SUPERVISOR';
+  supervisor?: { id: string; zoneId: string; municipioId: string } | null;
 }
 
 export interface InventoryLocation {
@@ -57,83 +37,152 @@ export interface InventoryLocation {
   code: string;
   name: string;
   type: InventoryLocationType;
-  zoneId?: string | null;
-  municipioId?: string | null;
+  zoneId: string | null;
+  municipioId: string | null;
   active: boolean;
+  inventoryEnabled: boolean;
+  zone?: { id: string; name: string } | null;
+  municipio?: { id: string; name: string; zoneId: string } | null;
+  assignments?: Array<{
+    id: string;
+    userId: string;
+    role: 'CUSTODIAN' | 'RECEIVER' | 'COUNTER';
+    validFrom: string;
+    validUntil: string | null;
+    user: { id: string; email: string; displayName?: string | null };
+  }>;
 }
 
 export interface InventoryBalance {
   id: string;
   locationId: string;
-  locationName?: string;
-  locationCode?: string;
   productId: string;
-  productSku?: string;
-  productName?: string;
   quantityBase: string;
   version: number;
-  minimumQuantity?: string;
-  isBelowMinimum?: boolean;
   updatedAt: string;
+  location: InventoryLocation;
+  product: InventoryProduct;
 }
 
 export interface InventoryMovement {
   id: string;
-  commandId?: string | null;
-  locationId: string;
-  locationName?: string;
-  productId: string;
-  productName?: string;
-  type: InventoryMovementType;
+  type: string;
   quantityBase: string;
-  unitCode: string;
-  reversalOfMovementId?: string | null;
-  capturedAt: string;
+  locationId: string;
+  productId: string;
+  capturedAtUtc: string;
   businessDate: string;
   createdAt: string;
+  sourceMovementId: string | null;
+  location: InventoryLocation;
+  product: InventoryProduct;
+  command: { clientCommandId: string; actorUserId: string; status: string };
+}
+
+export interface InventoryAlert {
+  location: InventoryLocation;
+  product: InventoryProduct;
+  quantityBase: string;
+  minimumBase: string;
+  shortageBase: string;
+}
+
+export interface InventoryReviewCommand {
+  id: string;
+  clientCommandId: string;
+  type: string;
+  status: 'NEEDS_REVIEW';
+  payload: Record<string, unknown>;
+  reviewCode: string | null;
+  reviewReason: string | null;
+  receivedAt: string;
+  location: InventoryLocation | null;
+  actor: { id: string; email: string; displayName?: string | null };
+}
+
+export interface InventoryCommandResult {
+  commandId: string;
+  status: string;
+  code: string;
+  movementIds: string[];
+  serverReceivedAt: string;
 }
 
 export interface ShipmentItem {
   id: string;
   productId: string;
-  productName?: string;
-  quantityDispatched: string;
-  quantityReceived?: string;
-  unitCode: string;
+  unitVersionId: string;
+  quantityBase: string;
+  receivedBase: string;
+  damagedBase: string;
+  lostBase: string;
+  product: InventoryProduct;
+  unitVersion: InventoryUnit;
 }
 
-export interface Shipment {
+export interface InventoryShipment {
   id: string;
   code: string;
+  status:
+    | 'DRAFT'
+    | 'DISPATCHED'
+    | 'PARTIALLY_RECEIVED'
+    | 'DISCREPANCY_REVIEW'
+    | 'RECEIVED'
+    | 'CANCELLED'
+    | 'RETURNED'
+    | 'CLOSED_WITH_DISCREPANCY';
   originLocationId: string;
-  originLocationName?: string;
   destinationLocationId: string;
-  destinationLocationName?: string;
-  status: ShipmentStatus;
-  dispatchedAt?: string | null;
-  receivedAt?: string | null;
-  items: ShipmentItem[];
+  inTransitLocationId: string | null;
+  notes: string | null;
+  dispatchedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
+  originLocation: InventoryLocation;
+  destinationLocation: InventoryLocation;
+  items: ShipmentItem[];
 }
 
 export interface InventoryCountLine {
   id: string;
   productId: string;
-  productName?: string;
-  expectedQuantity: string;
-  countedQuantity?: string | null;
-  differenceQuantity?: string | null;
-  unitCode: string;
+  expectedBase?: string | null;
+  countedBase: string | null;
+  differenceBase?: string | null;
+  product: InventoryProduct;
+  unitVersion: InventoryUnit;
 }
 
 export interface InventoryCount {
   id: string;
   locationId: string;
-  locationName?: string;
-  status: InventoryCountStatus;
-  cutoffDate: string;
-  submittedAt?: string | null;
-  approvedAt?: string | null;
-  lines: InventoryCountLine[];
+  status: 'OPEN' | 'SUBMITTED' | 'CLOSED' | 'CANCELLED';
+  counterUserId: string;
+  approverUserId: string | null;
+  cutoffAt: string;
+  submittedAt: string | null;
+  closedAt: string | null;
+  reason: string | null;
   createdAt: string;
+  location: InventoryLocation;
+  counter: { id: string; email: string; displayName?: string | null };
+  approver?: { id: string; email: string; displayName?: string | null } | null;
+  lines?: InventoryCountLine[];
+  _count?: { lines: number };
+}
+
+export interface InventoryReconciliation {
+  checkedAt: string;
+  balanceCount: number;
+  movementCount: number;
+  mismatches: Array<{
+    locationId: string;
+    productId: string;
+    locationCode: string | null;
+    productSku: string | null;
+    ledgerQuantityBase: string;
+    balanceQuantityBase: string;
+    differenceBase: string;
+  }>;
 }

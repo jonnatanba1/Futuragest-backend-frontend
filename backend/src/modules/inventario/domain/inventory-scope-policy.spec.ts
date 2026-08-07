@@ -28,7 +28,7 @@ describe('applyInventoryScope', () => {
         BASE,
         NOW,
       ),
-    ).toEqual({ AND: [BASE, { location: { zoneId: 'zone-1' } }] });
+    ).toEqual({ AND: [BASE, { location: { zoneId: 'zone-1', inventoryEnabled: true } }] });
   });
 
   it('fails closed when a coordinator has no zone', () => {
@@ -50,6 +50,51 @@ describe('applyInventoryScope', () => {
         BASE,
         {
           location: {
+            inventoryEnabled: true,
+            assignments: {
+              some: {
+                userId: 'user-1',
+                supervisorId: 'sup-1',
+                validFrom: { lte: NOW },
+                OR: [{ validUntil: null }, { validUntil: { gt: NOW } }],
+              },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('scopes coordinator shipments when either endpoint belongs to their zone', () => {
+    expect(
+      applyInventoryScope(
+        context({ role: 'COORDINADOR', zoneId: 'zone-1' }),
+        'Shipment',
+        BASE,
+        NOW,
+      ),
+    ).toEqual({
+      AND: [
+        BASE,
+        {
+          OR: [
+            { originLocation: { zoneId: 'zone-1', inventoryEnabled: true } },
+            { destinationLocation: { zoneId: 'zone-1', inventoryEnabled: true } },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('scopes supervisor counts through an active location assignment', () => {
+    expect(
+      applyInventoryScope(context({ supervisorId: 'sup-1' }), 'InventoryCount', BASE, NOW),
+    ).toEqual({
+      AND: [
+        BASE,
+        {
+          location: {
+            inventoryEnabled: true,
             assignments: {
               some: {
                 userId: 'user-1',

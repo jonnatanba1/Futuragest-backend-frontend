@@ -5,7 +5,8 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AppShellLayout } from '../features/shell/AppShellLayout';
 import { ConfigLayout } from '../features/config/ConfigLayout';
-import { ADMIN_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../lib/auth/roles';
+import { ADMIN_ROLES, INVENTORY_ROLES, OFFICE_ROLES, OPERARIO_READ_ROLES } from '../lib/auth/roles';
+import { useAuth } from '../lib/auth/auth-context';
 import { RequireAuth, RequireAuthAllowChange, RequireGuest } from '../routes/guards';
 
 // Feature pages are code-split per route (web.dev: keep the initial bundle small).
@@ -29,9 +30,14 @@ const CompensacionPage = lazy(() =>
 const ReportesPage = lazy(() =>
   import('../features/reportes/ReportesPage').then((m) => ({ default: m.ReportesPage })),
 );
-const InventarioPage = lazy(() =>
-  import('../features/inventario/InventarioPage').then((m) => ({ default: m.InventarioPage })),
+const InventoryPage = lazy(() =>
+  import('../features/inventario/InventoryPage').then((m) => ({ default: m.InventoryPage })),
 );
+
+function HomePage() {
+  const { user } = useAuth();
+  return user?.role === 'COMPRAS' ? <Navigate to="/inventario" replace /> : <DashboardPage />;
+}
 
 const ConfigJornadaPage = lazy(() =>
   import('../features/config/ConfigJornadaPage').then((m) => ({ default: m.ConfigJornadaPage })),
@@ -70,7 +76,15 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route index element={<HomePage />} />
+        <Route
+          path="inventario"
+          element={
+            <RequireAuth roles={INVENTORY_ROLES}>
+              <InventoryPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="operarios"
           element={
@@ -92,14 +106,6 @@ export function AppRoutes() {
           element={
             <RequireAuth roles={OFFICE_ROLES}>
               <NovedadesPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="inventario"
-          element={
-            <RequireAuth roles={['COMPRAS', 'SUPERVISOR', 'COORDINADOR', 'GERENCIA', 'SYSTEM_ADMIN']}>
-              <InventarioPage />
             </RequireAuth>
           }
         />

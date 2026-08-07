@@ -84,7 +84,9 @@ export function AppShellLayout() {
   const [opened, { toggle, close }] = useDisclosure();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  useNovedadSse(true);
+  useNovedadSse(
+    user?.role !== 'COMPRAS' && user?.role !== 'SUPERVISOR',
+  );
 
   const items = user ? navItemsForRole(user.role) : [];
   const userInitial = user?.email?.[0]?.toUpperCase() ?? '?';

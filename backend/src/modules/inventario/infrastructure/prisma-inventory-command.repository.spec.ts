@@ -54,7 +54,7 @@ function transaction(overrides: Record<string, unknown> = {}) {
         locationId: 'location-1',
         validFrom: new Date('2026-01-01T00:00:00.000Z'),
         validUntil: null,
-        location: { id: 'location-1', active: true, zoneId: 'zone-1' },
+        location: { id: 'location-1', active: true, inventoryEnabled: true, zoneId: 'zone-1' },
       }),
     },
     productUnitVersion: {

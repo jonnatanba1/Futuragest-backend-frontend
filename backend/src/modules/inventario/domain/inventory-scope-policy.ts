@@ -8,7 +8,9 @@ export type InventoryScopedModel =
   | 'InventoryCommand'
   | 'InventoryMovement'
   | 'InventoryBalance'
-  | 'StockMinimum';
+  | 'StockMinimum'
+  | 'Shipment'
+  | 'InventoryCount';
 
 const DENY = { id: { in: [] as string[] } } as const;
 const INVENTORY_GLOBAL_ROLES = new Set(['SYSTEM_ADMIN', 'COMPRAS', 'GERENCIA']);
@@ -41,14 +43,23 @@ export function applyInventoryScope(
 
     switch (model) {
       case 'InventoryLocation':
-        return and(where, { zoneId: ctx.zoneId });
+        return and(where, { zoneId: ctx.zoneId, inventoryEnabled: true });
       case 'InventoryLocationAssignment':
       case 'InventoryBalance':
       case 'StockMinimum':
       case 'InventoryMovement':
-        return and(where, { location: { zoneId: ctx.zoneId } });
+        return and(where, { location: { zoneId: ctx.zoneId, inventoryEnabled: true } });
       case 'InventoryCommand':
         return and(where, { zoneId: ctx.zoneId });
+      case 'Shipment':
+        return and(where, {
+          OR: [
+            { originLocation: { zoneId: ctx.zoneId, inventoryEnabled: true } },
+            { destinationLocation: { zoneId: ctx.zoneId, inventoryEnabled: true } },
+          ],
+        });
+      case 'InventoryCount':
+        return and(where, { location: { zoneId: ctx.zoneId, inventoryEnabled: true } });
       default:
         return and(where, DENY);
     }
@@ -58,6 +69,7 @@ export function applyInventoryScope(
     if (!ctx.userId || !ctx.supervisorId) return and(where, DENY);
 
     const activeAssignment = {
+      inventoryEnabled: true,
       assignments: {
         some: {
           userId: ctx.userId,
@@ -79,6 +91,15 @@ export function applyInventoryScope(
         return and(where, { location: activeAssignment });
       case 'InventoryCommand':
         return and(where, { actorUserId: ctx.userId });
+      case 'Shipment':
+        return and(where, {
+          OR: [
+            { originLocation: activeAssignment },
+            { destinationLocation: activeAssignment },
+          ],
+        });
+      case 'InventoryCount':
+        return and(where, { location: activeAssignment });
       default:
         return and(where, DENY);
     }

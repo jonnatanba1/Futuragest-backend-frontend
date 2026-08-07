@@ -117,6 +117,11 @@ model User {
   inventoryAssignments        InventoryLocationAssignment[]
   inventoryCommands           InventoryCommand[]            @relation("InventoryCommandActor")
   inventoryCommandsResolved   InventoryCommand[]            @relation("InventoryCommandResolver")
+  shipmentsCreated            Shipment[]                    @relation("ShipmentCreator")
+  shipmentsDispatched         Shipment[]                    @relation("ShipmentDispatcher")
+  shipmentsReceived           ShipmentReceipt[]             @relation("ShipmentReceiptActor")
+  inventoryCounts             InventoryCount[]              @relation("InventoryCountCounter")
+  inventoryCountsApproved     InventoryCount[]              @relation("InventoryCountApprover")
   createdAt                   DateTime                      @default(now())
 }
 
@@ -467,6 +472,24 @@ enum InventoryMovementType {
   REVERSAL
 }
 
+enum ShipmentStatus {
+  DRAFT
+  DISPATCHED
+  PARTIALLY_RECEIVED
+  DISCREPANCY_REVIEW
+  RECEIVED
+  CANCELLED
+  RETURNED
+  CLOSED_WITH_DISCREPANCY
+}
+
+enum InventoryCountStatus {
+  OPEN
+  SUBMITTED
+  CLOSED
+  CANCELLED
+}
+
 model Product {
   id            String               @id @default(uuid())
   sku           String               @unique
@@ -478,6 +501,8 @@ model Product {
   movements     InventoryMovement[]
   balances      InventoryBalance[]
   stockMinimums StockMinimum[]
+  shipmentItems ShipmentItem[]
+  countLines    InventoryCountLine[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -485,38 +510,45 @@ model Product {
 }
 
 model ProductUnitVersion {
-  id           String              @id @default(uuid())
-  productId    String
-  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
-  unitCode     String
-  factorToBase Decimal             @db.Decimal(20, 6)
-  isBase       Boolean             @default(false)
-  validFrom    DateTime
-  validUntil   DateTime?
-  movements    InventoryMovement[]
-  createdAt    DateTime            @default(now())
+  id            String               @id @default(uuid())
+  productId     String
+  product       Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitCode      String
+  factorToBase  Decimal              @db.Decimal(20, 6)
+  isBase        Boolean              @default(false)
+  validFrom     DateTime
+  validUntil    DateTime?
+  movements     InventoryMovement[]
+  shipmentItems ShipmentItem[]
+  countLines    InventoryCountLine[]
+  createdAt     DateTime             @default(now())
 
   @@unique([productId, unitCode, validFrom])
   @@index([productId, validUntil])
 }
 
 model InventoryLocation {
-  id          String                        @id @default(uuid())
-  code        String                        @unique
-  name        String
-  type        InventoryLocationType
-  zoneId      String?
-  zone        Zone?                         @relation(fields: [zoneId], references: [id], onDelete: Restrict)
-  municipioId String?
-  municipio   Municipio?                    @relation(fields: [municipioId, zoneId], references: [id, zoneId], onDelete: Restrict)
-  active      Boolean                       @default(true)
-  assignments InventoryLocationAssignment[]
-  commands    InventoryCommand[]
-  movements   InventoryMovement[]
-  balances    InventoryBalance[]
-  minimums    StockMinimum[]
-  createdAt   DateTime                      @default(now())
-  updatedAt   DateTime                      @updatedAt
+  id                   String                        @id @default(uuid())
+  code                 String                        @unique
+  name                 String
+  type                 InventoryLocationType
+  zoneId               String?
+  zone                 Zone?                         @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  municipioId          String?
+  municipio            Municipio?                    @relation(fields: [municipioId, zoneId], references: [id, zoneId], onDelete: Restrict)
+  active               Boolean                       @default(true)
+  inventoryEnabled     Boolean                       @default(false)
+  assignments          InventoryLocationAssignment[]
+  commands             InventoryCommand[]
+  movements            InventoryMovement[]
+  balances             InventoryBalance[]
+  minimums             StockMinimum[]
+  shipmentsOrigin      Shipment[]                    @relation("ShipmentOrigin")
+  shipmentsDestination Shipment[]                    @relation("ShipmentDestination")
+  shipmentsInTransit   Shipment[]                    @relation("ShipmentTransit")
+  inventoryCounts      InventoryCount[]
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
 
   @@index([type])
   @@index([zoneId])
@@ -577,6 +609,9 @@ model InventoryCommand {
   resolutionCommand   InventoryCommand?      @relation("InventoryCommandResolution", fields: [resolutionCommandId], references: [id], onDelete: Restrict)
   resolvedCommand     InventoryCommand?      @relation("InventoryCommandResolution")
   movements           InventoryMovement[]
+  dispatchShipment    Shipment?              @relation("ShipmentDispatchCommand")
+  shipmentReceipt     ShipmentReceipt?       @relation("ShipmentReceiptCommand")
+  inventoryCount      InventoryCount?        @relation("InventoryCountApprovalCommand")
   createdAt           DateTime               @default(now())
 
   @@index([actorUserId, receivedAt])
@@ -602,6 +637,7 @@ model InventoryMovement {
   sourceMovementId String?               @unique
   sourceMovement   InventoryMovement?    @relation("InventoryMovementReversal", fields: [sourceMovementId], references: [id], onDelete: Restrict)
   reversalMovement InventoryMovement?    @relation("InventoryMovementReversal")
+  countLine        InventoryCountLine?   @relation("InventoryCountAdjustment")
   capturedAtUtc    DateTime
   businessDate     String
   createdAt        DateTime              @default(now())
@@ -636,6 +672,126 @@ model StockMinimum {
   updatedAt    DateTime          @updatedAt
 
   @@unique([locationId, productId])
+}
+
+model Shipment {
+  id                    String             @id @default(uuid())
+  code                  String             @unique
+  status                ShipmentStatus     @default(DRAFT)
+  originLocationId      String
+  originLocation        InventoryLocation  @relation("ShipmentOrigin", fields: [originLocationId], references: [id], onDelete: Restrict)
+  destinationLocationId String
+  destinationLocation   InventoryLocation  @relation("ShipmentDestination", fields: [destinationLocationId], references: [id], onDelete: Restrict)
+  inTransitLocationId   String?
+  inTransitLocation     InventoryLocation? @relation("ShipmentTransit", fields: [inTransitLocationId], references: [id], onDelete: Restrict)
+  createdByUserId       String
+  createdBy             User               @relation("ShipmentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  dispatchedByUserId    String?
+  dispatchedBy          User?              @relation("ShipmentDispatcher", fields: [dispatchedByUserId], references: [id], onDelete: Restrict)
+  dispatchCommandId     String?            @unique
+  dispatchCommand       InventoryCommand?  @relation("ShipmentDispatchCommand", fields: [dispatchCommandId], references: [id], onDelete: Restrict)
+  notes                 String?
+  dispatchedAt          DateTime?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  items                 ShipmentItem[]
+  receipts              ShipmentReceipt[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([originLocationId, status])
+  @@index([destinationLocationId, status])
+}
+
+model ShipmentItem {
+  id            String                @id @default(uuid())
+  shipmentId    String
+  shipment      Shipment              @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  productId     String
+  product       Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitVersionId String
+  unitVersion   ProductUnitVersion    @relation(fields: [unitVersionId], references: [id], onDelete: Restrict)
+  quantityBase  Decimal               @db.Decimal(20, 6)
+  receivedBase  Decimal               @default(0) @db.Decimal(20, 6)
+  damagedBase   Decimal               @default(0) @db.Decimal(20, 6)
+  lostBase      Decimal               @default(0) @db.Decimal(20, 6)
+  receiptItems  ShipmentReceiptItem[]
+  createdAt     DateTime              @default(now())
+
+  @@unique([shipmentId, productId])
+  @@index([productId])
+}
+
+model ShipmentReceipt {
+  id              String                @id @default(uuid())
+  shipmentId      String
+  shipment        Shipment              @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  clientCommandId String                @unique
+  commandId       String                @unique
+  command         InventoryCommand      @relation("ShipmentReceiptCommand", fields: [commandId], references: [id], onDelete: Restrict)
+  actorUserId     String
+  actor           User                  @relation("ShipmentReceiptActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  result          Json
+  items           ShipmentReceiptItem[]
+  receivedAt      DateTime              @default(now())
+
+  @@index([shipmentId, receivedAt])
+}
+
+model ShipmentReceiptItem {
+  id             String          @id @default(uuid())
+  receiptId      String
+  receipt        ShipmentReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  shipmentItemId String
+  shipmentItem   ShipmentItem    @relation(fields: [shipmentItemId], references: [id], onDelete: Restrict)
+  receivedBase   Decimal         @default(0) @db.Decimal(20, 6)
+  damagedBase    Decimal         @default(0) @db.Decimal(20, 6)
+  missingBase    Decimal         @default(0) @db.Decimal(20, 6)
+
+  @@unique([receiptId, shipmentItemId])
+}
+
+model InventoryCount {
+  id                String               @id @default(uuid())
+  locationId        String
+  location          InventoryLocation    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  status            InventoryCountStatus @default(OPEN)
+  counterUserId     String
+  counter           User                 @relation("InventoryCountCounter", fields: [counterUserId], references: [id], onDelete: Restrict)
+  approverUserId    String?
+  approver          User?                @relation("InventoryCountApprover", fields: [approverUserId], references: [id], onDelete: Restrict)
+  approvalCommandId String?              @unique
+  approvalCommand   InventoryCommand?    @relation("InventoryCountApprovalCommand", fields: [approvalCommandId], references: [id], onDelete: Restrict)
+  cutoffAt          DateTime
+  submittedAt       DateTime?
+  closedAt          DateTime?
+  reason            String?
+  lines             InventoryCountLine[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([locationId, status])
+  @@index([status, createdAt])
+}
+
+model InventoryCountLine {
+  id                   String             @id @default(uuid())
+  countId              String
+  count                InventoryCount     @relation(fields: [countId], references: [id], onDelete: Restrict)
+  productId            String
+  product              Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitVersionId        String
+  unitVersion          ProductUnitVersion @relation(fields: [unitVersionId], references: [id], onDelete: Restrict)
+  expectedBase         Decimal            @db.Decimal(20, 6)
+  countedBase          Decimal?           @db.Decimal(20, 6)
+  differenceBase       Decimal?           @db.Decimal(20, 6)
+  adjustmentMovementId String?            @unique
+  adjustmentMovement   InventoryMovement? @relation("InventoryCountAdjustment", fields: [adjustmentMovementId], references: [id], onDelete: Restrict)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([countId, productId])
 }
 
 /// Device session for soft revocation and refresh token storage.

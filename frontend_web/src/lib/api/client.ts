@@ -33,6 +33,19 @@ export type { SupervisorDto };
 import { config } from '../../config';
 import { getDeviceId, getDeviceLabel } from '../auth/device';
 import { tokenStore } from '../auth/token-store';
+import type {
+  InventoryAlert,
+  InventoryAssignee,
+  InventoryBalance,
+  InventoryCommandResult,
+  InventoryCount,
+  InventoryLocation,
+  InventoryMovement,
+  InventoryProduct,
+  InventoryReconciliation,
+  InventoryReviewCommand,
+  InventoryShipment,
+} from '../../features/inventario/inventory.types';
 
 /**
  * Hand-typed thin HTTP client for the FuturaGest backend.
@@ -312,6 +325,115 @@ export const orgApi = {
 
   deleteArea: (id: string): Promise<void> =>
     request<void>('DELETE', `/org/areas/${id}`),
+};
+
+// --- Inventory -------------------------------------------------------------
+
+export const inventoryApi = {
+  listProducts: (): Promise<InventoryProduct[]> =>
+    request<InventoryProduct[]>('GET', '/inventario/products'),
+  createProduct: (body: { sku: string; name: string; baseUnitCode: string }): Promise<InventoryProduct> =>
+    request<InventoryProduct>('POST', '/inventario/products', { body }),
+  updateProduct: (id: string, body: { name?: string; active?: boolean }): Promise<InventoryProduct> =>
+    request<InventoryProduct>('PATCH', `/inventario/products/${id}`, { body }),
+  addProductUnit: (
+    id: string,
+    body: { unitCode: string; factorToBase: string; validFrom?: string },
+  ): Promise<InventoryProduct[]> =>
+    request<InventoryProduct[]>('POST', `/inventario/products/${id}/units`, { body }),
+  listLocations: (): Promise<InventoryLocation[]> =>
+    request<InventoryLocation[]>('GET', '/inventario/locations'),
+  listAssignees: (): Promise<InventoryAssignee[]> =>
+    request<InventoryAssignee[]>('GET', '/inventario/assignees'),
+  createLocation: (body: {
+    code: string;
+    name: string;
+    type: 'CENTRAL_WAREHOUSE' | 'MUNICIPAL_WAREHOUSE' | 'SUPERVISOR_CUSTODY';
+    zoneId?: string;
+    municipioId?: string;
+  }): Promise<InventoryLocation> =>
+    request<InventoryLocation>('POST', '/inventario/locations', { body }),
+  updateLocation: (
+    id: string,
+    body: { name?: string; active?: boolean; inventoryEnabled?: boolean },
+  ): Promise<InventoryLocation> =>
+    request<InventoryLocation>('PATCH', `/inventario/locations/${id}`, { body }),
+  assignLocation: (
+    id: string,
+    body: {
+      userId: string;
+      supervisorId?: string;
+      role: 'CUSTODIAN' | 'RECEIVER' | 'COUNTER';
+      deviceId?: string;
+    },
+  ): Promise<unknown> => request('POST', `/inventario/locations/${id}/assignments`, { body }),
+  setMinimum: (body: { locationId: string; productId: string; quantityBase: string }): Promise<unknown> =>
+    request('PUT', '/inventario/stock/minimum', { body }),
+  listBalances: (): Promise<InventoryBalance[]> =>
+    request<InventoryBalance[]>('GET', '/inventario/balances'),
+  listMovements: (cursor?: string): Promise<{ items: InventoryMovement[]; nextCursor: string | null }> =>
+    request('GET', `/inventario/movements${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  listAlerts: (): Promise<InventoryAlert[]> =>
+    request<InventoryAlert[]>('GET', '/inventario/stock/alerts'),
+  listReviews: (): Promise<InventoryReviewCommand[]> =>
+    request<InventoryReviewCommand[]>('GET', '/inventario/commands/review'),
+  resolveCommand: (
+    id: string,
+    body: { clientCommandId: string; action: 'APPROVE' | 'DISMISS'; reason: string; locationId?: string },
+  ): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/commands/${id}/resolve`, { body }),
+  reverseMovement: (
+    id: string,
+    body: { clientCommandId: string; reason: string },
+  ): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/movements/${id}/reverse`, { body }),
+  reconciliation: (): Promise<InventoryReconciliation> =>
+    request<InventoryReconciliation>('GET', '/inventario/reconciliation'),
+  listShipments: (): Promise<InventoryShipment[]> =>
+    request<InventoryShipment[]>('GET', '/inventario/shipments'),
+  createShipment: (body: {
+    originLocationId: string;
+    destinationLocationId: string;
+    notes?: string;
+    items: Array<{ productId: string; unitVersionId: string; quantity: string }>;
+  }): Promise<InventoryShipment> => request<InventoryShipment>('POST', '/inventario/shipments', { body }),
+  updateShipment: (id: string, body: unknown): Promise<InventoryShipment> =>
+    request<InventoryShipment>('PATCH', `/inventario/shipments/${id}`, { body }),
+  dispatchShipment: (id: string, clientCommandId: string): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/shipments/${id}/dispatch`, { body: { clientCommandId } }),
+  cancelShipment: (id: string): Promise<InventoryShipment> =>
+    request<InventoryShipment>('POST', `/inventario/shipments/${id}/cancel`),
+  receiveShipment: (
+    id: string,
+    body: {
+      clientCommandId: string;
+      items: Array<{ shipmentItemId: string; receivedBase: string; damagedBase?: string; missingBase?: string }>;
+    },
+  ): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/shipments/${id}/receipts`, { body }),
+  returnShipment: (id: string, body: { clientCommandId: string; reason: string }): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/shipments/${id}/return`, { body }),
+  resolveShipmentDiscrepancy: (
+    id: string,
+    body: { clientCommandId: string; reason: string },
+  ): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/shipments/${id}/resolve-discrepancy`, { body }),
+  listCounts: (): Promise<InventoryCount[]> => request<InventoryCount[]>('GET', '/inventario/counts'),
+  getCount: (id: string): Promise<InventoryCount> => request<InventoryCount>('GET', `/inventario/counts/${id}`),
+  openCount: (locationId: string): Promise<InventoryCount> =>
+    request<InventoryCount>('POST', '/inventario/counts', { body: { locationId } }),
+  saveCountLines: (id: string, lines: Array<{ productId: string; countedBase: string }>): Promise<InventoryCount> =>
+    request<InventoryCount>('PUT', `/inventario/counts/${id}/lines`, { body: { lines } }),
+  submitCount: (id: string): Promise<InventoryCount> =>
+    request<InventoryCount>('POST', `/inventario/counts/${id}/submit`),
+  approveCount: (id: string, body: { clientCommandId: string; reason: string }): Promise<InventoryCommandResult> =>
+    request<InventoryCommandResult>('POST', `/inventario/counts/${id}/approve`, { body }),
+  importOpeningBalances: (body: {
+    clientCommandId: string;
+    sourceHash: string;
+    rows: Array<{ locationCode: string; productSku: string; quantityBase: string }>;
+  }): Promise<InventoryCommandResult & { rowCount: number; sourceHash: string }> =>
+    request('POST', '/inventario/opening-balances/import', { body }),
 };
 
 /** User row from GET /org/users (admin). Never includes passwordHash. */

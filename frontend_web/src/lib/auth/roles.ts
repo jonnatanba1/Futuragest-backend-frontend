@@ -6,8 +6,16 @@ export const OFFICE_ROLES: RoleName[] = [
   'GERENCIA',
   'TALENTO_HUMANO',
   'LIDER_OPERATIVO',
+  'COORDINADOR',
+];
+
+/** Roles with explicit inventory-domain access. COMPRAS is global only here. */
+export const INVENTORY_ROLES: RoleName[] = [
+  'SYSTEM_ADMIN',
+  'GERENCIA',
   'COMPRAS',
   'COORDINADOR',
+  'SUPERVISOR',
 ];
 
 /**

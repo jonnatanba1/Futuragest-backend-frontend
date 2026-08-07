@@ -110,7 +110,8 @@ export class PrismaInventoryCommandRepository implements InventoryCommandReposit
       assignment.supervisorId === input.actor.supervisorId &&
       assignment.validFrom <= capturedAt &&
       (assignment.validUntil === null || assignment.validUntil > capturedAt) &&
-      assignment.location.active;
+      assignment.location.active &&
+      assignment.location.inventoryEnabled;
 
     if (!assignmentValid || !assignment) {
       return this.markReview(tx, command.id, input.event.clientEventId, 'ASSIGNMENT_INVALID');
