@@ -19,6 +19,18 @@ out/
 .env.*
 !**/.env.example
 deploy/.env
+deploy/*.local
+
+# Local notes, credentials, backups and signing material
+memorias.md
+**/memorias.md
+*.pgdump
+*.dump
+*.backup
+*.jks
+*.keystore
+android/key.properties
+frontend_flutter/android/key.properties
 
 # TypeScript
 *.tsbuildinfo
