@@ -17,6 +17,7 @@ import {
   Tabs,
   Text,
   TextInput,
+  Textarea,
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -267,7 +268,7 @@ function StockEntryModal({
         <Select searchable required label="Producto" data={products.filter((item) => item.active).map((item) => ({ value: item.id, label: `${item.sku} - ${item.name}` }))} {...form.getInputProps('productId')} onChange={(value) => { form.setFieldValue('productId', value ?? ''); form.setFieldValue('unitVersionId', ''); }} />
         <Select required disabled={!product} label="Unidad" data={(product?.unitVersions ?? []).filter((unit) => !unit.validUntil).map((unit) => ({ value: unit.id, label: unit.unitCode }))} {...form.getInputProps('unitVersionId')} />
         <TextInput required label="Cantidad" inputMode="decimal" {...form.getInputProps('quantity')} />
-        <TextInput label="Nota" description="Opcional: proveedor, remision u observacion." {...form.getInputProps('note')} />
+        <Textarea label="Nota" description="Opcional: proveedor, remision u observacion." autosize minRows={3} maxRows={8} {...form.getInputProps('note')} />
         <Button type="submit" loading={entry.isPending}>Registrar ingreso</Button>
       </Stack>
     </form>
