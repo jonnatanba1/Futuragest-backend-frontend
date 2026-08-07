@@ -97,7 +97,7 @@ Permite:
 - crear productos con SKU, nombre y unidad base seleccionada de un catalogo controlado;
 - ver stock central y total municipal por cada producto;
 - activar o desactivar productos;
-- agregar versiones de unidad cuando sea necesario.
+- agregar unidades de despacho o compra cuando sea necesario; una unidad adicional indica cuantas unidades base contiene (por ejemplo, una CAJA puede equivaler a 12 UND).
 
 Los municipios, zonas, supervisores y coordinadores no se crean desde Inventario. Se reutilizan los registros maestros existentes.
 

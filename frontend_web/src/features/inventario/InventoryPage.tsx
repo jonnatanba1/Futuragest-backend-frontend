@@ -298,6 +298,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
     return !query || product.sku.toLocaleLowerCase('es-CO').includes(query) || product.name.toLocaleLowerCase('es-CO').includes(query);
   });
   const detailProduct = products.data?.find((product) => product.id === detailProductId) ?? null;
+  const unitProduct = products.data?.find((product) => product.id === unitProductId) ?? null;
 
   return (
     <QueryBoundary queries={canAdmin ? [products, locations, balances] : [products, balances]}>
@@ -317,11 +318,11 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           <ScrollArea>
             <Table striped miw={680}>
               <Table.Thead>
-                <Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th ta="right">Central</Table.Th><Table.Th ta="right">Municipios</Table.Th><Table.Th>Estado</Table.Th><Table.Th /></Table.Tr>
+                <Table.Tr><Table.Th>SKU</Table.Th><Table.Th>Producto</Table.Th><Table.Th>Unidades vigentes</Table.Th><Table.Th ta="right">Central</Table.Th><Table.Th ta="right">Municipios</Table.Th><Table.Th>Estado</Table.Th></Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {products.data?.length === 0 && <EmptyTableRow columns={7} message="No hay productos registrados." />}
-                {products.data && products.data.length > 0 && visibleProducts.length === 0 && <EmptyTableRow columns={7} message="No hay productos que coincidan con la busqueda." />}
+                {products.data?.length === 0 && <EmptyTableRow columns={6} message="No hay productos registrados." />}
+                {products.data && products.data.length > 0 && visibleProducts.length === 0 && <EmptyTableRow columns={6} message="No hay productos que coincidan con la busqueda." />}
                 {visibleProducts.map((product) => (
                   <Table.Tr key={product.id}>
                     <Table.Td>{product.sku}</Table.Td>
@@ -330,22 +331,6 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
                     <Table.Td ta="right">{quantity(centralStock[product.id] ?? 0)}</Table.Td>
                     <Table.Td ta="right">{quantity(municipalStock[product.id] ?? 0)}</Table.Td>
                     <Table.Td><Badge color={product.active ? 'green' : 'gray'}>{product.active ? 'Activo' : 'Inactivo'}</Badge></Table.Td>
-                    <Table.Td>
-                      {canAdmin && (
-                        <Group gap="xs" wrap="nowrap">
-                          <Button size="xs" variant="subtle" onClick={() => setUnitProductId(product.id)}>Unidad</Button>
-                          <Button
-                            size="xs"
-                            variant="subtle"
-                            color={product.active ? 'red' : 'green'}
-                            loading={updateProduct.isPending}
-                            onClick={() => updateProduct.mutate({ id: product.id, active: !product.active }, { onError: failure })}
-                          >
-                            {product.active ? 'Desactivar' : 'Activar'}
-                          </Button>
-                        </Group>
-                      )}
-                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -391,7 +376,18 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
               <Card withBorder><Text size="xs" c="dimmed">Stock central</Text><Text fw={700}>{quantity(detailProduct ? centralStock[detailProduct.id] ?? 0 : 0)}</Text></Card>
               <Card withBorder><Text size="xs" c="dimmed">Stock municipios</Text><Text fw={700}>{quantity(detailProduct ? municipalStock[detailProduct.id] ?? 0 : 0)}</Text></Card>
             </SimpleGrid>
-            {canAdmin && <Button onClick={() => { setEntryProductId(detailProduct?.id ?? null); setDetailProductId(null); setEntryOpened(true); }}>Registrar ingreso</Button>}
+            {canAdmin && detailProduct && <Group grow>
+              <Button onClick={() => { setEntryProductId(detailProduct.id); setDetailProductId(null); setEntryOpened(true); }}>Registrar ingreso</Button>
+              <Button variant="default" onClick={() => { setUnitProductId(detailProduct.id); setDetailProductId(null); }}>Agregar unidad</Button>
+              <Button
+                color={detailProduct.active ? 'red' : 'green'}
+                variant="light"
+                loading={updateProduct.isPending}
+                onClick={() => updateProduct.mutate({ id: detailProduct.id, active: !detailProduct.active }, { onError: failure })}
+              >
+                {detailProduct.active ? 'Desactivar' : 'Activar'}
+              </Button>
+            </Group>}
           </Stack>
         </Modal>
         {canAdmin && entryOpened && <StockEntryModal key={entryProductId ?? 'new-entry'} opened={entryOpened} onClose={() => { setEntryOpened(false); setEntryProductId(null); }} locations={locations.data ?? []} products={products.data ?? []} initialProductId={entryProductId ?? undefined} />}
@@ -408,17 +404,18 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
           </form>
         </Modal>
 
-        <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar versión de unidad">
+        <Modal opened={unitProductId !== null} onClose={() => setUnitProductId(null)} title="Agregar unidad">
           <form onSubmit={unitForm.onSubmit((values) => {
             if (!unitProductId) return;
             addUnit.mutate({ id: unitProductId, ...values }, {
-              onSuccess: () => { success('Unidad versionada.'); unitForm.reset(); setUnitProductId(null); }, onError: failure,
+              onSuccess: () => { success('Unidad agregada.'); unitForm.reset(); setUnitProductId(null); }, onError: failure,
             });
           })}>
             <Stack>
               <Select label="Codigo de unidad" required data={INVENTORY_UNIT_OPTIONS} {...unitForm.getInputProps('unitCode')} />
-              <TextInput label="Factor a unidad base" inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
-              <Button type="submit" loading={addUnit.isPending}>Agregar versión</Button>
+              <Text size="sm" c="dimmed">Unidad base: {unitProduct?.baseUnitCode ?? 'sin definir'}.</Text>
+              <TextInput label="Equivale a cuantas unidades base" description="Ejemplo: si la unidad base es UND y una CAJA trae 12 UND, escribi 12. Si equivale a una unidad, escribi 1." inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
+              <Button type="submit" loading={addUnit.isPending}>Agregar unidad</Button>
             </Stack>
           </form>
         </Modal>
