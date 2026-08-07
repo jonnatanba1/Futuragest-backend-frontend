@@ -51,7 +51,7 @@ async function main() {
             zoneId: municipio.zoneId,
             municipioId: municipio.id,
             active: true,
-            inventoryEnabled: false,
+            inventoryEnabled: true,
           },
         });
         locationCreated = true;

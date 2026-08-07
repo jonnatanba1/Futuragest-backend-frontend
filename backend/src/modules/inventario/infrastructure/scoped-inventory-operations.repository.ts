@@ -19,6 +19,7 @@ import {
   assertMunicipalShipmentOrigin,
   assertShipmentReceiptIdentity,
 } from '../domain/inventory-shipment-policy';
+import { determineShipmentReceiptStatus } from '../domain/shipment-receipt-status';
 import {
   InventoryOperationError,
   type AddProductUnitInput,
@@ -252,7 +253,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     amount: Prisma.Decimal,
   ): Promise<void> {
     if (amount.isZero()) return;
-    if (amount.isPositive()) {
+    if (amount.gt(0)) {
       await tx.inventoryBalance.upsert({
         where: { locationId_productId: { locationId, productId } },
         create: { locationId, productId, quantityBase: amount, version: 1 },
@@ -1249,7 +1250,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       const capturedAtUtc = new Date(input.capturedAtUtc);
       const movementIds: string[] = [];
       for (const line of parsed) {
-        if (line.received.isPositive()) {
+        if (line.received.gt(0)) {
           await this.applyBalanceDelta(
             tx,
             shipment.inTransitLocationId,
@@ -1309,17 +1310,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           lostBase: item.lostBase.plus(line?.missing ?? 0),
         };
       });
-      const hasDiscrepancy = afterItems.some(
-        (item) => item.damagedBase.isPositive() || item.lostBase.isPositive(),
-      );
-      const fullyAccounted = afterItems.every((item) =>
-        item.receivedBase.plus(item.damagedBase).plus(item.lostBase).equals(item.quantityBase),
-      );
-      const nextStatus = hasDiscrepancy
-        ? 'DISCREPANCY_REVIEW'
-        : fullyAccounted
-          ? 'RECEIVED'
-          : 'PARTIALLY_RECEIVED';
+      const nextStatus = determineShipmentReceiptStatus(afterItems);
       const result = commandResult(reserved.id, `SHIPMENT_${nextStatus}`, movementIds);
       await tx.shipmentReceipt.create({
         data: {
@@ -1375,7 +1366,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       if (!shipment.inTransitLocationId) {
         throw new InventoryOperationError('INVALID_STATE', 'Shipment has no transit location.');
       }
-      if (shipment.items.some((item) => item.damagedBase.isPositive() || item.lostBase.isPositive())) {
+      if (shipment.items.some((item) => item.damagedBase.gt(0) || item.lostBase.gt(0))) {
         throw new InventoryOperationError('DISCREPANCY_PENDING', 'Resolve discrepancies before returning a shipment.');
       }
       const reason = nonEmpty(input.reason ?? '', 'reason');
@@ -1394,7 +1385,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
       const movementIds: string[] = [];
       for (const item of shipment.items) {
         const pending = item.quantityBase.minus(item.receivedBase);
-        if (!pending.isPositive()) continue;
+        if (!pending.gt(0)) continue;
         await this.applyBalanceDelta(tx, shipment.inTransitLocationId, item.productId, pending.negated());
         await this.applyBalanceDelta(tx, shipment.originLocationId, item.productId, pending);
         const movements = await Promise.all([
@@ -1474,7 +1465,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           ['IN_TRANSIT_DAMAGE', item.damagedBase],
           ['IN_TRANSIT_LOSS', item.lostBase],
         ] as const) {
-          if (!quantity.isPositive()) continue;
+          if (!quantity.gt(0)) continue;
           await this.applyBalanceDelta(tx, shipment.inTransitLocationId, item.productId, quantity.negated());
           const movement = await tx.inventoryMovement.create({
             data: {
@@ -1676,7 +1667,7 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
             productId: line.productId,
             unitVersionId: line.unitVersionId,
             locationId: count.locationId,
-            type: difference.isPositive() ? 'COUNT_ADJUSTMENT_IN' : 'COUNT_ADJUSTMENT_OUT',
+            type: difference.gt(0) ? 'COUNT_ADJUSTMENT_IN' : 'COUNT_ADJUSTMENT_OUT',
             quantityBase: difference.abs(),
             capturedAtUtc: now,
             businessDate: colombiaBusinessDate(now),
