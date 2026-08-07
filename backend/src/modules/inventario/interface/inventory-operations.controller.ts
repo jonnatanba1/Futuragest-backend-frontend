@@ -23,6 +23,7 @@ import {
   IsEnum,
   IsInt,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -191,6 +192,9 @@ class ReceiveShipmentBody extends CommandBody {
   @IsOptional() @IsString() verificationReason?: string;
   @IsDateString() capturedAtUtc!: string;
   @IsInt() @Min(-840) @Max(840) capturedOffsetMin!: number;
+  @IsOptional() @IsNumber() @Min(-90) @Max(90) capturedLatitude?: number;
+  @IsOptional() @IsNumber() @Min(-180) @Max(180) capturedLongitude?: number;
+  @IsOptional() @IsNumber() @Min(0) capturedAccuracyM?: number;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ShipmentReceiptLineBody)
   items!: ShipmentReceiptLineBody[];
 }

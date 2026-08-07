@@ -743,6 +743,9 @@ model ShipmentReceipt {
   deviceId           String?
   capturedAtUtc      DateTime?
   capturedOffsetMin  Int?
+  capturedLatitude   Float?
+  capturedLongitude  Float?
+  capturedAccuracyM  Float?
   result             Json
   items              ShipmentReceiptItem[]
   receivedAt         DateTime              @default(now())

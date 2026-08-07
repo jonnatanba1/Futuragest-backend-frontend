@@ -113,6 +113,9 @@ export interface ReceiveShipmentInput extends ShipmentCommandInput {
   verificationReason?: string;
   capturedAtUtc: string;
   capturedOffsetMin: number;
+  capturedLatitude?: number;
+  capturedLongitude?: number;
+  capturedAccuracyM?: number;
   items: ShipmentReceiptLineInput[];
 }
 

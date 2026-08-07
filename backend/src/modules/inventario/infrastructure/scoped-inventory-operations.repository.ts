@@ -1141,6 +1141,14 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
     if (input.items.length === 0) {
       throw new InventoryOperationError('INVALID_INPUT', 'Receipt items are required.');
     }
+    const hasLatitude = input.capturedLatitude !== undefined;
+    const hasLongitude = input.capturedLongitude !== undefined;
+    if (hasLatitude !== hasLongitude || (input.capturedAccuracyM !== undefined && !hasLatitude)) {
+      throw new InventoryOperationError(
+        'INVALID_INPUT',
+        'GPS receipt evidence requires latitude and longitude together.',
+      );
+    }
     return this.transaction(async (tx) => {
       const shipment = await tx.shipment.findFirst({
         where: applyInventoryScope(actor, 'Shipment', { id }),
@@ -1196,6 +1204,9 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
         verificationReason: input.verificationReason?.trim() || undefined,
         capturedAtUtc: input.capturedAtUtc,
         capturedOffsetMin: input.capturedOffsetMin,
+        capturedLatitude: input.capturedLatitude,
+        capturedLongitude: input.capturedLongitude,
+        capturedAccuracyM: input.capturedAccuracyM,
         items: parsed.map((line) => ({
           shipmentItemId: line.item.id,
           receivedBase: line.received.toString(),
@@ -1305,6 +1316,9 @@ export class ScopedInventoryOperationsRepository implements InventoryOperationsR
           deviceId: actor.deviceId,
           capturedAtUtc,
           capturedOffsetMin: input.capturedOffsetMin,
+          capturedLatitude: input.capturedLatitude,
+          capturedLongitude: input.capturedLongitude,
+          capturedAccuracyM: input.capturedAccuracyM ?? null,
           result: asJson(result),
           items: {
             create: parsed.map((line) => ({
