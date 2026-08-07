@@ -98,7 +98,7 @@ Permite:
 - crear productos con SKU, nombre y unidad base seleccionada de un catalogo controlado;
 - ver stock central y total municipal por cada producto;
 - activar o desactivar productos;
-- agregar unidades de despacho o compra cuando sea necesario; una unidad adicional indica cuantas unidades base contiene (por ejemplo, una CAJA puede equivaler a 12 UND).
+- agregar unidades de despacho o compra cuando sea necesario; las conversiones entre gramos/kilogramos y litros/mililitros se calculan automáticamente, mientras que las presentaciones como CAJA requieren indicar cuantas unidades base contienen (por ejemplo, CAJA = 12 UND).
 
 Los municipios, zonas, supervisores y coordinadores no se crean desde Inventario. Se reutilizan los registros maestros existentes.
 

@@ -65,7 +65,7 @@ import {
   useUpdateProduct,
 } from './inventory-queries';
 import { clearInventoryCommandId, stableInventoryCommandId } from './inventory-command-id';
-import { INVENTORY_UNIT_OPTIONS } from './inventory-unit-options';
+import { automaticFactorToBase, INVENTORY_UNIT_OPTIONS } from './inventory-unit-options';
 import { availableProductIdsAtLocation, stockByProduct } from './inventory-stock';
 import {
   eligibleShipmentReceivers,
@@ -300,6 +300,7 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
   });
   const detailProduct = products.data?.find((product) => product.id === detailProductId) ?? null;
   const unitProduct = products.data?.find((product) => product.id === unitProductId) ?? null;
+  const automaticUnitFactor = unitProduct ? automaticFactorToBase(unitProduct.baseUnitCode, unitForm.values.unitCode) : null;
 
   return (
     <QueryBoundary queries={canAdmin ? [products, locations, balances] : [products, balances]}>
@@ -413,8 +414,19 @@ function MasterDataPanel({ canAdmin }: { canAdmin: boolean }) {
             });
           })}>
             <Stack>
-              <Select label="Codigo de unidad" required data={INVENTORY_UNIT_OPTIONS} {...unitForm.getInputProps('unitCode')} />
-              {unitForm.values.unitCode && <>
+              <Select
+                label="Codigo de unidad"
+                required
+                data={INVENTORY_UNIT_OPTIONS.filter((unit) => unit.value !== unitProduct?.baseUnitCode)}
+                {...unitForm.getInputProps('unitCode')}
+                onChange={(value) => {
+                  const unitCode = value ?? '';
+                  unitForm.setFieldValue('unitCode', unitCode);
+                  unitForm.setFieldValue('factorToBase', unitProduct ? automaticFactorToBase(unitProduct.baseUnitCode, unitCode) ?? '' : '');
+                }}
+              />
+              {automaticUnitFactor !== null && <Text size="sm" c="dimmed">Conversión automática: 1 {unitForm.values.unitCode} equivale a {automaticUnitFactor} {unitProduct?.baseUnitCode}.</Text>}
+              {unitForm.values.unitCode && automaticUnitFactor === null && <>
                 <Text size="sm" c="dimmed">Unidad base: {unitProduct?.baseUnitCode ?? 'sin definir'}.</Text>
                 <TextInput label="Equivale a cuantas unidades base" description="Ejemplo: si la unidad base es UND y una CAJA trae 12 UND, escribi 12. Si equivale a una unidad, escribi 1." inputMode="decimal" required {...unitForm.getInputProps('factorToBase')} />
               </>}
