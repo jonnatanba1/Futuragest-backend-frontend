@@ -9,6 +9,7 @@ import {
   Group,
   Loader,
   Modal,
+  NumberInput,
   ScrollArea,
   Select,
   SimpleGrid,
@@ -267,7 +268,17 @@ function StockEntryModal({
         <TextInput readOnly label="Bodega central" value={centralLocation ? `${centralLocation.code} - ${centralLocation.name}` : ''} description="Destino fijo de las compras y reposiciones." />
         <Select searchable required label="Producto" data={products.filter((item) => item.active).map((item) => ({ value: item.id, label: `${item.sku} - ${item.name}` }))} {...form.getInputProps('productId')} onChange={(value) => { form.setFieldValue('productId', value ?? ''); form.setFieldValue('unitVersionId', ''); }} />
         <Select required disabled={!product} label="Unidad" data={(product?.unitVersions ?? []).filter((unit) => !unit.validUntil).map((unit) => ({ value: unit.id, label: unit.unitCode }))} {...form.getInputProps('unitVersionId')} />
-        <TextInput required label="Cantidad" inputMode="decimal" {...form.getInputProps('quantity')} />
+        <NumberInput
+          required
+          label="Cantidad"
+          description="Admite hasta 6 decimales. Ejemplo: 1,5."
+          min={0.000001}
+          step={0.01}
+          decimalScale={6}
+          decimalSeparator=","
+          value={form.values.quantity}
+          onChange={(value) => form.setFieldValue('quantity', String(value).replace(',', '.'))}
+        />
         <Textarea label="Nota" description="Opcional: proveedor, remision u observacion." autosize minRows={3} maxRows={8} {...form.getInputProps('note')} />
         <Button type="submit" loading={entry.isPending}>Registrar ingreso</Button>
       </Stack>
