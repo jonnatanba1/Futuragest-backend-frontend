@@ -45,6 +45,18 @@ Apartadó y Caucasia pueden tener además su propia bodega municipal. Esta es di
 
 Cada envío municipal conserva su envío consolidado padre. Compras ve la cadena completa: creación, despacho central, recepción zonal, despacho municipal y recepción municipal. Las alertas cubren tránsito, recepción parcial, discrepancias, falta de stock y comandos pendientes de sincronización.
 
+## Dashboard de Resumen
+
+El Resumen consolida stock, alertas, envíos activos y cobertura territorial. La red se representa sobre Google Maps con un nodo accesible por municipio:
+
+- Montería se muestra como origen central.
+- Apartadó y Caucasia se muestran como puntos de distribución; cada nodo separa el saldo zonal del saldo municipal.
+- Las rutas representan Montería → bodega zonal → municipios de la zona.
+- Al seleccionar un punto se muestran existencias, SKU, alertas, envíos en camino, responsable y última actualización.
+- Las coordenadas pertenecen al maestro `Municipio`; no se geocodifican nombres en cada carga.
+- La clave web se inyecta en tiempo de ejecución mediante `GOOGLE_MAPS_API_KEY` y debe restringirse por dominio y por Maps JavaScript API. `GOOGLE_MAPS_MAP_ID` configura el estilo y los marcadores avanzados.
+- Si Google Maps no está configurado o no está disponible, el Resumen conserva una vista seleccionable de los municipios y sus indicadores; el resto del módulo no se bloquea.
+
 ## Protección offline
 
 La aplicación cifra el contexto y la cola local por usuario. Primero confirma la transacción local y luego sincroniza; reintentos idempotentes, leases y backoff impiden pérdidas o duplicados. Las salidas pendientes reservan saldo local para impedir sobreconsumo sin conexión.
