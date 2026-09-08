@@ -20,8 +20,9 @@ La etapa 1 puede comenzar sin resolver las decisiones de la etapa 2. Las demás 
 ### Progreso registrado
 
 - ✅ **U1 — Sincronización del coordinador:** backend `60a3fe3` permite `COORDINADOR` en `/inventario/sync` y `/inventario/events/status`; se agregó cobertura del evento zonal y se hicieron deterministas los fixtures de asignación y reloj. Suite focalizada: 12 suites, 96 pruebas pasando.
-- ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 99 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
-- 🔲 **U2, importación U4, U5 y U6:** sin iniciar. Las decisiones de GPS, despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
+- ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 103 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
+- 🔶 **U4 — Importación:** `fca4767` endurece hash SHA-256, filas no vacías y referencias activas/habilitadas, pero todavía no procesa las planillas XLSX ni ofrece previsualización/corte histórico.
+- 🔲 **U2, U5 y U6:** sin iniciar. Las decisiones de GPS, despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
 
 ## Punto de partida verificado
 
@@ -81,7 +82,7 @@ Prioridad: P1. Dependencias: política histórica/corte aprobada; reutilizar la 
 
 - [ ] Detectar formato por contenido: los tres archivos `.xls` suministrados son realmente OOXML. No prometer soporte de XLS binario sin implementarlo y probarlo.
 - [ ] Leer fecha, municipio, producto, existencia, ingresos, salidas, saldo y mínimo; ignorar encabezados y filas vacías de plantilla mediante reglas verificables.
-- [ ] Mapear nombres a ubicaciones y SKU existentes mediante confirmación explícita. Rechazar referencias desconocidas, inactivas o no habilitadas.
+- [x] Rechazar referencias desconocidas, inactivas o no habilitadas, y exigir un hash SHA-256 verificable. El mapeo de nombres a ubicaciones/SKU y su confirmación explícita sigue pendiente del parser.
 - [ ] Previsualizar filas válidas, errores y diferencias antes de aplicar. Validar cantidades, precisión, fechas, duplicados normalizados y la ecuación del saldo.
 - [ ] Recalcular independientemente las cantidades del formato. No ejecutar macros, fórmulas arbitrarias ni enlaces externos; limitar tamaño y filas del archivo.
 - [ ] Conservar archivo/hash, fecha fuente, actor, momento de importación y resultado. No sustituir la fecha histórica por la fecha de carga.
