@@ -21,7 +21,7 @@ La etapa 1 puede comenzar sin resolver las decisiones de la etapa 2. Las demás 
 
 - ✅ **U1 — Sincronización del coordinador:** backend `60a3fe3` permite `COORDINADOR` en `/inventario/sync` y `/inventario/events/status`; se agregó cobertura del evento zonal y se hicieron deterministas los fixtures de asignación y reloj. Suite focalizada: 12 suites, 96 pruebas pasando.
 - ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 104 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
-- 🔶 **U2 — GPS para registros:** el usuario confirmó que la ubicación es esencial para el control interno. Backend `5fb5f2f` y web `59a263d` hacen obligatorias las coordenadas y precisión en capturas móviles y recepciones, y exponen la evidencia en auditoría; faltan consolidación documental y pruebas en dispositivo real.
+- 🔶 **U2 — GPS para registros:** el usuario confirmó que la ubicación es esencial para el control interno. Backend `5fb5f2f`, web `59a263d` y móvil `7168db1` hacen obligatorias las coordenadas y precisión en capturas móviles y recepciones, y exponen la evidencia en auditoría; faltan consolidación documental y pruebas en dispositivo real.
 - 🔶 **U4 — Importación:** `fca4767` endurece hash SHA-256, filas no vacías y referencias activas/habilitadas, pero todavía no procesa las planillas XLSX ni ofrece previsualización/corte histórico.
 - 🔲 **U5 y U6:** sin iniciar. Las decisiones de despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
 
