@@ -1,6 +1,6 @@
 # Plan de implementación y cierre de Inventario
 
-Estado: U1 y consulta U3 completadas; U2, importación U4, U5 y U6 pendientes. Fecha: 8 de septiembre de 2026.
+Estado: U1 y consulta U3 completadas; U2 (política GPS) en implementación; importación U4, U5 y U6 pendientes. Fecha: 8 de septiembre de 2026.
 
 ## Objetivo
 
@@ -20,9 +20,10 @@ La etapa 1 puede comenzar sin resolver las decisiones de la etapa 2. Las demás 
 ### Progreso registrado
 
 - ✅ **U1 — Sincronización del coordinador:** backend `60a3fe3` permite `COORDINADOR` en `/inventario/sync` y `/inventario/events/status`; se agregó cobertura del evento zonal y se hicieron deterministas los fixtures de asignación y reloj. Suite focalizada: 12 suites, 96 pruebas pasando.
-- ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 103 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
+- ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 104 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
+- 🔶 **U2 — GPS para registros:** el usuario confirmó que la ubicación es esencial para el control interno. Backend `5fb5f2f` y web `59a263d` hacen obligatorias las coordenadas y precisión en capturas móviles y recepciones, y exponen la evidencia en auditoría; faltan consolidación documental y pruebas en dispositivo real.
 - 🔶 **U4 — Importación:** `fca4767` endurece hash SHA-256, filas no vacías y referencias activas/habilitadas, pero todavía no procesa las planillas XLSX ni ofrece previsualización/corte histórico.
-- 🔲 **U2, U5 y U6:** sin iniciar. Las decisiones de GPS, despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
+- 🔲 **U5 y U6:** sin iniciar. Las decisiones de despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
 
 ## Punto de partida verificado
 
@@ -53,7 +54,7 @@ Prioridad: P0 para las funcionalidades afectadas. Entregable: reglas aprobadas y
 
 | Decisión pendiente | Propuesta para validar | Consecuencia |
 | --- | --- | --- |
-| GPS de recepción | Exigirlo en API y móvil, con precisión aceptable definida por negocio; si se necesita excepción, registrarla con motivo y autorización explícita. | Mayor evidencia, pero puede impedir recepción donde no haya señal GPS. No cambiar obligatoriedad sin acuerdo. |
+| GPS de recepción | **Confirmado:** exigirlo en API y móvil para cada registro, con coordenadas y precisión capturadas; no se permite guardar sin evidencia GPS. | Mayor evidencia y control interno, pero puede impedir registros donde no haya señal o permiso de ubicación. |
 | Despacho municipal | Coordinador de la zona como regla; decidir expresamente si Compras/Administrador conserva una excepción auditada. | Exclusividad refuerza custodia; excepción facilita contingencias. |
 | Reporte frente a cierre | Entregar primero una consulta diaria recalculable; confirmar si también se necesita cierre aprobado e inmutable. | Un cierre formal requiere reglas para movimientos offline tardíos y correcciones. |
 | Historia importada | Mantener planillas históricas como referencias separadas y usar un corte aprobado para inicializar saldos. | Evita duplicar inventario; reconstruir movimientos históricos requiere evidencia adicional. |

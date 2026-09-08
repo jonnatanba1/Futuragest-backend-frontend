@@ -166,7 +166,7 @@ flowchart LR
 1. **Compras** registra entradas sin costo en la bodega central de Montería y puede consultar stock y alertas.
 2. Desde Montería se planifica lo destinado a los municipios; la distribución física pasa primero por Apartadó (Urabá) o Caucasia (Bajo Cauca).
 3. El coordinador de zona recibe el envío. Solo tras confirmarlo puede distribuir a los municipios de su zona.
-4. El supervisor asignado al municipio recibe el envío y confirma con biometría. El registro debe incluir hora/fecha, ubicación GPS cuando esté disponible, dispositivo y método/evidencia de verificación.
+4. El supervisor asignado al municipio recibe el envío y confirma con biometría. Cada registro debe incluir hora/fecha, coordenadas GPS y precisión de la captura, además de dispositivo y método/evidencia de verificación. Sin evidencia GPS no se guarda el registro.
 5. Las salidas de un supervisor reducen su saldo. No se permite despachar o registrar salida por encima del stock disponible.
 6. Cada producto conserva trazabilidad de entradas, salidas, origen/destino y saldo mediante `InventoryMovement` y `InventoryBalance`.
 
