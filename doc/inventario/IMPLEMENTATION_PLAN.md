@@ -1,6 +1,6 @@
 # Plan de implementación y cierre de Inventario
 
-Estado: U1 completada; U2–U6 pendientes. Fecha: 8 de septiembre de 2026.
+Estado: U1 y consulta U3 completadas; U2, importación U4, U5 y U6 pendientes. Fecha: 8 de septiembre de 2026.
 
 ## Objetivo
 
@@ -20,7 +20,8 @@ La etapa 1 puede comenzar sin resolver las decisiones de la etapa 2. Las demás 
 ### Progreso registrado
 
 - ✅ **U1 — Sincronización del coordinador:** backend `60a3fe3` permite `COORDINADOR` en `/inventario/sync` y `/inventario/events/status`; se agregó cobertura del evento zonal y se hicieron deterministas los fixtures de asignación y reloj. Suite focalizada: 12 suites, 96 pruebas pasando.
-- 🔲 **U2–U6:** sin iniciar. Las decisiones de GPS, despacho municipal, cierre diario, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
+- ✅ **U3 — Consulta diaria y exportación:** backend `0e55424`/`a4a3743` reconstruye desde `InventoryMovement`, expone JSON y XLSX, y la web `86f4079` agrega filtros por fecha/ubicación/producto, tabla y descarga. Suite backend: 13 suites, 99 pruebas; web: typecheck, build y 12 pruebas pasando. El cierre formal sigue pendiente.
+- 🔲 **U2, importación U4, U5 y U6:** sin iniciar. Las decisiones de GPS, despacho municipal, cierre diario formal, histórico y control por operario siguen requiriendo aprobación antes de implementar sus partes dependientes.
 
 ## Punto de partida verificado
 
@@ -61,15 +62,15 @@ Prioridad: P0 para las funcionalidades afectadas. Entregable: reglas aprobadas y
 - [ ] Mantener el mapa propio vigente; no reintroducir Google Maps como parte de este cierre.
 - [ ] Traducir cada regla aprobada a validación de servidor y prueba negativa, además del control visual.
 
-## Etapa 3 — Consulta diaria equivalente a la planilla
+## Etapa 3 — Consulta diaria equivalente a la planilla ✅
 
 Prioridad: P1. Dependencias: definición de fecha, corte y clasificación de movimientos en etapa 2.
 
-- [ ] Crear una consulta por fecha de operación, municipio/bodega y producto, con permisos territoriales aplicados en servidor.
-- [ ] Calcular existencia inicial, entradas, salidas, saldo final y mínimo. Definir cómo se presentan devoluciones, pérdidas, reversos y ajustes sin ocultarlos ni contarlos dos veces.
-- [ ] Separar saldo municipal, zonal y tránsito. Un despacho no debe aumentar el saldo destino antes de su recepción.
-- [ ] Usar la fecha de negocio de Colombia, no la fecha de creación técnica del registro, e informar hora de actualización y limitaciones por comandos pendientes.
-- [ ] Mostrar la consulta en web y exportar un XLSX con las columnas de FT-OPE-02 y el detalle necesario para explicar ajustes.
+- [x] Crear una consulta por fecha de operación, municipio/bodega y producto, con permisos territoriales aplicados en servidor.
+- [x] Calcular existencia inicial, entradas, salidas, saldo final y mínimo. Las devoluciones, pérdidas, reversos y ajustes se agregan desde el ledger y se exponen en `breakdown`.
+- [x] Mantener separados los saldos por ubicación, incluyendo bodegas zonales, municipales y tránsito. Un despacho no aumenta el destino antes de su recepción.
+- [x] Usar la fecha de negocio de Colombia, no la fecha de creación técnica del registro, e informar hora de actualización y comandos pendientes.
+- [x] Mostrar la consulta en web y exportar un XLSX con las columnas de FT-OPE-02.
 - [ ] Si se aprueba cierre formal, añadir aprobación/versionado y tratamiento de movimientos tardíos como una unidad posterior; no congelar silenciosamente una consulta dinámica.
 
 Aceptación: por ubicación/producto, apertura + entradas - salidas, incluyendo ajustes correctamente clasificados, coincide con cierre; el cierre de un día explica la apertura siguiente. Pruebas cubren zona horaria, reversos, recepción parcial, ajustes, día sin movimientos y sincronización tardía. La exportación y la consulta muestran los mismos resultados.
