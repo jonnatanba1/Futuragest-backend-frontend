@@ -1,6 +1,6 @@
 # Plan de corrección de lógica: inventario, GPS y sincronización
 
-**Estado: L0 y L1 implementadas en backend `1bca0dd`; L2–L8 pendientes. Fecha: 8 de septiembre de 2026.**
+**Estado: L0 y L1 implementadas en backend `1bca0dd`; L3 implementada en backend `9b889e6`; L2 y L4–L8 pendientes. Fecha: 8 de septiembre de 2026.**
 
 **Conclusión:** no liberar el flujo como cerrado hasta corregir idempotencia, clasificación de errores, aprobaciones y reconciliación móvil. La captura nueva exige GPS, pero esa condición todavía no se conserva de extremo a extremo. Los cinco fallos iniciales comparten dependencias; corregirlos aisladamente dejaría vías de inconsistencia.
 
@@ -22,7 +22,8 @@ Orden recomendado:
 
 - ✅ **L0 — Base segura:** el setup de integración aborta antes de limpiar, migrar o sembrar si `.env.test` no apunta exactamente a `futuragest_test`. La configuración actual apunta a `futuragest_dev`, por lo que la integración queda bloqueada hasta crear el entorno aislado. Se añadieron pruebas del guardrail.
 - ✅ **L1 — Replay y contratos:** el sync conserva el resultado de replays v1 sin GPS solo cuando pertenecen al mismo actor y coinciden con el hash canónico original; no permite crear capturas nuevas sin GPS. Errores del repositorio se propagan para reintento y comandos incompletos ya no se confunden con nuevos.
-- 🔶 **Siguiente:** L2 — clasificar resultados y errores de lote/transporte. L3–L8 siguen bloqueadas por esas garantías.
+- ✅ **L3 — Recepción atómica:** el reintento de una recepción parcial ya reproduce el resultado original antes de evaluar pendientes o alcance actual; exige coincidencia de actor, tipo, hash, comprobante y envío. GPS faltante solo puede reproducir un resultado histórico idéntico; nunca crear una recepción nueva.
+- 🔶 **Siguiente:** L2 — clasificar resultados y errores de lote/transporte. L4–L8 siguen pendientes.
 
 **Incluido:** los cinco fallos, sus dependencias verificadas y una estrategia de recuperación compatible con aplicaciones anteriores. **Fuera del cambio principal:** parser de planillas, entregas por operario, cierres diarios formales, reconstrucción histórica y cambios generales de permisos. La extensión de GPS a acciones administrativas se delimita en la sección 12; no debe quedar oculta bajo la afirmación «cada registro tiene GPS».
 
@@ -277,7 +278,7 @@ Cada unidad incluye comportamiento, regresiones y documentación, con Convention
 | L0 — Base segura ✅ | Inventariar cambios locales; conservar fixtures v1; añadir pruebas reproductoras y barreras del entorno de integración. | Ninguna. | Implementado en `1bca0dd`: la integración aborta antes de escribir si el destino no es `futuragest_test`. Revertible sin tocar datos. |
 | L1 — Replay y contratos ✅ | Separar sobre histórico/captura validada; modelar `NOT_FOUND/REPLAY/INCOMPLETE`; checks de actor y hash; mantener canonicalización v1. | L0. | Implementado en `1bca0dd`: replays idénticos no tienen efecto nuevo y los incompletos no pasan como nuevos. Validación de recurso para recepciones/resoluciones queda en L3/L4. |
 | L2 — Errores y lotes | F1, errores tipados, 5xx recuperables, conflictos por evento, respuestas parciales y códigos estables en transportes. | L1. | Fallo temporal no produce rechazo; un evento conflictivo no envenena el lote. Puede detenerse envío nuevo sin borrar cola. |
-| L3 — Recepción atómica | F2/F5/C2/C4; camino único de replay; pending bajo transacción; retry serializable acotado y separación de funciones. | L1–L2. | Caso 6/10 y carreras pasan sin duplicar recibo/movimientos. Suspender nuevas recepciones antes que volver al replay defectuoso. |
+| L3 — Recepción atómica ✅ | F2/F5/C2/C4; camino único de replay; pending bajo transacción; retry serializable acotado y separación de funciones. | L1. | Implementado en `9b889e6`: caso 6/10, replay legado sin GPS y comprobantes cerrados se validan por identidad completa antes de devolver resultados. Falta prueba de concurrencia PostgreSQL aislada en L8. |
 | L4 — Aprobación segura | F4/C1; validar GPS original, ubicación efectiva, cantidad/unidad; transición condicional y replay de resolución. | L1. | Sin GPS/fuera de scope no hay escritura; una única resolución bajo concurrencia. Se puede deshabilitar aprobación manteniendo pendientes. |
 | L5 — Evidencia y estado | F3/C3; joins de procedencia, proyección de resolución, consulta de estado para capturas/recibos, UI de impedimentos y evidencia. | L3–L4. | Captura y aprobador separados; estado converge; sin N+1/payload bruto. Retirar vista no altera ledger. |
 | L6 — Cola y snapshot | C5–C7; estados tipados, lease fencing, aislamiento de usuario, reconciliación atómica de contexto/efectos, bloqueo temporal correcto de recibos. | L2–L5. | Respuesta perdida, worker tardío, cache vieja y aprobación remota no pierden ni duplican disponibilidad. Reversión conserva DB cifrada y lectores compatibles. |
