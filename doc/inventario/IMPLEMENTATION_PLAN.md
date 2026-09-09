@@ -2,7 +2,7 @@
 
 Estado: U1 y consulta U3 completadas; U2 (política GPS) en implementación; importación U4, U5 y U6 pendientes. Fecha: 8 de septiembre de 2026.
 
-**Bloqueo de cierre:** la revisión posterior reprodujo fallos de sincronización, idempotencia, aprobación y trazabilidad GPS. L0 y L1 del [plan detallado de corrección de lógica](D:/DEV/futuragest/doc/inventario/LOGIC_REMEDIATION_PLAN.md) ya se implementaron en backend `1bca0dd` y L3 en `9b889e6`; L2 y L4–L8 siguen pendientes. Las pruebas unitarias actuales no constituyen autorización de despliegue.
+**Bloqueo de cierre:** la revisión posterior reprodujo fallos de sincronización, idempotencia, aprobación y trazabilidad GPS. L0–L4 del [plan detallado de corrección de lógica](D:/DEV/futuragest/doc/inventario/LOGIC_REMEDIATION_PLAN.md) ya se implementaron en backend (`1bca0dd`, `9b889e6`, `1859731`, `b2d6a0e`, `b5fd9dc`) y Flutter (`6af27f2`); L5–L8 siguen pendientes. Las pruebas unitarias actuales no constituyen autorización de despliegue.
 
 ## Objetivo
 
@@ -141,4 +141,4 @@ Registrar por unidad los comandos ejecutados, sus resultados, escenario funciona
 
 ## Siguiente paso
 
-Continuar con L2 del [plan de corrección de lógica](D:/DEV/futuragest/doc/inventario/LOGIC_REMEDIATION_PLAN.md); U1, L0, L1 y L3 ya están implementadas. Resolver las decisiones de negocio restantes una por una; este plan no constituye su aprobación ni autoriza producción.
+Continuar con L5 del [plan de corrección de lógica](D:/DEV/futuragest/doc/inventario/LOGIC_REMEDIATION_PLAN.md); U1 y L0–L4 ya están implementadas. Resolver las decisiones de negocio restantes una por una; este plan no constituye su aprobación ni autoriza producción.
