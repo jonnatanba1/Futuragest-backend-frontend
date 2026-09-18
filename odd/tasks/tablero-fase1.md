@@ -51,7 +51,7 @@ Cero tecnicismos visibles: nada de snapshot, conciliación, validadas, breakdown
 - Assess acotado `HEAD~1 --committed-only` + spot check del parent
 
 ## Progress
-- 2026-09-18: F1..F6 DONE y verificados (writer + spot parent; assess medium). Commit frontend_web 864d8eb (+902/-86, 4 files). Super-repo en `feat/tablero-dedup-extras-tardes`, pointer bump pendiente.
+- 2026-09-18: F1..F6 DONE, verificados y pusheados (submódulos + rama). Commit frontend_web 864d8eb.
 
 ## Verification evidence
 - Writer: dashboard+novedades 268/268, typecheck clean, eslint clean en tocados.
