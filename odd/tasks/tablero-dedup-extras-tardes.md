@@ -48,6 +48,7 @@ User: "procede con esta propuesta" (2026-09-17). Incluye P1-P4 arriba. No incluy
 - [x] ODD-2 P2 Tardes visibles (card hoy con `lateArrivalsCount` + modal propio con `novedadTardanzaLabel`, timezone IANA via `toWorkDate`, `0` vs `—` en error) — checks: dashboard 186/186, typecheck clean, lint clean en files tocados. Commit: d752a56 (submodule).
 - [x] ODD-3 P3 Extras honestos (4 numeros solicitadas/autorizadas/validadas/pagables-snapshot, sin `?? hours`, PENDIENTES/SIN_AUTORIZACION con filtro) — checks: dashboard 207 + novedades 39 verdes, typecheck clean, lint clean en 5 files. Commit: a94350b (submodule).
 - [x] ODD-4 P4 Contrato Fase 4 (6 campos en DTO con Swagger, ausente sigue ausente, tests de contrato) — checks: spec 21/21, typecheck clean. Commit: 0fa05a2 (backend submodule).
+- [x] ODD-5 Tarjeta Horas extra ancha (prop `wide` + `.fg-insight-card-wide` span 2, fallback 1 col en móvil, test de regresión) — checks: dashboard 208/208, typecheck clean, eslint clean. Commit: 135d498 (frontend_web).
 
 ## Acceptance criteria
 - Una sola card Cobertura hoy; una sola card Extras con `X autorizadas · Y validadas` y estado sin-datos vs 0.
@@ -61,16 +62,16 @@ User: "procede con esta propuesta" (2026-09-17). Incluye P1-P4 arriba. No incluy
 - Estructura: readback de archivos tocados
 
 ## Progress
-- 2026-09-17: ODD-1..ODD-4 DONE y verificados. Running: ~1663 authored lines. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b; backend 0fa05a2. Super-repo en `feat/tablero-dedup-extras-tardes`, pointer bumps pendientes (decision del usuario).
+- 2026-09-17: ODD-1..ODD-5 DONE y verificados. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b, 135d498; backend 0fa05a2. Super-repo en `feat/tablero-dedup-extras-tardes`; push del ODD-5 pendiente (decision del usuario).
 
 ## Verification evidence
 - ODD-1/ODD-2/ODD-3: verificado (ver entradas anteriores).
 - ODD-4 writer: spec 21/21 (18 + 3 nuevos), typecheck clean; novedades 1310 pass con 2 preexistentes probados via stash (scope-meta-guard + flake T30); eslint config roto por dep faltante (preexistente, ambiente).
 - ODD-4 parent: assess acotado `HEAD~1 --committed-only` = medium (2 paths/150 lines); spot checks: spec 21/21 + typecheck clean. Sin verificador separado (tier medium).
-- Slices stacked-to-main: #1 ODD-1 (107e0fd5+a6a227c, frontend), #2 ODD-2 (d752a56), #3 ODD-3 (a94350b), #4 ODD-4 (0fa05a2, backend). PRs los crea el usuario.
+- Slices stacked-to-main: #1 ODD-1 (107e0fd5+a6a227c, frontend), #2 ODD-2 (d752a56), #3 ODD-3 (a94350b), #4 ODD-4 (0fa05a2, backend), #5 ODD-5 (135d498, frontend). PRs los crea el usuario.
 
 ## Next step
-- Cierre: reporte final. Push/PRs/merge los decide el usuario bajo policy ordinaria (RDD off).
+- Push ODD-5 + PRs los decide el usuario bajo policy ordinaria (RDD off).
 
 ## Locator
 - File: `odd/tasks/tablero-dedup-extras-tardes.md`
