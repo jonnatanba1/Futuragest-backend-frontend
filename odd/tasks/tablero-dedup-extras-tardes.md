@@ -49,6 +49,7 @@ User: "procede con esta propuesta" (2026-09-17). Incluye P1-P4 arriba. No incluy
 - [x] ODD-3 P3 Extras honestos (4 numeros solicitadas/autorizadas/validadas/pagables-snapshot, sin `?? hours`, PENDIENTES/SIN_AUTORIZACION con filtro) — checks: dashboard 207 + novedades 39 verdes, typecheck clean, lint clean en 5 files. Commit: a94350b (submodule).
 - [x] ODD-4 P4 Contrato Fase 4 (6 campos en DTO con Swagger, ausente sigue ausente, tests de contrato) — checks: spec 21/21, typecheck clean. Commit: 0fa05a2 (backend submodule).
 - [x] ODD-5 Tarjeta Horas extra ancha (prop `wide` + `.fg-insight-card-wide` span 2, fallback 1 col en móvil, test de regresión) — checks: dashboard 208/208, typecheck clean, eslint clean. Commit: 135d498 (frontend_web).
+- [x] ODD-6 Detalle de horas extra en modal ancho (`size="lg"` → `"xl"`, test ODD-6 sobre `--modal-size`) — checks: dashboard 209/209, typecheck clean, eslint clean. Commit: de13011 (frontend_web, sin push).
 
 ## Acceptance criteria
 - Una sola card Cobertura hoy; una sola card Extras con `X autorizadas · Y validadas` y estado sin-datos vs 0.
@@ -62,7 +63,7 @@ User: "procede con esta propuesta" (2026-09-17). Incluye P1-P4 arriba. No incluy
 - Estructura: readback de archivos tocados
 
 ## Progress
-- 2026-09-17: ODD-1..ODD-5 DONE, verificados y pusheados. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b, 135d498; backend 0fa05a2; super-repo 360f29e, 1df4c59 en `feat/tablero-dedup-extras-tardes`.
+- 2026-09-17: ODD-1..ODD-6 DONE y verificados. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b, 135d498, de13011 (este último sin push); backend 0fa05a2; super-repo `feat/tablero-dedup-extras-tardes` con push pendiente del ODD-6.
 
 ## Verification evidence
 - ODD-1/ODD-2/ODD-3: verificado (ver entradas anteriores).
