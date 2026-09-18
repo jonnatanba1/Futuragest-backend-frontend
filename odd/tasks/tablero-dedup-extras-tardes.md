@@ -62,7 +62,7 @@ User: "procede con esta propuesta" (2026-09-17). Incluye P1-P4 arriba. No incluy
 - Estructura: readback de archivos tocados
 
 ## Progress
-- 2026-09-17: ODD-1..ODD-5 DONE y verificados. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b, 135d498; backend 0fa05a2. Super-repo en `feat/tablero-dedup-extras-tardes`; push del ODD-5 pendiente (decision del usuario).
+- 2026-09-17: ODD-1..ODD-5 DONE, verificados y pusheados. Commits: frontend_web 107e0fd5, a6a227c, d752a56, a94350b, 135d498; backend 0fa05a2; super-repo 360f29e, 1df4c59 en `feat/tablero-dedup-extras-tardes`.
 
 ## Verification evidence
 - ODD-1/ODD-2/ODD-3: verificado (ver entradas anteriores).
