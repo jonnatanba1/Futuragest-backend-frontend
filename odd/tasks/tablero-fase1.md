@@ -51,7 +51,12 @@ Cero tecnicismos visibles: nada de snapshot, conciliación, validadas, breakdown
 - Assess acotado `HEAD~1 --committed-only` + spot check del parent
 
 ## Progress
-- 2026-09-18: F1..F6 DONE, verificados y pusheados (submódulos + rama). Commit frontend_web 864d8eb.
+- 2026-09-18: F1..F6 + calendario DONE y verificados. Commits frontend_web: 864d8eb, e67b8c5. Super-repo en `feat/tablero-dedup-extras-tardes`, push pendiente (lo decide el usuario).
+
+## Verification evidence
+- Writer Fase 1: dashboard+novedades 268/268, typecheck clean, eslint clean.
+- Calendario: dashboard+novedades 269/269, typecheck clean, eslint clean; Modal en vez de Popover (el toggle no abría en tests); borrador local para completar el rango.
+- Assess: medium (solo cambios en tests/ejecutables); spot parent: metrics + types verdes.
 
 ## Verification evidence
 - Writer: dashboard+novedades 268/268, typecheck clean, eslint clean en tocados.
