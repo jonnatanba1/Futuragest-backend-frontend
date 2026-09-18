@@ -51,7 +51,7 @@ Cero tecnicismos visibles: nada de snapshot, conciliación, validadas, breakdown
 - Assess acotado `HEAD~1 --committed-only` + spot check del parent
 
 ## Progress
-- 2026-09-18: F1..F6 + calendario DONE y verificados. Commits frontend_web: 864d8eb, e67b8c5. Super-repo en `feat/tablero-dedup-extras-tardes`, push pendiente (lo decide el usuario).
+- 2026-09-18: F1..F6 + calendario + fix UI filtros DONE y verificados. Commits frontend_web: 864d8eb, e67b8c5, bdcb20c. Push pendiente (lo decide el usuario).
 
 ## Verification evidence
 - Writer Fase 1: dashboard+novedades 268/268, typecheck clean, eslint clean.
