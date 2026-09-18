@@ -60,9 +60,10 @@ Conectar la salida del operario con la conciliacion automatica de horas extra, a
 - 2026-09-18: F2-4 completada (metodo findClosedInRange y endpoint GET /compensacion/payout-summary; 29/29 tests controller OK, 9/9 repo OK).
 - 2026-09-18: F2-5 completada (contrato PayoutSummaryDto, query hook, integracion en overtime card detail; 63/63 tests DashboardPage OK).
 - 2026-09-18: F2-6 completada (accion de acuse de recibo en modal de tardanzas, badges 'Revisado por TH' y 'Pendiente de revisión', typecheck limpio; 169/169 metrics tests OK, 33/33 client tests OK).
-- 2026-09-18: Commits generados:
-  - Backend: `2d31c54` (`feat(backend): conciliacion automatica, acuse de tardanzas y resumen de liquidacion`)
-  - Frontend Web: `a0071e2` (`feat(tablero): snapshot de liquidacion y acuse de llegadas tarde`)
+- 2026-09-18: Commits generados y pusheados:
+  - Backend: `2d31c54` (`feat(backend): conciliacion automatica, acuse de tardanzas y resumen de liquidacion`) -> `origin/main`
+  - Frontend Web: `a0071e2` (`feat(tablero): snapshot de liquidacion y acuse de llegadas tarde`) -> `origin/main`
+  - Root: `4464a6e` (`feat(tablero): completar fase 2 conciliacion, buzon de tardanzas y liquidacion`) -> `origin/feat/tablero-dedup-extras-tardes`
 
 ## Locator
 - File: `odd/tasks/tablero-fase2.md`
