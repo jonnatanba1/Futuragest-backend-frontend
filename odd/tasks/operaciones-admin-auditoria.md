@@ -14,7 +14,7 @@ Implementar los 6 pilares de mejora operativa y administrativa aprobados:
 
 - [x] **TASK-1**: Trazabilidad del usuario aprobador de horas extras (backend join con `User`, DTOs con `approvedByName` y `approvedByRole`, visualización en web). *(Completado: backend `c53ccac`, frontend_web `0d46f78`)*
 - [x] **TASK-2**: Auto-cierre de horas extras con tolerancia de 10 minutos, cómputo estricto de horas solicitadas y marca `cerradoPor: 'SISTEMA'`. *(Completado: backend `4c9e78d`, frontend_web `b619b5c`)*
-- [ ] **TASK-3**: Módulo "Mi Perfil" en frontend web (`/perfil`), cambio de contraseña propio y visualización de perfil.
+- [x] **TASK-3**: Módulo "Mi Perfil" en frontend web (`/perfil`), cambio de contraseña propio y visualización de perfil. *(Completado: frontend_web `8c80e87`)*
 - [ ] **TASK-4**: Expansión de gestión de usuarios en administración (edición de email, reseteo de contraseña por admin, `mustChangePassword`).
 - [ ] **TASK-5**: Extracción y reporte de hardware/UUID de dispositivos en sesiones (`device_info_plus` en mobile y user-agent en web) para detección de fraude.
 - [ ] **TASK-6**: Entidad `AuditLog`, servicio/interceptor de auditoría de operaciones críticas y vista Kardex en `/admin/auditoria`.
