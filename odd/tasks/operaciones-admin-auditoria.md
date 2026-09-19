@@ -17,7 +17,7 @@ Implementar los 6 pilares de mejora operativa y administrativa aprobados:
 - [x] **TASK-3**: Módulo "Mi Perfil" en frontend web (`/perfil`), cambio de contraseña propio y visualización de perfil. *(Completado: frontend_web `8c80e87`)*
 - [x] **TASK-4**: Expansión de gestión de usuarios en administración (edición de email, reseteo de contraseña por admin, `mustChangePassword`). *(Completado: backend `49f6d94`, frontend_web `b1a72c3`)*
 - [x] **TASK-5**: Extracción y reporte de hardware/UUID de dispositivos en sesiones (`device_info_plus` en mobile y user-agent en web) para detección de fraude. *(Completado: frontend_flutter `98d5fe0`, frontend_web `86e7d68`)*
-- [ ] **TASK-6**: Entidad `AuditLog`, servicio/interceptor de auditoría de operaciones críticas y vista Kardex en `/admin/auditoria`.
+- [x] **TASK-6**: Entidad `AuditLog`, servicio/interceptor de auditoría de operaciones críticas y vista Kardex en `/admin/auditoria`. *(Completado: backend `011133e`, frontend_web `3aa2cb4`)*
 - [ ] **TASK-7**: Web Push Notifications con Service Worker (`sw.js`), VAPID en backend y suscripciones en navegador.
 
 ## Verificación Aplicable
